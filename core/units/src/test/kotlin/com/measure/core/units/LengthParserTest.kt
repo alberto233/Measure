@@ -88,7 +88,7 @@ class LengthParserTest {
         val samples = listOf(0.375, 4.0, 12.0, 148.375, 0.5, 100.125)
         for (inches in samples) {
             val original = Length.of(inches, LengthUnit.INCH)
-            val text = LengthFormatter.formatImperial(original)
+            val text = LengthFormatter.formatImperial(original, locale = java.util.Locale.ROOT)
             val reparsed = LengthParser.parseImperial(text)
             assertMetres(original.metres, reparsed)
         }
@@ -102,7 +102,9 @@ class LengthParserTest {
 
     @Test
     fun `area formats as a range when uncertain`() {
-        val result = AreaFormatter.formatRange(Area(19.0), Area(0.6), UnitSystem.METRIC)
+        val result = AreaFormatter.formatRange(
+            Area(19.0), Area(0.6), UnitSystem.METRIC, java.util.Locale.ROOT,
+        )
         assertEquals("18.4–19.6 m²", result)
     }
 }

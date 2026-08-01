@@ -33,6 +33,7 @@ record a point when tracking quality is too poor to trust.
 | [docs/FEATURES.md](docs/FEATURES.md) | The full feature list, prioritized and grouped by release |
 | [docs/TECHNICAL_DESIGN.md](docs/TECHNICAL_DESIGN.md) | Stack choices, module layout, data model, AR pipeline, export formats, testing strategy |
 | [docs/ACCURACY.md](docs/ACCURACY.md) | The core of the product: where error comes from and the twelve mitigations we apply |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | How to build and test, the environment constraints, and why every version is pinned where it is |
 
 ## Reading order
 

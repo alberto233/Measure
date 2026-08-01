@@ -26,6 +26,8 @@ import com.measure.core.units.AreaFormatter
 import com.measure.core.units.Length
 import com.measure.core.units.LengthFormatter
 import com.measure.core.units.UnitSystem
+import java.util.Date
+import java.util.Locale
 
 /**
  * The capability gate, and for now the whole app.
@@ -51,6 +53,12 @@ class MainActivity : Activity() {
     private var userRequestedInstall = true
 
     private var pendingRecheck: Runnable? = null
+
+    /**
+     * Stamped onto each report. The checks are deterministic, so without a visible
+     * change every re-run looks identical and the button appears dead.
+     */
+    private var runCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,6 +96,7 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         cancelPendingRecheck()
+        runCount++
 
         val availability = try {
             ArCoreApk.getInstance().checkAvailability(this)
@@ -151,6 +160,9 @@ class MainActivity : Activity() {
     }
 
     private fun deviceSection(): String = buildString {
+        val stamp = java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        appendLine("Check #$runCount at $stamp")
+        appendLine()
         appendLine("Device")
         appendLine("  ${Build.MANUFACTURER} ${Build.MODEL}")
         appendLine("  Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
@@ -203,7 +215,10 @@ class MainActivity : Activity() {
                 appendLine("  Wall $index: ${LengthFormatter.formatMetric(Length(edge.length))}")
             }
             appendLine("  Area: ${AreaFormatter.format(solution.area, UnitSystem.METRIC)} (true 20 m²)")
-            appendLine("  Misclosure: ${"%.1f".format(solution.closure.relativeError * 100)}% of perimeter")
+            val misclosure = String.format(
+                Locale.getDefault(), "%.1f", solution.closure.relativeError * 100,
+            )
+            appendLine("  Misclosure: $misclosure% of perimeter")
             append("  Reliable: ${yesNo(solution.isReliable)}")
         }
     } catch (error: Throwable) {
