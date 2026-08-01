@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
@@ -275,7 +276,7 @@ class MainActivity : Activity() {
         measureButton.text = if (canMeasure) "Start measuring" else "Measuring unavailable"
 
         clearCrashButton.visibility =
-            if (CrashLog.read(this) != null) android.view.View.VISIBLE else android.view.View.GONE
+            if (CrashLog.read(this) != null) View.VISIBLE else View.GONE
 
         when {
             availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ||
@@ -321,7 +322,15 @@ class MainActivity : Activity() {
 
     // --- layout -------------------------------------------------------------------
 
-    private fun buildLayout(): ScrollView {
+    /**
+     * A scrolling report with a **fixed button bar underneath**.
+     *
+     * The buttons used to sit inside the scroll region, which put the primary action
+     * above a report long enough to need scrolling: it slid under the title bar and its
+     * label became unreadable. Actions that are always available should always be
+     * visible, and the bottom of the screen is also where a thumb already is.
+     */
+    private fun buildLayout(): LinearLayout {
         val padding = dp(20)
 
         val title = TextView(this).apply {
@@ -338,55 +347,68 @@ class MainActivity : Activity() {
             setTextIsSelectable(true)
         }
 
-        actionButton = Button(this).apply {
-            text = "Re-run checks"
-            setPadding(0, dp(16), 0, 0)
-        }
-
         measureButton = Button(this).apply {
             text = "Start measuring"
             setOnClickListener { startActivity(Intent(this@MainActivity, CaptureActivity::class.java)) }
         }
 
+        actionButton = Button(this).apply {
+            text = "Re-run checks"
+        }
+
         clearCrashButton = Button(this).apply {
             text = "Clear crash report"
-            visibility = android.view.View.GONE
+            visibility = View.GONE
             setOnClickListener {
                 CrashLog.clear(this@MainActivity)
                 refresh()
             }
         }
 
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(padding, padding, padding, padding)
-            addView(title)
+        val scrollingReport = ScrollView(this).apply {
             addView(
-                measureButton,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { bottomMargin = dp(20) },
-            )
-            addView(reportView)
-            addView(
-                actionButton,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(24) },
-            )
-            addView(
-                clearCrashButton,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(8) },
+                LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(padding, padding, padding, padding)
+                    addView(title)
+                    addView(reportView)
+                },
             )
         }
 
-        return ScrollView(this).apply { addView(column) }
+        val buttonBar = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(padding, dp(12), padding, padding)
+            addView(measureButton, barParams())
+            addView(actionButton, barParams(topMargin = dp(8)))
+            addView(clearCrashButton, barParams(topMargin = dp(8)))
+        }
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(
+                scrollingReport,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    0,
+                    // The report absorbs all the spare height; the bar keeps its own.
+                    1f,
+                ),
+            )
+            addView(
+                buttonBar,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
     }
+
+    private fun barParams(topMargin: Int = 0) = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+    ).apply { this.topMargin = topMargin }
 
     private fun dp(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()

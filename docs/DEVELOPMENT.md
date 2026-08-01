@@ -126,10 +126,29 @@ version catalog for that reason. Configure Kotlin via a top-level `kotlin { comp
 block; `android { kotlinOptions { … } }` was removed in AGP 9.
 
 The Compose compiler plugin is the one exception to "Android modules apply only AGP":
-`:feature:capture` applies `org.jetbrains.kotlin.plugin.compose` as well, because AGP
-demands it. It loads cleanly because it is a *compiler* plugin — it hooks into AGP's own
-Kotlin compiler rather than contributing a Gradle plugin that needs AGP's classes — which
-is exactly why the version has to match that compiler and not the `kotlin` pin.
+every module with Compose code applies `org.jetbrains.kotlin.plugin.compose` as well,
+because AGP demands it. It loads cleanly because it is a *compiler* plugin — it hooks
+into AGP's own Kotlin compiler rather than contributing a Gradle plugin that needs AGP's
+classes — which is exactly why the version has to match that compiler and not the
+`kotlin` pin.
+
+> **Every module containing a `@Composable` needs the plugin and `buildFeatures.compose`,
+> including one whose only Compose code is a single `setContent { }` call.**
+>
+> This cost an evening. `:app` had neither, on the reasoning that the composables all
+> live in `:feature:capture`. But `setContent` takes a composable lambda, so `:app`
+> contained Compose code after all. Without the plugin the Kotlin compiler still
+> type-checks that lambda perfectly happily and then emits it **untransformed** — a plain
+> `Function0` instead of the `Function2` the Compose runtime expects, since a composable
+> lambda carries a `Composer` and a changed-flags int.
+>
+> Nothing fails at build time. It fails on the device, as
+> `NoSuchMethodError: No static method setContent$default(…Function0…)`, the instant the
+> activity starts. AGP only enforces the plugin when `buildFeatures.compose = true`, so a
+> module that forgets both gets no warning at all.
+>
+> To check a suspect module: `javap -c` the class and look at the `setContent$default`
+> descriptor. `Function2` is correct; `Function0` means the plugin did not run.
 
 ## 4a. Module map
 

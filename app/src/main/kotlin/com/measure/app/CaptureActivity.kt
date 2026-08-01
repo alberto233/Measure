@@ -51,11 +51,15 @@ class CaptureActivity : ComponentActivity() {
         val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }
         setContentView(
             ScrollView(this).apply {
+                // The window is already edge to edge by this point, so without this the
+                // first lines of the trace render underneath the status bar clock.
+                fitsSystemWindows = true
                 addView(
                     TextView(this@CaptureActivity).apply {
                         typeface = Typeface.MONOSPACE
                         setTextIsSelectable(true)
-                        setPadding(32, 32, 32, 32)
+                        val pad = (16 * resources.displayMetrics.density).toInt()
+                        setPadding(pad, pad, pad, pad)
                         text = "Capture screen failed to start\n\n$trace"
                     },
                 )

@@ -3,6 +3,13 @@
 // applying it fails the build outright.
 plugins {
     alias(libs.plugins.android.application)
+    // Required in *every* module containing a @Composable, including this one, whose
+    // only Compose code is a single setContent call. Without it the Kotlin compiler
+    // still type-checks the composable lambda but emits it untransformed, as a plain
+    // Function0 rather than the Function2 the Compose runtime expects — which links to
+    // nothing and throws NoSuchMethodError the moment the activity starts. Nothing
+    // fails at build time, so the rule is: composables anywhere, plugin here.
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -21,6 +28,10 @@ android {
         release {
             isMinifyEnabled = false
         }
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
