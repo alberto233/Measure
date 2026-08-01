@@ -40,3 +40,64 @@ jobs:
             core/*/build/reports/tests/
             core/*/build/test-results/
           retention-days: 7
+
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The Android SDK is preinstalled on GitHub runners. It is not reachable from the
+      # development container, whose egress policy blocks dl.google.com, so this job is
+      # where Android code gets compiled at all.
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Stage the APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk measure-dev.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: measure-dev-apk
+          path: measure-dev.apk
+          retention-days: 14
+
+      # Published to a rolling prerelease so the APK has a stable, unauthenticated
+      # download URL. The repository is public, so this link installs straight from a
+      # phone browser with no login and no zip to unpack:
+      #
+      #   https://github.com/${{ github.repository }}/releases/download/dev/measure-dev.apk
+      - name: Publish rolling dev build
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTES="Debug build of \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA:0:7}\`.
+
+          Install straight from your phone: tap the APK below. You will need to allow
+          installs from unknown sources for your browser the first time.
+
+          Debug-signed, so this cannot be published to the Play Store as-is."
+
+          if gh release view dev >/dev/null 2>&1; then
+            gh release upload dev measure-dev.apk --clobber
+            gh release edit dev --notes "$NOTES"
+          else
+            gh release create dev measure-dev.apk \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Dev build (rolling)" \
+              --notes "$NOTES"
+          fi

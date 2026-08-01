@@ -32,3 +32,5 @@ rootProject.name = "Measure"
 // free of any Android dependency so they can be built and unit tested on the JVM.
 include(":core:units")
 include(":core:geometry")
+
+include(":app")
