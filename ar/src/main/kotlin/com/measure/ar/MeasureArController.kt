@@ -449,6 +449,11 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         if (samples.size < config.targetFrames && burstFramesRemaining > 0) return
 
         burst = null
+        // A second tap can land in the one-frame window before `sampling` is published
+        // and the capture button disables itself. Clearing the request here stops that
+        // stray tap from immediately starting another burst and placing a point the user
+        // never asked for.
+        captureRequested.set(false)
         _outcomes.tryEmit(PointAggregator.aggregate(samples, config))
     }
 
