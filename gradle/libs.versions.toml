@@ -1,7 +1,10 @@
 [versions]
 agp = "9.3.0"
 arcore = "1.54.0"
-kotlin = "2.4.10"
+# Capped by AGP 9.3, whose built-in Kotlin compiler is on the 2.2 line and reads class
+# metadata up to version 2.3.0. Kotlin 2.4.x emits 2.4.0 metadata, which makes the core
+# modules unreadable from :app. 2.3.21 is the newest that stays within range.
+kotlin = "2.3.21"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerialization = "1.9.0"
 junit5 = "5.11.4"
