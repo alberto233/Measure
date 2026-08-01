@@ -65,7 +65,7 @@ class MainActivity : Activity() {
 
     override fun onPause() {
         super.onPause()
-        pendingRecheck?.let(handler::removeCallbacks)
+        cancelPendingRecheck()
     }
 
     override fun onRequestPermissionsResult(
@@ -79,8 +79,15 @@ class MainActivity : Activity() {
 
     // --- report -------------------------------------------------------------------
 
+    /** Written out rather than as `handler::removeCallbacks`, which is overloaded. */
+    private fun cancelPendingRecheck() {
+        val scheduled = pendingRecheck ?: return
+        handler.removeCallbacks(scheduled)
+        pendingRecheck = null
+    }
+
     private fun refresh() {
-        pendingRecheck?.let(handler::removeCallbacks)
+        cancelPendingRecheck()
 
         val availability = try {
             ArCoreApk.getInstance().checkAvailability(this)

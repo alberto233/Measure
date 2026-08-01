@@ -62,7 +62,20 @@ jobs:
       # development container, whose egress policy blocks dl.google.com, so this job is
       # where Android code gets compiled at all.
       - name: Build debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleDebug --console=plain 2>&1 | tee /tmp/build.log
+
+      # Kotlin prints diagnostics before the failure marker, and a long Gradle stack
+      # trace then buries them. Anyone reading only the end of the log — including
+      # tooling that can fetch just the tail — would never see the actual error, so
+      # reprint them last.
+      - name: Surface compiler errors
+        if: failure()
+        run: |
+          echo "════════ COMPILER DIAGNOSTICS ════════"
+          grep -E "^e: |^w: |error:" /tmp/build.log | head -80 || echo "(no diagnostics matched)"
+          echo "════════ END DIAGNOSTICS ════════"
 
       - name: Stage the APK
         run: cp app/build/outputs/apk/debug/app-debug.apk measure-dev.apk
