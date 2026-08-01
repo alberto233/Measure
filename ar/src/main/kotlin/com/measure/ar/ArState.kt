@@ -1,6 +1,7 @@
 package com.measure.ar
 
 import com.measure.core.geometry.Vec3
+import com.measure.core.geometry.capture.FloorCandidate
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.RangeAdvice
@@ -26,6 +27,29 @@ data class ArFailure(
     val detail: String? = null,
     val recoverable: Boolean = true,
 )
+
+/** Which kind of capture the screen is doing. */
+enum class CaptureMode { DISTANCE, ROOM }
+
+/**
+ * The dominant floor, once one has been found — docs/ACCURACY.md M2.
+ *
+ * Room corners are projected onto this single height, which removes all vertical jitter
+ * from the plan, guarantees the polygon is genuinely planar so its area is well defined,
+ * and turns a 3D estimation problem into the 2D one the constraint solver expects.
+ */
+data class FloorState(
+    val height: Double,
+    val area: Double,
+    val planeCount: Int,
+) {
+    val isEstablished: Boolean get() = area >= com.measure.core.geometry.capture.FloorSelector.ESTABLISHED_AREA
+
+    companion object {
+        fun from(candidate: FloorCandidate) =
+            FloorState(candidate.height, candidate.area, candidate.planeCount)
+    }
+}
 
 /** Where the reticle is currently pointing, if anywhere. */
 data class ReticleTarget(
@@ -75,6 +99,7 @@ data class ArUiState(
     val sampling: SamplingProgress? = null,
     val preview: MeasurementPreview? = null,
     val anchors: List<ScreenAnchor> = emptyList(),
+    val floor: FloorState? = null,
     val failure: ArFailure? = null,
 ) {
     /** True when a tap should be allowed to start a sample burst. */
@@ -84,6 +109,14 @@ data class ArUiState(
             target != null &&
             rangeAdvice != RangeAdvice.TOO_CLOSE &&
             sampling == null
+
+    /**
+     * Room capture additionally needs a floor to project onto, so it is gated harder
+     * than a one-off distance. Refusing until the floor is established is the difference
+     * between a plan and a scatter of points at slightly different heights.
+     */
+    val canCaptureCorner: Boolean
+        get() = canCapture && floor?.isEstablished == true
 }
 
 /** One committed measurement, in the form the renderer needs. */
@@ -98,9 +131,14 @@ data class ArSegment(val id: Long, val from: Vec3, val to: Vec3)
  * crosses the thread boundary.
  */
 data class ArScene(
+    val captureMode: CaptureMode = CaptureMode.DISTANCE,
     val segments: List<ArSegment> = emptyList(),
     val pendingAnchor: Vec3? = null,
     val mode: MeasurementMode = MeasurementMode.FREE,
+    /** Room corners in order, already projected onto the floor plane. */
+    val roomCorners: List<Vec3> = emptyList(),
+    /** True once the perimeter has been closed and there is nothing left to add. */
+    val roomClosed: Boolean = false,
     val showPlanes: Boolean = true,
     val samplingConfig: SamplingConfig = SamplingConfig(),
 ) {

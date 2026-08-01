@@ -30,6 +30,8 @@ import com.measure.ar.render.RibbonRenderer
 import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.CaptureOutcome
 import com.measure.core.geometry.capture.CaptureRejection
+import com.measure.core.geometry.capture.FloorSelector
+import com.measure.core.geometry.capture.PlaneObservation
 import com.measure.core.geometry.capture.PointAggregator
 import com.measure.core.geometry.capture.PointSample
 import com.measure.core.geometry.capture.RangeAdvice
@@ -283,7 +285,15 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
     /** Ask for a sample burst. Ignored unless the session is in a state to honour it. */
     fun requestCapture() {
-        if (!_state.value.canCapture) return
+        val state = _state.value
+        // Room capture is gated harder: without an established floor there is nothing
+        // to project the corner onto. Checked here as well as in the UI, because the
+        // button is not the only thing that can ask.
+        val allowed = when (scene.captureMode) {
+            CaptureMode.ROOM -> state.canCaptureCorner
+            CaptureMode.DISTANCE -> state.canCapture
+        }
+        if (!allowed) return
         captureRequested.set(true)
     }
 
@@ -408,26 +418,45 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             cameraPose.tz().toDouble(),
         )
 
-        val hit = hitTestCentre(frame)
         val currentScene = scene
+        val floor = findFloor(session)
 
-        // The moving end of the rubber-band line, constrained by the active mode.
-        val anchor = currentScene.pendingAnchor
-        val constrained = if (anchor != null && hit != null) {
+        // In room mode every corner is pulled onto the one floor plane before it is
+        // used for anything — sampling, preview, drawing — so what the user sees while
+        // aiming is exactly what gets recorded (docs/ACCURACY.md M2).
+        val hit = hitTestCentre(frame)?.let { raw ->
+            if (currentScene.captureMode == CaptureMode.ROOM && floor?.isEstablished == true) {
+                raw.copy(position = Vec3(raw.position.x, floor.height, raw.position.z))
+            } else {
+                raw
+            }
+        }
+
+        // The fixed end of the rubber-band line: the placed point in distance mode, the
+        // last corner in room mode.
+        val anchor = when (currentScene.captureMode) {
+            CaptureMode.DISTANCE -> currentScene.pendingAnchor
+            CaptureMode.ROOM -> if (currentScene.roomClosed) null else currentScene.roomCorners.lastOrNull()
+        }
+
+        // Level and plumb apply to a free-standing distance. A room corner is already
+        // constrained, by the floor.
+        val constrained = if (anchor != null && hit != null && currentScene.captureMode == CaptureMode.DISTANCE) {
             currentScene.mode.constrain(anchor, hit.position)
         } else {
             null
         }
+        val movingEnd = constrained?.position ?: hit?.position.takeIf { anchor != null }
 
         collectBurstSample(hit, tracking.quality)
 
-        drawScene(session, currentScene, cameraPosition, anchor, constrained?.position, hit?.position)
+        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, hit?.position)
 
-        val preview = if (anchor != null && constrained != null) {
+        val preview = if (anchor != null && movingEnd != null) {
             MeasurementPreview(
-                lengthMetres = anchor.distanceTo(constrained.position),
-                correction = constrained.correction,
-                correctionIsNotable = constrained.isNotable,
+                lengthMetres = anchor.distanceTo(movingEnd),
+                correction = constrained?.correction ?: 0.0,
+                correctionIsNotable = constrained?.isNotable ?: false,
             )
         } else {
             null
@@ -437,8 +466,36 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             tracking = tracking,
             target = hit?.let { ReticleTarget(it.position, it.range, it.source) },
             preview = preview,
-            anchors = screenAnchors(currentScene, anchor, constrained?.position),
+            anchors = screenAnchors(currentScene, anchor, movingEnd),
+            floor = floor,
         )
+    }
+
+    /**
+     * Re-derives the dominant floor every frame rather than latching it.
+     *
+     * ARCore keeps refining planes as the user walks, and a floor latched from the first
+     * two seconds of a session is latched from its worst two seconds. The selection is
+     * cheap and stable — it is dominated by the largest surface, which does not flicker
+     * once found — so recomputing costs nothing and tracks the improving estimate.
+     */
+    private fun findFloor(session: Session): FloorState? {
+        val observations = try {
+            session.getAllTrackables(Plane::class.java)
+                .filter { it.trackingState == TrackingState.TRACKING }
+                .map { plane ->
+                    PlaneObservation(
+                        id = plane.hashCode().toLong(),
+                        height = plane.centerPose.ty().toDouble(),
+                        area = (plane.extentX * plane.extentZ).toDouble(),
+                        isUpwardHorizontal = plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING,
+                        isSubsumed = plane.subsumedBy != null,
+                    )
+                }
+        } catch (error: Throwable) {
+            return null
+        }
+        return FloorSelector.select(observations)?.let(FloorState::from)
     }
 
     private fun assessTracking(session: Session, camera: Camera, frame: Frame): TrackingStatus {
@@ -545,8 +602,31 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
         val ribbonWidth = RibbonRenderer.widthFactorFor(projectionMatrix, viewportHeight, LINE_WIDTH_PX)
 
-        val committed = scene.segments.map { it.from to it.to }
+        val committed = when (scene.captureMode) {
+            CaptureMode.DISTANCE -> scene.segments.map { it.from to it.to }
+            CaptureMode.ROOM -> scene.roomCorners.zipWithNext() +
+                // The closing wall only exists once the loop is shut.
+                if (scene.roomClosed && scene.roomCorners.size >= 3) {
+                    listOf(scene.roomCorners.last() to scene.roomCorners.first())
+                } else {
+                    emptyList()
+                }
+        }
         ribbonRenderer.draw(committed, viewProjection, cameraPosition, MEASURED, ribbonWidth)
+
+        // While the loop is still open, show where it would close. Seeing the room shut
+        // itself is what tells the user they have walked far enough.
+        if (scene.captureMode == CaptureMode.ROOM && !scene.roomClosed && scene.roomCorners.size >= 2) {
+            val start = scene.roomCorners.first()
+            val end = previewEnd ?: scene.roomCorners.last()
+            ribbonRenderer.draw(
+                listOf(end to start),
+                viewProjection,
+                cameraPosition,
+                CLOSING,
+                ribbonWidth * 0.6f,
+            )
+        }
 
         if (anchor != null && previewEnd != null) {
             ribbonRenderer.draw(
@@ -558,8 +638,18 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             )
         }
 
-        val endpoints = scene.segments.flatMap { listOf(it.from, it.to) }
+        val endpoints = when (scene.captureMode) {
+            CaptureMode.DISTANCE -> scene.segments.flatMap { listOf(it.from, it.to) }
+            CaptureMode.ROOM -> scene.roomCorners
+        }
         markerRenderer.draw(endpoints, viewProjection, MEASURED, MARKER_SIZE_PX)
+
+        // The first corner is the one the user has to come back to, so it is marked out.
+        if (scene.captureMode == CaptureMode.ROOM && !scene.roomClosed) {
+            scene.roomCorners.firstOrNull()?.let {
+                markerRenderer.draw(listOf(it), viewProjection, START_CORNER, MARKER_SIZE_PX * 1.35f)
+            }
+        }
 
         if (anchor != null) {
             markerRenderer.draw(listOf(anchor), viewProjection, PENDING, MARKER_SIZE_PX)
@@ -574,7 +664,28 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     }
 
     private fun screenAnchors(scene: ArScene, anchor: Vec3?, previewEnd: Vec3?): List<ScreenAnchor> {
-        val anchors = ArrayList<ScreenAnchor>(scene.segments.size + 1)
+        val anchors = ArrayList<ScreenAnchor>(scene.segments.size + scene.roomCorners.size + 1)
+
+        if (scene.captureMode == CaptureMode.ROOM) {
+            // Ids are wall indices, which the view model resolves against the same
+            // corner list it pushed, so the two cannot disagree.
+            val walls = scene.roomCorners.zipWithNext() +
+                if (scene.roomClosed && scene.roomCorners.size >= 3) {
+                    listOf(scene.roomCorners.last() to scene.roomCorners.first())
+                } else {
+                    emptyList()
+                }
+            walls.forEachIndexed { index, (from, to) ->
+                project(midpoint(from, to))?.let { anchors += ScreenAnchor(index.toLong(), it[0], it[1]) }
+            }
+            if (anchor != null && previewEnd != null) {
+                project(midpoint(anchor, previewEnd))?.let {
+                    anchors += ScreenAnchor(ArScene.PREVIEW_ANCHOR_ID, it[0], it[1])
+                }
+            }
+            return anchors
+        }
+
         scene.segments.forEach { segment ->
             val midpoint = midpoint(segment.from, segment.to)
             project(midpoint)?.let { anchors += ScreenAnchor(segment.id, it[0], it[1]) }
@@ -615,6 +726,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         target: ReticleTarget?,
         preview: MeasurementPreview?,
         anchors: List<ScreenAnchor>,
+        floor: FloorState? = null,
     ) {
         val quantisedTarget = target?.copy(range = quantise(target.range, RANGE_STEP))
         val quantisedPreview = preview?.copy(
@@ -632,6 +744,11 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                 sampling = sampling,
                 preview = quantisedPreview,
                 anchors = anchors,
+                // Quantised like everything else, so a settled floor stops republishing.
+                floor = floor?.copy(
+                    height = quantise(floor.height, RANGE_STEP),
+                    area = quantise(floor.area, AREA_STEP),
+                ),
             )
         }
     }
@@ -675,9 +792,12 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         /** Publication granularity: half a centimetre of range, one millimetre of length. */
         const val RANGE_STEP = 0.005
         const val LENGTH_STEP = 0.001
+        const val AREA_STEP = 0.25
 
         val MEASURED = GlColour.of(0xFFFFFF, 0.95f)
         val PENDING = GlColour.of(0x2ED3B7, 0.95f)
         val RETICLE = GlColour.of(0xFFD166, 0.9f)
+        val CLOSING = GlColour.of(0xFFD166, 0.5f)
+        val START_CORNER = GlColour.of(0xFF6B6B, 0.95f)
     }
 }

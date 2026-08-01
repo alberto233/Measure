@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.measure.ar.CaptureMode
 import com.measure.core.geometry.capture.MeasurementMode
 
 /** Free / Level / Plumb. Three states, so a segmented control beats a dropdown. */
@@ -49,6 +50,37 @@ internal fun ModeSelector(
                     .clickable { onSelect(mode) }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 color = if (active) Color(0xFF06231F) else CaptureColours.OnScrimMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/** Distance versus room. The top-level choice about what is being captured. */
+@Composable
+internal fun CaptureModeSelector(
+    selected: CaptureMode,
+    onSelect: (CaptureMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(CaptureColours.Scrim)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        CaptureMode.entries.forEach { mode ->
+            val active = mode == selected
+            Text(
+                text = if (mode == CaptureMode.DISTANCE) "Distance" else "Room",
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (active) CaptureColours.OnScrim else Color.Transparent)
+                    .clickable { onSelect(mode) }
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+                color = if (active) Color(0xFF14181C) else CaptureColours.OnScrimMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )

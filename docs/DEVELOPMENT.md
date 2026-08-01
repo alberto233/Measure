@@ -11,15 +11,18 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry` | Implemented, 95 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
-| `:feature:capture` | M1 capture screen — reticle, planes, point-to-point, modes |
+| `:feature:capture` | M1 capture screen, plus M3 room capture — minimap, closure, solved plan |
 | `:app` | Capability gate, which launches the capture screen once the device passes |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M1 field testing on the A36, then M3 room capture |
+| Next | M3 field testing, then M4 persistence |
 
-**M1 is implemented and compiles; it has not yet been validated on the handset.** The
-numbers it produces are governed by thresholds in `:core:geometry`'s `capture` package
-(sampling dispersion limit, range bands, tracking-quality cut-offs) which were chosen from
-the analysis in `docs/ACCURACY.md` and want tuning against real measurements.
+**M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
+measuring all work on hardware, and a short measurement matched a tape. The thresholds
+were retuned off that session — see §8 for what is still a guess.
+
+**M3 is implemented but not yet validated on hardware.** Floor lock, corner-by-corner
+capture, the live minimap and the full correction pipeline are wired up; nobody has walked
+a real room with it.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -232,9 +235,13 @@ A release signing config is an M10 concern.
 ## 8. Open decisions
 
 - **App name.** `Measure` is a working title and too generic for the Play Store.
-- **M1 thresholds.** The sampling dispersion limit (3 cm), the feature-count bands in
-  `TrackingAssessor`, and the per-source sigmas in `HitSource` are reasoned estimates, not
-  measurements. Tune them against the A36 before they harden into promises.
+- **Capture thresholds.** The sampling dispersion limit (3 cm) and the per-source sigmas
+  and correlations in `HitSource` are still reasoned estimates rather than measurements.
+  The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
+  them want a recorded-session corpus behind them before they harden into promises.
+- **Floor selection when the floor is barely visible.** `FloorSelector` prefers a lower
+  surface over a larger one, which handles the dining-table case. A mezzanine, a sunken
+  living room or a staircase landing would defeat it, and none of those is handled.
 - **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces.
   Changing this touches the data model, so decide before the editor work in M5.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"?

@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.ar.ArPhase
 import com.measure.ar.ArScene
+import com.measure.ar.CaptureMode
 import com.measure.ar.ArSurfaceView
 import com.measure.ar.ArUiState
 import com.measure.ar.MeasureArController
@@ -71,6 +72,12 @@ fun CaptureScreen(
 
     CameraPermissionAndLifecycle(viewModel.controller, surfaceView, activity)
 
+    // The reticle position lives on the render thread's state; proximity to the starting
+    // corner is a view-model concern. This is the seam between them.
+    LaunchedEffect(state.target, viewModel.captureMode, viewModel.roomCorners.size) {
+        viewModel.updateStartProximity(state.target?.position)
+    }
+
     Box(modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             // Detached first because this view outlives the AndroidView node that hosts
@@ -94,6 +101,19 @@ fun CaptureScreen(
 
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             TopBar(state, viewModel, onExit, Modifier.align(Alignment.TopCenter))
+
+            if (viewModel.captureMode == CaptureMode.ROOM) {
+                RoomMinimap(
+                    corners = viewModel.planOutline(),
+                    preview = state.target?.position?.toFloorPlane()
+                        .takeIf { !viewModel.isRoomClosed },
+                    closed = viewModel.isRoomClosed,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 108.dp, end = 16.dp),
+                )
+            }
+
             BottomBar(state, viewModel, Modifier.align(Alignment.BottomCenter))
             Notice(viewModel, Modifier.align(Alignment.Center).padding(top = 140.dp))
         }
@@ -227,14 +247,20 @@ private fun BottomBar(
     viewModel: CaptureViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val room = viewModel.captureMode == CaptureMode.ROOM
+
     Column(
         modifier = modifier.fillMaxWidth().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        LatestMeasurement(viewModel)
+        if (room) RoomReadout(state, viewModel) else LatestMeasurement(viewModel)
 
-        ModeSelector(viewModel.mode, viewModel::selectMode)
+        // Level and plumb only mean anything for a free-standing distance; a room corner
+        // is already constrained, by the floor.
+        if (!room) ModeSelector(viewModel.mode, viewModel::selectMode)
+
+        CaptureModeSelector(viewModel.captureMode, viewModel::selectCaptureMode)
 
         Row(
             Modifier.fillMaxWidth(),
@@ -243,19 +269,105 @@ private fun BottomBar(
         ) {
             PillButton(
                 label = "Undo",
-                enabled = viewModel.pending != null || viewModel.segments.isNotEmpty(),
+                enabled = if (room) {
+                    viewModel.roomCorners.isNotEmpty() || viewModel.isRoomClosed
+                } else {
+                    viewModel.pending != null || viewModel.segments.isNotEmpty()
+                },
                 onClick = viewModel::undo,
             )
             CaptureButton(
-                enabled = state.canCapture,
+                enabled = if (room) state.canCaptureCorner && !viewModel.isRoomClosed else state.canCapture,
                 sampling = state.sampling != null,
                 onClick = viewModel::capture,
             )
-            PillButton(
-                label = if (viewModel.showPlanes) "Hide planes" else "Show planes",
-                onClick = viewModel::togglePlanes,
-            )
+            if (room) {
+                PillButton(
+                    label = if (viewModel.isRoomClosed) "New room" else "Close",
+                    enabled = viewModel.isRoomClosed || viewModel.roomCorners.size >= 3,
+                    onClick = {
+                        if (viewModel.isRoomClosed) viewModel.restartRoom() else viewModel.closeRoom()
+                    },
+                )
+            } else {
+                PillButton(
+                    label = if (viewModel.showPlanes) "Hide planes" else "Show planes",
+                    onClick = viewModel::togglePlanes,
+                )
+            }
         }
+    }
+}
+
+/**
+ * The room readout: guidance while capturing, the result once closed.
+ *
+ * The area comes with its own caveat when the loop closed badly. A number presented
+ * without that context is the thing this app is built not to do.
+ */
+@Composable
+private fun RoomReadout(
+    state: ArUiState,
+    viewModel: CaptureViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val solution = viewModel.roomSolution
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(CaptureColours.Scrim)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        if (solution != null) {
+            Text(
+                text = viewModel.formatArea(solution),
+                color = CaptureColours.OnScrim,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Perimeter ${viewModel.formatLength(solution.perimeter.metres)}" +
+                    " · ${solution.polygon.size} walls",
+                color = CaptureColours.OnScrimMuted,
+                fontSize = 12.sp,
+            )
+            Text(
+                text = if (solution.isReliable) {
+                    "Closed to ${viewModel.percent(solution.closure.relativeError)} of perimeter"
+                } else {
+                    "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
+                },
+                color = if (solution.isReliable) CaptureColours.OnScrimMuted else CaptureColours.Warning,
+                fontSize = 12.sp,
+            )
+            return@Column
+        }
+
+        val corners = viewModel.roomCorners.size
+        Text(
+            text = when {
+                state.floor?.isEstablished != true -> "Finding the floor…"
+                corners == 0 -> "Tap the first corner"
+                viewModel.isNearStartCorner -> "Tap to close the room"
+                else -> "$corners ${if (corners == 1) "corner" else "corners"}"
+            },
+            color = if (viewModel.isNearStartCorner) CaptureColours.Ready else CaptureColours.OnScrim,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = when {
+                state.floor?.isEstablished != true -> "Point at the floor and move slowly"
+                corners == 0 -> "Then walk round, tapping each corner"
+                viewModel.isNearStartCorner -> "Closing here measures the drift and corrects the plan"
+                corners < 3 -> "Keep going round the room"
+                else -> "Return to the first corner to close"
+            },
+            color = CaptureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
     }
 }
 
