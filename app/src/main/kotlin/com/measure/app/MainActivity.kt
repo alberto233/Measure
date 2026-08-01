@@ -54,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var reportView: TextView
     private lateinit var actionButton: Button
     private lateinit var measureButton: Button
+    private lateinit var clearCrashButton: Button
 
     /** ARCore's install flow may only be requested once per user gesture. */
     private var userRequestedInstall = true
@@ -135,6 +136,7 @@ class MainActivity : Activity() {
         }
 
         reportView.text = buildString {
+            crashSection()?.let { appendLine(it) }
             appendLine(deviceSection())
             appendLine("ARCore")
             appendLine("  Availability: ${describe(availability)}")
@@ -163,6 +165,19 @@ class MainActivity : Activity() {
         }
 
         configureActionButton(availability, hasCamera)
+    }
+
+    /**
+     * The last crash, if there was one. Shown first and in full, because on a sideloaded
+     * build this is the only place the stack trace can be read at all.
+     */
+    private fun crashSection(): String? {
+        val crash = CrashLog.read(this) ?: return null
+        return buildString {
+            appendLine("PREVIOUS RUN CRASHED")
+            appendLine(crash.trimEnd())
+            appendLine("─".repeat(48))
+        }
     }
 
     private fun deviceSection(): String = buildString {
@@ -259,6 +274,9 @@ class MainActivity : Activity() {
         measureButton.isEnabled = canMeasure
         measureButton.text = if (canMeasure) "Start measuring" else "Measuring unavailable"
 
+        clearCrashButton.visibility =
+            if (CrashLog.read(this) != null) android.view.View.VISIBLE else android.view.View.GONE
+
         when {
             availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ||
                 availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> {
@@ -330,6 +348,15 @@ class MainActivity : Activity() {
             setOnClickListener { startActivity(Intent(this@MainActivity, CaptureActivity::class.java)) }
         }
 
+        clearCrashButton = Button(this).apply {
+            text = "Clear crash report"
+            visibility = android.view.View.GONE
+            setOnClickListener {
+                CrashLog.clear(this@MainActivity)
+                refresh()
+            }
+        }
+
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(padding, padding, padding, padding)
@@ -348,6 +375,13 @@ class MainActivity : Activity() {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                 ).apply { topMargin = dp(24) },
+            )
+            addView(
+                clearCrashButton,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(8) },
             )
         }
 

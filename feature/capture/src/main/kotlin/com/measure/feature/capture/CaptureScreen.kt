@@ -3,6 +3,7 @@ package com.measure.feature.capture
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -71,7 +72,16 @@ fun CaptureScreen(
     CameraPermissionAndLifecycle(viewModel.controller, surfaceView, activity)
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(factory = { surfaceView }, modifier = Modifier.fillMaxSize())
+        AndroidView(
+            // Detached first because this view outlives the AndroidView node that hosts
+            // it: it is remembered across recompositions so the lifecycle effect can
+            // drive it. Handing an already-parented view to a new host throws.
+            factory = {
+                (surfaceView.parent as? ViewGroup)?.removeView(surfaceView)
+                surfaceView
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
 
         MeasurementLabels(state, viewModel)
 

@@ -284,10 +284,20 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
-        background.createOnGlThread()
-        planeRenderer.createOnGlThread()
-        markerRenderer.createOnGlThread()
-        ribbonRenderer.createOnGlThread()
+        // Shader compilation is the one part of startup that depends on the specific GPU
+        // driver, so it is the part most likely to fail on a device we have never seen.
+        // Uncaught, it would propagate out of GLSurfaceView's render thread and take the
+        // process with it — the app would simply vanish, with nothing on screen to
+        // explain why. Reported instead, it becomes a message the user can read to us.
+        try {
+            background.createOnGlThread()
+            planeRenderer.createOnGlThread()
+            markerRenderer.createOnGlThread()
+            ribbonRenderer.createOnGlThread()
+        } catch (error: Throwable) {
+            Log.e(TAG, "GL initialisation failed", error)
+            fail("Graphics setup failed", error.readableMessage(), recoverable = false)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {

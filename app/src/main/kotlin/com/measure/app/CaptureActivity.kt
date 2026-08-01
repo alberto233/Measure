@@ -1,11 +1,16 @@
 package com.measure.app
 
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.WindowManager
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.measure.feature.capture.CaptureScreen
+import java.io.PrintWriter
+import java.io.StringWriter
 
 /**
  * Hosts the AR capture screen.
@@ -23,11 +28,38 @@ class CaptureActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        setContent {
-            CaptureScreen(onExit = { finish() })
+        // Anything thrown while wiring the screen up — a missing class, a resource that
+        // did not merge — would otherwise kill the process before a single pixel is
+        // drawn, which from the outside looks exactly like the app closing for no
+        // reason. Showing the trace instead keeps a sideloaded build diagnosable.
+        //
+        // This cannot catch failures during composition, which happen later on the main
+        // looper; CrashLog is what covers those.
+        try {
+            enableEdgeToEdge()
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            setContent {
+                CaptureScreen(onExit = { finish() })
+            }
+        } catch (error: Throwable) {
+            showStartupFailure(error)
         }
+    }
+
+    private fun showStartupFailure(error: Throwable) {
+        val trace = StringWriter().also { error.printStackTrace(PrintWriter(it)) }
+        setContentView(
+            ScrollView(this).apply {
+                addView(
+                    TextView(this@CaptureActivity).apply {
+                        typeface = Typeface.MONOSPACE
+                        setTextIsSelectable(true)
+                        setPadding(32, 32, 32, 32)
+                        text = "Capture screen failed to start\n\n$trace"
+                    },
+                )
+            },
+        )
     }
 }
