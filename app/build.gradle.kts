@@ -1,6 +1,8 @@
+// AGP 9.0 has built-in Kotlin support and enables it by default. The standalone
+// org.jetbrains.kotlin.android plugin is not merely redundant now, it is rejected:
+// applying it fails the build outright.
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -27,6 +29,8 @@ android {
     }
 }
 
+// Top-level rather than inside android { kotlinOptions }, which AGP 9 removed. The
+// extension is contributed by AGP itself now.
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
