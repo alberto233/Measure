@@ -40,5 +40,11 @@ kotlin {
 dependencies {
     implementation(project(":core:units"))
     implementation(project(":core:geometry"))
+    implementation(project(":feature:capture"))
+
+    // Still needed here for the capability gate on the launch screen, which reports
+    // ARCore availability and Depth support before any session is ever opened.
     implementation(libs.arcore)
+
+    implementation(libs.androidx.activity.compose)
 }

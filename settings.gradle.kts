@@ -33,4 +33,11 @@ rootProject.name = "Measure"
 include(":core:units")
 include(":core:geometry")
 
+// ARCore session handling and AR rendering. Everything that imports com.google.ar
+// lives here, so the rest of the app never depends on ARCore directly.
+include(":ar")
+
+// The AR capture screen.
+include(":feature:capture")
+
 include(":app")

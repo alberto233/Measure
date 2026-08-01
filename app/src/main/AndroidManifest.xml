@@ -23,6 +23,18 @@
             android:name="com.google.ar.core"
             android:value="optional" />
 
+        <!--
+          Portrait-locked and keeping the screen awake: see CaptureActivity for why both
+          are measurement decisions rather than styling ones.
+        -->
+        <activity
+            android:name=".CaptureActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:screenOrientation="portrait"
+            android:label="@string/capture_title"
+            android:theme="@style/Theme.Measure.Capture" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

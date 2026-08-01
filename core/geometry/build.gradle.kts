@@ -7,7 +7,9 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:units"))
+    // api, not implementation: Length and Area appear in this module's public API
+    // (RoomSolution, MeasuredSegment), so consumers need them on their compile classpath.
+    api(project(":core:units"))
 
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

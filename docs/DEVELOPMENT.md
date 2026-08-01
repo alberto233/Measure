@@ -9,36 +9,45 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 55 tests passing, CI green |
-| `:app` | ARCore capability gate only. Installs, runs, reports device support |
+| `:core:units`, `:core:geometry` | Implemented, 95 tests passing, CI green |
+| `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
+| `:feature:capture` | M1 capture screen — reticle, planes, point-to-point, modes |
+| `:app` | Capability gate, which launches the capture screen once the device passes |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M1: AR capture — reticle, plane visualisation, point-to-point measuring |
+| Next | M1 field testing on the A36, then M3 room capture |
+
+**M1 is implemented and compiles; it has not yet been validated on the handset.** The
+numbers it produces are governed by thresholds in `:core:geometry`'s `capture` package
+(sampling dispersion limit, range bands, tracking-quality cut-offs) which were chosen from
+the analysis in `docs/ACCURACY.md` and want tuning against real measurements.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
 tier is blocked, so the full plan is achievable on the target device.
 
-## 2. The environment constraint that shapes everything
+## 2. The environment
 
-**`dl.google.com` is blocked by the cloud environment's egress policy**, and
-`maven.google.com` 301-redirects to it. Consequently *no* Google Maven artifact — AGP,
-AndroidX, ARCore — resolves inside the development container.
+**Android builds work locally. The egress restriction that shaped this repository has
+been lifted.** `./gradlew :app:assembleDebug` completes in the container, from a clean
+build, in about two minutes.
 
-What follows from that:
+### What that changes
 
-- The pure-Kotlin modules build and test locally, in seconds. They deliberately depend
-  on nothing from Google, which is what keeps the measurement work fast to iterate on.
-- **Android code can only be compiled in CI.** Six consecutive CI failures were spent on
-  build plumbing that a local compile would have caught instantly.
-- Actions logs are served from `productionresultssa3.blob.core.windows.net`, also
-  blocked, so only the *tail* of a job log is readable. Kotlin prints diagnostics
-  *before* the failure marker, where the tail cannot reach — hence the "Surface compiler
-  errors" CI step, which reprints them last. Do not remove it while this constraint holds.
+- Android code no longer has to be compiled in CI to find out whether it compiles. Six
+  consecutive CI failures were once spent on build plumbing that a local compile catches
+  instantly; that loop is gone.
+- Compose and AndroidX are now usable, which is what made the M1 capture screen possible
+  as designed rather than as a plain-views approximation.
+- The "Surface compiler errors" step in CI is no longer load-bearing and may be removed
+  whenever it stops paying for itself. It is kept for now because Actions logs are still
+  served from a host the container cannot read, so only the *tail* of a job log is
+  fetchable, and Kotlin prints diagnostics before the failure marker where the tail
+  cannot reach.
 
-### Lifting the constraint
+### Reproducing this environment
 
-Worth doing before any significant Android work. It requires a **new session**, because
-network policy is fixed when the VM starts.
+Network policy is fixed when the VM starts, so a session that lacks this needs to be
+**restarted** after changing it.
 
 1. Go to **claude.ai/code**.
 2. Click the **cloud icon** showing the environment name, in the row above the message
@@ -55,21 +64,30 @@ network policy is fixed when the VM starts.
 6. **Tick "Also include default list of common package managers."** Leaving it unchecked
    restricts the session to *only* those two domains, breaking Maven Central and Gradle's
    own distribution.
-7. Optionally add the setup script in §6 to preinstall the Android SDK.
+7. Add the setup script in §6, which preinstalls the Android SDK.
 8. Save, then start a **new** session.
+
+`ANDROID_HOME` is written to `/etc/environment` by that script, which shells do not
+always source. If Gradle cannot find the SDK, export it for the command:
+
+```bash
+export ANDROID_HOME=/opt/android-sdk
+```
 
 ## 3. Build and test
 
 ```bash
-# The fast loop. Works in the container today; no Android SDK needed.
+# The fast loop. Seconds, no Android SDK needed, and where the measurement logic lives.
 ./gradlew :core:units:test :core:geometry:test
 
-# Android. Only works where Google's Maven host is reachable.
+# The whole app.
+export ANDROID_HOME=/opt/android-sdk
 ./gradlew :app:assembleDebug
 ```
 
 `org.gradle.configureondemand=true` in `gradle.properties` is what lets the first command
-run without configuring `:app` — without it, Gradle would try to resolve AGP and fail.
+run without configuring the Android modules at all. Keep using it: the pure-Kotlin loop
+being fast is what makes the accuracy work practical to iterate on.
 
 ## 4. Version pins, and why
 
@@ -84,6 +102,10 @@ Do not bump these casually. Each one is load-bearing.
 | `compileSdk` / `targetSdk` | 36 | |
 | `minSdk` | 26 | ARCore allows 24, but the practical ARCore population is 8.0+ |
 | ARCore | 1.54.0 | |
+| Compose compiler plugin | **2.2.10** | **Must equal the Kotlin compiler AGP embeds**, which is `kotlin-compiler-embeddable` **2.2.10** inside AGP 9.3.0 — *not* the `kotlin` version above. AGP 9 compiles Kotlin with its own compiler and a Compose plugin from another line will not load into it. AGP also *requires* the plugin: `buildFeatures.compose = true` alone fails the build |
+| Compose BOM | 2026.06.01 | |
+| `androidx.lifecycle` | **2.10.0** | **Capped by `compileSdk`.** 2.11.0 declares a minimum compileSdk of 37 and fails AAR metadata checking against 36. Bumping to 2.11 means bumping `compileSdk` to 37 in every module and installing that platform in the setup script |
+| `androidx.activity` | 1.13.0 | |
 
 ### The root build declares no plugins
 
@@ -102,6 +124,44 @@ Note that **AGP 9 compiles Kotlin itself** and *rejects* the standalone
 `org.jetbrains.kotlin.android` plugin outright. There is no `kotlin-android` entry in the
 version catalog for that reason. Configure Kotlin via a top-level `kotlin { compilerOptions { … } }`
 block; `android { kotlinOptions { … } }` was removed in AGP 9.
+
+The Compose compiler plugin is the one exception to "Android modules apply only AGP":
+`:feature:capture` applies `org.jetbrains.kotlin.plugin.compose` as well, because AGP
+demands it. It loads cleanly because it is a *compiler* plugin — it hooks into AGP's own
+Kotlin compiler rather than contributing a Gradle plugin that needs AGP's classes — which
+is exactly why the version has to match that compiler and not the `kotlin` pin.
+
+## 4a. Module map
+
+```
+:core:units       length/area formatting and imperial parsing — pure Kotlin
+:core:geometry    snapping, loop closure, constraint solver, and the capture maths
+                  (multi-frame sampling, uncertainty model, tracking assessment,
+                  range gating, measurement modes) — pure Kotlin, all JVM tested
+:ar               the only module that imports com.google.ar. Session lifecycle,
+                  hit-test ranking, frame sampling, and four small GLES renderers
+:feature:capture  the Compose capture screen
+:app              capability gate, and assembly
+```
+
+Two rules hold this together and are worth defending:
+
+- **The maths is not in the AR module.** Everything in `:ar` that could be tested was
+  moved into `:core:geometry`'s `capture` package instead — the median sampler, the sigma
+  model, the quality thresholds, the mode constraints. `:ar` is left with ARCore glue and
+  OpenGL, which are the parts a JVM test could not reach anyway.
+- **Nothing outside `:ar` imports ARCore.** `:feature:capture` talks to `MeasureArController`
+  and reads `ArUiState`; it has never heard of a `Frame`.
+
+### On SceneView
+
+`docs/TECHNICAL_DESIGN.md` names SceneView as the AR renderer, with a note that plain
+OpenGL along the lines of Google's `hello_ar` is a viable fallback. **The fallback was
+taken as the first choice.** The whole visual requirement is a camera background,
+translucent plane polygons, point markers and thick lines — four shaders and about 400
+lines — and text labels are drawn in Compose over the top, projected by the render thread,
+rather than as a font atlas in GL. Taking a community 3D engine for that would buy churn
+risk in exchange for features we do not use. Revisit if the 3D view in M9 needs more.
 
 ## 5. Conventions
 
@@ -153,6 +213,9 @@ A release signing config is an M10 concern.
 ## 8. Open decisions
 
 - **App name.** `Measure` is a working title and too generic for the Play Store.
+- **M1 thresholds.** The sampling dispersion limit (3 cm), the feature-count bands in
+  `TrackingAssessor`, and the per-source sigmas in `HitSource` are reasoned estimates, not
+  measurements. Tune them against the A36 before they harden into promises.
 - **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces.
   Changing this touches the data model, so decide before the editor work in M5.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"?

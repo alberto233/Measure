@@ -2,6 +2,7 @@ package com.measure.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -30,17 +31,21 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The capability gate, and for now the whole app.
+ * The capability gate and the launcher for the capture screen.
  *
  * Before any measuring work is worth doing we need a definitive answer to two questions
  * about the actual handset: does ARCore support it, and does it support the Depth API.
  * Published lists go stale — the community mirror has no device newer than early 2024 —
- * so the only trustworthy check is the one the device performs on itself.
+ * so the only trustworthy check is the one the device performs on itself. Capture is
+ * offered only once those checks pass, which is why this screen still exists now that
+ * there is a real UI behind it: opening a session we already know will fail is how
+ * competitors earn their crash-on-scan-start reviews.
  *
- * Deliberately built on plain Android views with no Compose and no AndroidX. The
- * development container cannot reach Google's Maven host, so Android code is compiled
- * in CI rather than locally; keeping the dependency surface to ARCore alone keeps the
- * number of unverifiable version choices near zero. The real UI arrives with M1.
+ * Still plain Android views rather than Compose. That began as a constraint — the
+ * development container could not resolve AndroidX — and survives it as a choice: this is
+ * a diagnostic screen, it is the one thing that must render even when everything else is
+ * broken, and it depends on nothing but the framework and ARCore. A proper home screen
+ * replaces it in a later milestone.
  */
 class MainActivity : Activity() {
 
@@ -48,6 +53,7 @@ class MainActivity : Activity() {
 
     private lateinit var reportView: TextView
     private lateinit var actionButton: Button
+    private lateinit var measureButton: Button
 
     /** ARCore's install flow may only be requested once per user gesture. */
     private var userRequestedInstall = true
@@ -246,6 +252,13 @@ class MainActivity : Activity() {
     }
 
     private fun configureActionButton(availability: ArCoreApk.Availability, hasCamera: Boolean) {
+        // Capture is offered only once the device has actually proved it can do it.
+        // Opening an AR session we already know will fail is how competitors produce the
+        // crash-on-scan-start reviews in docs/PRODUCT_PLAN.md §4.
+        val canMeasure = availability == ArCoreApk.Availability.SUPPORTED_INSTALLED && hasCamera
+        measureButton.isEnabled = canMeasure
+        measureButton.text = if (canMeasure) "Start measuring" else "Measuring unavailable"
+
         when {
             availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ||
                 availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> {
@@ -312,10 +325,22 @@ class MainActivity : Activity() {
             setPadding(0, dp(16), 0, 0)
         }
 
+        measureButton = Button(this).apply {
+            text = "Start measuring"
+            setOnClickListener { startActivity(Intent(this@MainActivity, CaptureActivity::class.java)) }
+        }
+
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(padding, padding, padding, padding)
             addView(title)
+            addView(
+                measureButton,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = dp(20) },
+            )
             addView(reportView)
             addView(
                 actionButton,
