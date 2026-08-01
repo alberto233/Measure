@@ -201,6 +201,15 @@ where the majority of accuracy testing should live, because it is fast, determin
 requires no hardware. The whole geometry core is designed as pure Kotlin for exactly this
 reason.
 
+*First measured result.* On a 5 × 4 m room corrupted with 2.5 cm per-corner targeting
+noise and 15 cm of accumulated drift, averaged over 40 seeded runs, the pipeline reduces
+mean wall error from **3.88 cm to 1.95 cm** — a 50% reduction, and comfortably inside the
+±2% per-wall target. Right angles come back to within 1°, and a single locked wall
+dimension pulls to within 5 mm. See `RoomSolverTest` in `:core:geometry`. These figures
+are synthetic and therefore optimistic about tracking behaviour; they establish that the
+maths works, not that the phone does. Real-device numbers replace them once the
+recorded-session corpus exists.
+
 **Recorded-session regression tests.** ARCore has a Recording and Playback API: capture a
 real AR session once, complete with camera and sensor data, then replay it deterministically
 on-device. That gives repeatable end-to-end accuracy tests over genuine data — the same
