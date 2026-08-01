@@ -69,6 +69,9 @@ data class ArUiState(
     val target: ReticleTarget? = null,
     val rangeAdvice: RangeAdvice = RangeAdvice.IDEAL,
     val depthEnabled: Boolean = false,
+    /** Whether the camera config ARCore chose allows the torch at all. */
+    val torchSupported: Boolean = false,
+    val torchOn: Boolean = false,
     val sampling: SamplingProgress? = null,
     val preview: MeasurementPreview? = null,
     val anchors: List<ScreenAnchor> = emptyList(),

@@ -132,14 +132,14 @@ class TrackingAssessorTest {
 
     @Test
     fun `a sparse map is poor even when ARCore claims to be tracking`() {
-        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 2, 10)
+        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 2, 3)
         assertEquals(TrackingQuality.POOR, status.quality)
         assertEquals(TrackingIssue.INSUFFICIENT_FEATURES, status.issue)
     }
 
     @Test
     fun `no planes yet is fair and says so`() {
-        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 0, 400)
+        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 0, 200)
         assertEquals(TrackingQuality.FAIR, status.quality)
         assertEquals(TrackingIssue.NO_SURFACES_YET, status.issue)
         assertTrue(status.canCapture)
@@ -147,10 +147,19 @@ class TrackingAssessorTest {
 
     @Test
     fun `a dense map with planes is good`() {
-        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 3, 400)
+        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 3, 200)
         assertEquals(TrackingQuality.GOOD, status.quality)
         assertEquals(TrackingIssue.NONE, status.issue)
         assertTrue(status.canCapture)
+    }
+
+    @Test
+    fun `an ordinary furnished room reads as good, not fair`() {
+        // A well-lit rug and table gave roughly this per-frame cloud on the test device
+        // and reported "fair", because the thresholds had been set as if the count were
+        // cumulative over the session rather than per frame.
+        val status = TrackingAssessor.assess(true, TrackingIssue.NONE, 2, 60)
+        assertEquals(TrackingQuality.GOOD, status.quality)
     }
 
     @Test
@@ -327,10 +336,96 @@ class PointUncertaintyTest {
         assertTrue(sigma < 0.02, "sigma $sigma exceeds the published expectation")
     }
 
+    private fun point(
+        x: Double,
+        sigma: Double = 0.02,
+        dispersion: Double = 0.004,
+        source: HitSource = HitSource.PLANE_POLYGON,
+    ) = SampledPoint(
+        position = Vec3(x, 0.0, 0.0),
+        sigma = sigma,
+        dispersion = dispersion,
+        range = 2.0,
+        source = source,
+        sampleCount = 15,
+    )
+
     @Test
-    fun `distance sigma combines both endpoints`() {
-        val point = SampledPoint(Vec3.ZERO, sigma = 0.03, dispersion = 0.0, range = 2.0, source = HitSource.PLANE_POLYGON, sampleCount = 15)
-        assertEquals(0.03 * kotlin.math.sqrt(2.0), PointUncertainty.distanceSigma(point, point), 1e-12)
+    fun `two points on the same surface beat the independent estimate`() {
+        val a = point(0.0)
+        val b = point(0.35)
+
+        val correlated = PointUncertainty.distanceSigma(a, b)
+        val independent = kotlin.math.sqrt(a.sigma * a.sigma + b.sigma * b.sigma)
+
+        assertTrue(
+            correlated < independent * 0.75,
+            "shared surface error was not cancelled: \$correlated vs \$independent",
+        )
+    }
+
+    @Test
+    fun `the benefit fades as the points separate`() {
+        val near = PointUncertainty.distanceSigma(point(0.0), point(0.2))
+        val mid = PointUncertainty.distanceSigma(point(0.0), point(1.5))
+        val far = PointUncertainty.distanceSigma(point(0.0), point(8.0))
+
+        assertTrue(near < mid, "near \$near should beat mid \$mid")
+        assertTrue(mid < far, "mid \$mid should beat far \$far")
+
+        // Far apart, the answer must fall back to treating the errors as independent.
+        val independent = kotlin.math.sqrt(2 * 0.02 * 0.02)
+        assertEquals(independent, far, 1e-4)
+    }
+
+    @Test
+    fun `points from different kinds of estimate share nothing`() {
+        val sigma = PointUncertainty.distanceSigma(
+            point(0.0, source = HitSource.PLANE_POLYGON),
+            point(0.2, source = HitSource.DEPTH),
+        )
+        assertEquals(kotlin.math.sqrt(2 * 0.02 * 0.02), sigma, 1e-9)
+    }
+
+    @Test
+    fun `targeting error is never cancelled, only the surface model is`() {
+        // Identical points, so the surface term cancels entirely and only the two
+        // independent sampling dispersions should survive.
+        val shaky = SampledPoint(
+            position = Vec3.ZERO,
+            sigma = 0.02,
+            dispersion = 0.012,
+            range = 2.0,
+            source = HitSource.PLANE_POLYGON,
+            sampleCount = 15,
+        )
+        val sigma = PointUncertainty.distanceSigma(shaky, shaky)
+        assertTrue(sigma > 0.012, "dispersion was wrongly cancelled: \$sigma")
+    }
+
+    @Test
+    fun `no measurement is ever claimed better than five millimetres`() {
+        val perfect = SampledPoint(
+            position = Vec3.ZERO,
+            sigma = 0.001,
+            dispersion = 0.0,
+            range = 2.0,
+            source = HitSource.PLANE_POLYGON,
+            sampleCount = 15,
+        )
+        assertEquals(PointUncertainty.MINIMUM_SIGMA, PointUncertainty.distanceSigma(perfect, perfect), 1e-12)
+    }
+
+    @Test
+    fun `the reported tolerance on a real short measurement is believable`() {
+        // The case that motivated this: two taps a third of a metre apart on the same
+        // rug, about a metre away, on a well-tracked plane. It reported 8% before.
+        val sigma = PointUncertainty.sigma(0.003, 1.0, HitSource.PLANE_POLYGON, TrackingQuality.GOOD)
+        val a = SampledPoint(Vec3.ZERO, sigma, 0.003, 1.0, HitSource.PLANE_POLYGON, 15)
+        val b = a.copy(position = Vec3(0.357, 0.0, 0.0))
+
+        val relative = PointUncertainty.distanceSigma(a, b) / 0.357
+        assertTrue(relative < 0.04, "tolerance is still \${relative * 100}% of the distance")
     }
 }
 
@@ -400,8 +495,13 @@ class MeasuredSegmentTest {
         val segment = MeasuredSegment(1L, point(0.0, 0.0, 0.0), point(3.0, 0.0, 4.0), MeasurementMode.FREE)
 
         assertEquals(5.0, segment.lengthMetres, 1e-12)
-        assertEquals(0.01 * kotlin.math.sqrt(2.0), segment.sigmaMetres, 1e-12)
         assertEquals(Vec3(1.5, 0.0, 2.0), segment.midpoint)
+
+        // Five metres apart, so almost none of the surface error is shared and the
+        // answer sits just under the independent quadrature sum.
+        val independent = 0.01 * kotlin.math.sqrt(2.0)
+        assertTrue(segment.sigmaMetres <= independent, "sigma ${segment.sigmaMetres}")
+        assertTrue(segment.sigmaMetres > independent * 0.95, "sigma ${segment.sigmaMetres}")
     }
 
     @Test

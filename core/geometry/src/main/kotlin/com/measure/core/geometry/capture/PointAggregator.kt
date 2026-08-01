@@ -1,6 +1,7 @@
 package com.measure.core.geometry.capture
 
 import com.measure.core.geometry.Vec3
+import kotlin.math.exp
 import kotlin.math.sqrt
 
 /** One frame's observation of where the reticle is pointing. */
@@ -159,12 +160,65 @@ object PointUncertainty {
     }
 
     /**
-     * Uncertainty of the distance between two independently sampled points.
+     * Uncertainty of the distance between two sampled points.
      *
-     * Treating each point's error as isotropic makes this the quadrature sum, which is
-     * an upper bound on the true along-axis figure. Erring high is the right direction
-     * for a tolerance: it is a promise we can keep.
+     * The obvious formula is the quadrature sum, treating the two errors as independent.
+     * That is wrong in a way that matters, and it showed up the first time a real
+     * measurement was taken: two points a third of a metre apart on the same rug came
+     * back at ±3 cm, or 8% of the distance, when the number was in fact good to a
+     * centimetre.
+     *
+     * The reason is that **a measurement is a difference, and common-mode error cancels
+     * out of a difference.** If ARCore's floor plane sits a centimetre below the real
+     * floor, both endpoints are a centimetre low and the distance between them is
+     * untouched. So the shared part of the error must be subtracted, not added:
+     *
+     *     Var(a − b) = σa² + σb² − 2ρ·σa·σb
+     *
+     * Only the *modelled* surface error is shared. The sampling dispersion is targeting
+     * error — hand shake, the reticle not quite on the mark — which is independent
+     * between two separate taps and stays in the sum at full weight.
      */
-    fun distanceSigma(from: SampledPoint, to: SampledPoint): Double =
-        sqrt(from.sigma * from.sigma + to.sigma * to.sigma)
+    fun distanceSigma(from: SampledPoint, to: SampledPoint): Double {
+        val modelledFrom = modelledPart(from)
+        val modelledTo = modelledPart(to)
+        val shared = correlation(from, to)
+
+        val variance = from.dispersion * from.dispersion +
+            to.dispersion * to.dispersion +
+            modelledFrom * modelledFrom +
+            modelledTo * modelledTo -
+            2.0 * shared * modelledFrom * modelledTo
+
+        return sqrt(variance.coerceAtLeast(MINIMUM_SIGMA * MINIMUM_SIGMA))
+    }
+
+    /** The part of a point's sigma that came from the surface model rather than the burst. */
+    private fun modelledPart(point: SampledPoint): Double =
+        sqrt((point.sigma * point.sigma - point.dispersion * point.dispersion).coerceAtLeast(0.0))
+
+    /**
+     * How much of two points' modelled error is shared.
+     *
+     * Zero when the points came from different kinds of estimate, since they have no
+     * common fit to share. Otherwise it decays with separation: two points a handspan
+     * apart are almost certainly on the same fitted plane, while two points across a
+     * room may well be on different ones, and by then the cancellation should be assumed
+     * gone. Nothing here can exceed the source's own ceiling, so a distance is never
+     * reported as more certain than the surface it was measured from allows.
+     */
+    private fun correlation(from: SampledPoint, to: SampledPoint): Double {
+        if (from.source != to.source) return 0.0
+        val separation = from.position.distanceTo(to.position)
+        return from.source.spatialCorrelation * exp(-separation / CORRELATION_LENGTH_METRES)
+    }
+
+    /** Separation over which shared error is assumed to have decayed away. */
+    private const val CORRELATION_LENGTH_METRES = 1.5
+
+    /**
+     * No measurement is claimed better than this, however the arithmetic comes out.
+     * Nothing about a phone justifies a five-millimetre promise.
+     */
+    const val MINIMUM_SIGMA = 0.005
 }

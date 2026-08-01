@@ -88,6 +88,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     private val sessionLock = Any()
 
     private var session: Session? = null
+    private var sessionConfig: Config? = null
     private var installRequested = false
 
     private val background = BackgroundRenderer()
@@ -165,9 +166,28 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
             val created = Session(activity)
             val depthSupported = created.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
-            created.configure(configure(created, depthSupported))
+            val config = configure(created, depthSupported)
+
+            // Whether the torch can be driven at all is a property of the camera config
+            // ARCore chose, not just of the hardware, so it has to be asked rather than
+            // assumed. isSupported takes the whole config: a flash mode that clashes
+            // with something else we set would fail here rather than at configure time.
+            val torchSupported = created.isSupported(
+                Config(created).apply {
+                    depthMode = config.depthMode
+                    planeFindingMode = config.planeFindingMode
+                    instantPlacementMode = config.instantPlacementMode
+                    focusMode = config.focusMode
+                    lightEstimationMode = config.lightEstimationMode
+                    updateMode = config.updateMode
+                    flashMode = Config.FlashMode.TORCH
+                },
+            )
+
+            created.configure(config)
             session = created
-            _state.update { it.copy(depthEnabled = depthSupported) }
+            sessionConfig = config
+            _state.update { it.copy(depthEnabled = depthSupported, torchSupported = torchSupported) }
             return true
         } catch (error: UnavailableUserDeclinedInstallationException) {
             fail("ARCore is needed to measure", "Install Google Play Services for AR to continue.")
@@ -205,6 +225,10 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         // The GL thread drives the loop, so blocking on the newest camera image keeps
         // the reticle in step with what the user sees rather than a frame behind.
         updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+
+        // Off at the start. A torch that switches itself on is startling in a lit room
+        // and expensive everywhere; the user asks for it when the scene needs it.
+        flashMode = Config.FlashMode.OFF
     }
 
     fun pause() = synchronized(sessionLock) {
@@ -217,11 +241,13 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         // for it to be abandoned on the next frame.
         burstCancelled.set(true)
         captureRequested.set(false)
+        // The camera is released on pause, so the torch goes out whatever we think.
+        sessionConfig?.flashMode = Config.FlashMode.OFF
         _state.update {
             if (it.phase == ArPhase.RUNNING) {
-                it.copy(phase = ArPhase.PAUSED, target = null, preview = null, sampling = null)
+                it.copy(phase = ArPhase.PAUSED, target = null, preview = null, sampling = null, torchOn = false)
             } else {
-                it
+                it.copy(torchOn = false)
             }
         }
     }
@@ -259,6 +285,32 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     fun requestCapture() {
         if (!_state.value.canCapture) return
         captureRequested.set(true)
+    }
+
+    /**
+     * Turn the camera torch on or off.
+     *
+     * Driven through ARCore's own config rather than `CameraManager.setTorchMode`,
+     * because ARCore holds the camera and a second client asking the framework for the
+     * same device is a fight we would lose intermittently and inexplicably. Reconfiguring
+     * a running session is cheap and does not disturb tracking.
+     */
+    fun setTorch(enabled: Boolean) = synchronized(sessionLock) {
+        val session = session ?: return
+        val config = sessionConfig ?: return
+        if (!_state.value.torchSupported) return
+
+        config.flashMode = if (enabled) Config.FlashMode.TORCH else Config.FlashMode.OFF
+        try {
+            session.configure(config)
+            _state.update { it.copy(torchOn = enabled) }
+        } catch (error: Throwable) {
+            // Some devices refuse the torch while the camera is thermally throttled.
+            // Losing the light is not worth losing the session over.
+            Log.w(TAG, "could not change the torch", error)
+            config.flashMode = Config.FlashMode.OFF
+            _state.update { it.copy(torchOn = false) }
+        }
     }
 
     fun setDisplayRotation(rotation: Int) {

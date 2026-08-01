@@ -13,17 +13,26 @@ package com.measure.core.geometry.capture
  * [baseSigma] and [sigmaPerMetre] are the two terms of a linear error model, in metres.
  * They are deliberately conservative: over-reporting confidence is the failure mode this
  * app exists to avoid.
+ *
+ * [spatialCorrelation] is how much of that error two nearby points from this kind of
+ * source *share*. It matters because a measurement is a difference, and whatever the two
+ * endpoints get wrong in common cancels out of a difference. A fitted plane is the
+ * extreme case: if ARCore places the floor a centimetre low, every point on it is a
+ * centimetre low, and the distance between two of them is unaffected. A depth hit shares
+ * less, because much of its error is per-pixel. A lone feature point shares almost
+ * nothing.
  */
 enum class HitSource(
     val baseSigma: Double,
     val sigmaPerMetre: Double,
+    val spatialCorrelation: Double,
     val label: String,
 ) {
-    PLANE_POLYGON(0.008, 0.004, "surface"),
-    PLANE_INFINITE(0.015, 0.008, "surface (extended)"),
-    DEPTH(0.020, 0.012, "depth"),
-    FEATURE_POINT(0.030, 0.020, "feature"),
-    INSTANT_PLACEMENT(0.060, 0.040, "estimate"),
+    PLANE_POLYGON(0.008, 0.004, 0.80, "surface"),
+    PLANE_INFINITE(0.015, 0.008, 0.75, "surface (extended)"),
+    DEPTH(0.020, 0.012, 0.50, "depth"),
+    FEATURE_POINT(0.030, 0.020, 0.20, "feature"),
+    INSTANT_PLACEMENT(0.060, 0.040, 0.60, "estimate"),
     ;
 
     /**

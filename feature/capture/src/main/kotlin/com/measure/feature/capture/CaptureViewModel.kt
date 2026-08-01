@@ -85,6 +85,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         unitSystem = if (unitSystem == UnitSystem.METRIC) UnitSystem.IMPERIAL else UnitSystem.METRIC
     }
 
+    fun setTorch(on: Boolean) = controller.setTorch(on)
+
     fun togglePlanes() {
         showPlanes = !showPlanes
         pushScene()

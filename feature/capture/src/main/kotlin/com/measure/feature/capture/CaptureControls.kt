@@ -100,6 +100,7 @@ internal fun CaptureButton(
 internal fun PillButton(
     label: String,
     enabled: Boolean = true,
+    highlighted: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -108,10 +109,10 @@ internal fun PillButton(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.4f)
             .clip(RoundedCornerShape(50))
-            .background(CaptureColours.Scrim)
+            .background(if (highlighted) CaptureColours.Sampling else CaptureColours.Scrim)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        color = CaptureColours.OnScrim,
+        color = if (highlighted) Color(0xFF2A1F00) else CaptureColours.OnScrim,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
     )

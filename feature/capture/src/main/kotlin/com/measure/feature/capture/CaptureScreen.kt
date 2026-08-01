@@ -198,10 +198,19 @@ private fun TopBar(
         ) {
             PillButton("Done", onClick = onExit)
             TrackingChip(state.tracking, state.depthEnabled)
-            PillButton(
-                label = if (viewModel.unitSystem == UnitSystem.METRIC) "m" else "ft",
-                onClick = viewModel::toggleUnits,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.torchSupported) {
+                    PillButton(
+                        label = if (state.torchOn) "Torch on" else "Torch",
+                        highlighted = state.torchOn,
+                        onClick = { viewModel.setTorch(!state.torchOn) },
+                    )
+                }
+                PillButton(
+                    label = if (viewModel.unitSystem == UnitSystem.METRIC) "m" else "ft",
+                    onClick = viewModel::toggleUnits,
+                )
+            }
         }
 
         AimAdvice(
@@ -313,12 +322,23 @@ private fun MeasurementLabels(state: ArUiState, viewModel: CaptureViewModel) {
         modifier = Modifier.fillMaxSize(),
     ) { measurables, constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
+        // Lifted above the midpoint rather than centred on it. The reticle is at the
+        // exact centre of the screen, and aiming at the middle of your own measurement
+        // is the normal thing to do, so a centred label covers the thing you are aiming
+        // with at precisely the moment you need it.
+        val lift = LABEL_LIFT_DP.dp.roundToPx()
         layout(constraints.maxWidth, constraints.maxHeight) {
             placeables.forEachIndexed { index, placeable ->
                 val anchor = state.anchors.getOrNull(index) ?: return@forEachIndexed
                 placeable.place(
-                    x = (anchor.x - placeable.width / 2f).toInt(),
-                    y = (anchor.y - placeable.height / 2f).toInt(),
+                    x = (anchor.x - placeable.width / 2f).toInt().coerceIn(
+                        0,
+                        (constraints.maxWidth - placeable.width).coerceAtLeast(0),
+                    ),
+                    y = (anchor.y - placeable.height / 2f - lift).toInt().coerceIn(
+                        0,
+                        (constraints.maxHeight - placeable.height).coerceAtLeast(0),
+                    ),
                 )
             }
         }
@@ -401,3 +421,6 @@ private fun SessionProblem(
 }
 
 private const val NOTICE_DURATION_MS = 2600L
+
+/** Enough to clear the reticle, whose outer radius is 26 dp. */
+private const val LABEL_LIFT_DP = 46

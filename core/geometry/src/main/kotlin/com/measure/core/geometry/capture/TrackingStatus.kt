@@ -18,7 +18,7 @@ enum class TrackingIssue(val advice: String) {
     NO_SURFACES_YET("Point at the floor and move slowly to find surfaces"),
     INSUFFICIENT_FEATURES("Not enough detail here — aim at a textured surface"),
     EXCESSIVE_MOTION("Slow down"),
-    INSUFFICIENT_LIGHT("Too dark — turn a light on"),
+    INSUFFICIENT_LIGHT("Too dark — try the torch, or turn a light on"),
     CAMERA_UNAVAILABLE("Camera unavailable"),
     UNKNOWN("Tracking lost — look around slowly"),
 }
@@ -45,11 +45,16 @@ data class TrackingStatus(
  */
 object TrackingAssessor {
 
-    /** Below this, ARCore's map is too sparse for a hit test to be worth anything. */
-    const val SPARSE_FEATURE_THRESHOLD = 30
+    // These count the feature points in a *single frame's* point cloud, not the whole
+    // session map, which is why they are far smaller than a running total would suggest.
+    // The first values tried were calibrated as if cumulative and reported "fair" on a
+    // well-lit, textured scene that was in fact tracking perfectly.
 
-    /** Above this the map is dense enough that feature count stops being the limit. */
-    const val HEALTHY_FEATURE_THRESHOLD = 120
+    /** Below this, the frame is too sparse for a hit test to be worth anything. */
+    const val SPARSE_FEATURE_THRESHOLD = 10
+
+    /** Above this the frame is rich enough that feature count stops being the limit. */
+    const val HEALTHY_FEATURE_THRESHOLD = 45
 
     fun assess(
         isTracking: Boolean,
