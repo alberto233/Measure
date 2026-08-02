@@ -9,12 +9,99 @@ import org.junit.jupiter.api.Test
 
 private var nextId = 0L
 
+// Named arguments throughout: this was positional, and adding a field to
+// PlaneObservation silently rebound `subsumed` to the new one.
 private fun plane(
     height: Double,
     area: Double,
     upward: Boolean = true,
+    downward: Boolean = false,
     subsumed: Boolean = false,
-) = PlaneObservation(nextId++, height, area, upward, subsumed)
+) = PlaneObservation(
+    id = nextId++,
+    height = height,
+    area = area,
+    isUpwardHorizontal = upward,
+    isDownwardHorizontal = downward,
+    isSubsumed = subsumed,
+)
+
+class CeilingSelectorTest {
+
+    private val floor = -1.4
+
+    @Test
+    fun `no ceiling in sight`() {
+        assertNull(CeilingSelector.select(emptyList(), floor))
+        assertNull(CeilingSelector.select(listOf(plane(1.0, 12.0)), floor))
+    }
+
+    @Test
+    fun `a ceiling is found and measured from the floor`() {
+        val ceiling = CeilingSelector.select(
+            listOf(plane(1.0, 14.0, upward = false, downward = true)),
+            floor,
+        )!!
+        assertEquals(2.4, ceiling.height - floor, 1e-9)
+    }
+
+    @Test
+    fun `the underside of a table is not a ceiling`() {
+        // 0.75 m above the floor, downward facing, and large enough to be tempting.
+        assertNull(
+            CeilingSelector.select(
+                listOf(plane(floor + 0.75, 2.0, upward = false, downward = true)),
+                floor,
+            ),
+        )
+    }
+
+    @Test
+    fun `a stairwell is too tall for a single height to mean anything`() {
+        assertNull(
+            CeilingSelector.select(
+                listOf(plane(floor + 7.0, 20.0, upward = false, downward = true)),
+                floor,
+            ),
+        )
+    }
+
+    @Test
+    fun `a small overhead scrap is a shelf, not a ceiling`() {
+        assertNull(
+            CeilingSelector.select(
+                listOf(plane(floor + 2.4, 0.3, upward = false, downward = true)),
+                floor,
+            ),
+        )
+    }
+
+    @Test
+    fun `a dropped soffit wins over the main ceiling above it`() {
+        // Both are genuinely overhead; the lower one is what a person measures to.
+        val ceiling = CeilingSelector.select(
+            listOf(
+                plane(floor + 2.60, 18.0, upward = false, downward = true),
+                plane(floor + 2.15, 3.0, upward = false, downward = true),
+            ),
+            floor,
+        )!!
+        assertEquals(2.15, ceiling.height - floor, 1e-9)
+    }
+
+    @Test
+    fun `fragments of one ceiling merge`() {
+        val ceiling = CeilingSelector.select(
+            listOf(
+                plane(floor + 2.40, 6.0, upward = false, downward = true),
+                plane(floor + 2.42, 5.0, upward = false, downward = true),
+            ),
+            floor,
+        )!!
+        assertEquals(2, ceiling.planeCount)
+        assertEquals(11.0, ceiling.area, 1e-9)
+    }
+}
 
 class FloorSelectorTest {
 

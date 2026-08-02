@@ -1,7 +1,7 @@
 package com.measure.ar
 
 import com.measure.core.geometry.Vec3
-import com.measure.core.geometry.capture.FloorCandidate
+import com.measure.core.geometry.capture.HorizontalSurface
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.RangeAdvice
@@ -46,8 +46,8 @@ data class FloorState(
     val isEstablished: Boolean get() = area >= com.measure.core.geometry.capture.FloorSelector.ESTABLISHED_AREA
 
     companion object {
-        fun from(candidate: FloorCandidate) =
-            FloorState(candidate.height, candidate.area, candidate.planeCount)
+        fun from(surface: HorizontalSurface) =
+            FloorState(surface.height, surface.area, surface.planeCount)
     }
 }
 
@@ -102,6 +102,8 @@ data class ArUiState(
     val floor: FloorState? = null,
     /** Room capture, aiming at something that is not the floor. Nothing can be placed. */
     val offFloor: Boolean = false,
+    /** Ceiling height above the floor, if a ceiling has come into view. */
+    val ceilingHeight: Double? = null,
     val failure: ArFailure? = null,
 ) {
     /** True when a tap should be allowed to start a sample burst. */

@@ -23,9 +23,10 @@ import androidx.sqlite.execSQL
         RoomEntity::class,
         CornerEntity::class,
         WallEntity::class,
+        OpeningEntity::class,
         MeasurementEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -34,6 +35,7 @@ abstract class MeasureDatabase : RoomDatabase() {
     abstract fun levelDao(): LevelDao
     abstract fun roomDao(): RoomDao
     abstract fun wallDao(): WallDao
+    abstract fun openingDao(): OpeningDao
     abstract fun measurementDao(): MeasurementDao
 
     companion object {
@@ -85,6 +87,31 @@ abstract class MeasureDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds doors and windows. Nothing existing changes, so nothing needs copying. */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `openings` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `roomId` INTEGER NOT NULL,
+                        `wallIndex` INTEGER NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `offset` REAL NOT NULL,
+                        `width` REAL NOT NULL,
+                        `height` REAL NOT NULL,
+                        `sillHeight` REAL NOT NULL,
+                        FOREIGN KEY(`roomId`) REFERENCES `rooms`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """,
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_openings_roomId` ON `openings` (`roomId`)",
+                )
+            }
+        }
+
         @Volatile
         private var instance: MeasureDatabase? = null
 
@@ -98,7 +125,7 @@ abstract class MeasureDatabase : RoomDatabase() {
                 // Cascading deletes are declared on the entities and are load-bearing:
                 // Room does not switch foreign keys on for you.
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

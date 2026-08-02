@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.IntSize
 import com.measure.core.data.SavedMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.Segments
 import com.measure.core.geometry.Vec2
@@ -202,6 +203,34 @@ internal fun PlanCanvas(
                     end = to,
                     strokeWidth = if (selected || locked) 6f else 3.5f,
                 )
+
+                // Openings are drawn over the wall as a break in it, which is how they
+                // appear on any floor plan and is far quicker to read than a list.
+                val wallLength = outline[index].distanceTo(outline[(index + 1) % outline.size])
+                if (wallLength > 0.0) {
+                    room.openings[index].orEmpty().forEach { saved ->
+                        val startFraction = (saved.opening.offset / wallLength).coerceIn(0.0, 1.0)
+                        val endFraction =
+                            ((saved.opening.offset + saved.opening.width) / wallLength).coerceIn(0.0, 1.0)
+
+                        drawLine(
+                            color = MeasureColours.Surface,
+                            start = lerp(from, to, startFraction.toFloat()),
+                            end = lerp(from, to, endFraction.toFloat()),
+                            strokeWidth = 9f,
+                        )
+                        drawLine(
+                            color = if (saved.opening.kind == OpeningKind.WINDOW) {
+                                MeasureColours.Idle
+                            } else {
+                                MeasureColours.Ready
+                            },
+                            start = lerp(from, to, startFraction.toFloat()),
+                            end = lerp(from, to, endFraction.toFloat()),
+                            strokeWidth = 4f,
+                        )
+                    }
+                }
             }
 
             screen.forEachIndexed { index, point ->
@@ -221,10 +250,16 @@ internal fun PlanCanvas(
     WallLabels(rooms, camera, size, dragging, selection, formatLength)
 }
 
+private fun lerp(from: Offset, to: Offset, t: Float) = Offset(
+    x = from.x + (to.x - from.x) * t,
+    y = from.y + (to.y - from.y) * t,
+)
+
 private fun Selection.roomId(): Long? = when (this) {
     is Selection.Wall -> roomId
     is Selection.Corner -> roomId
     is Selection.Measurement -> null
+    is Selection.Room -> roomId
     Selection.None -> null
 }
 
@@ -259,7 +294,7 @@ private fun hitTest(
 
     rooms.forEach { room ->
         val polygon = room.polygonOrNull() ?: return@forEach
-        if (Segments.contains(polygon, point)) return Selection.Wall(room.id, 0)
+        if (Segments.contains(polygon, point)) return Selection.Room(room.id)
     }
     return Selection.None
 }

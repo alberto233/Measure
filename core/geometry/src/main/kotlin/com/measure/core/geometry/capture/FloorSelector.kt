@@ -16,12 +16,13 @@ data class PlaneObservation(
     /** Approximate extent, in square metres. */
     val area: Double,
     val isUpwardHorizontal: Boolean,
+    val isDownwardHorizontal: Boolean = false,
     /** True when ARCore has already folded this plane into a larger one. */
     val isSubsumed: Boolean = false,
 )
 
-/** The floor, once chosen: one height for the whole room to be projected onto. */
-data class FloorCandidate(
+/** A merged horizontal surface: the floor, or the ceiling. */
+data class HorizontalSurface(
     val height: Double,
     val area: Double,
     /** How many separate ARCore planes were merged to get here. */
@@ -29,6 +30,52 @@ data class FloorCandidate(
 ) {
     /** Enough floor to be worth trusting as *the* floor rather than a patch of one. */
     val isEstablished: Boolean get() = area >= FloorSelector.ESTABLISHED_AREA
+}
+
+/**
+ * Picks the ceiling — docs/ACCURACY.md M11.
+ *
+ * The preferred way to get a room's height, because it needs no aiming at all: the
+ * ceiling is a large, flat, well-observed plane and the height is simply its distance
+ * above the floor. The fallback is a plumb measurement, which works everywhere but
+ * depends on the user holding steady.
+ *
+ * Two traps that the floor does not have. A downward-facing plane can be the underside of
+ * a table or a shelf, so anything below head height is rejected outright. And the *lowest*
+ * qualifying surface wins rather than the largest — a dropped soffit over a kitchen
+ * counter is genuinely the ceiling there, and in a room with both, the lower one is what
+ * a person would measure to.
+ */
+object CeilingSelector {
+
+    /** Below this it is furniture or a door frame, not a ceiling. */
+    const val MINIMUM_HEIGHT_METRES = 1.8
+
+    /** Above this it is a stairwell or an atrium, and a single height is meaningless. */
+    const val MAXIMUM_HEIGHT_METRES = 6.0
+
+    /** Smaller than this and it is a shelf rather than a surface overhead. */
+    const val MINIMUM_AREA = 0.8
+
+    fun select(planes: List<PlaneObservation>, floorHeight: Double): HorizontalSurface? {
+        val usable = planes.filter { plane ->
+            plane.isDownwardHorizontal &&
+                !plane.isSubsumed &&
+                plane.area >= MINIMUM_AREA &&
+                (plane.height - floorHeight) in MINIMUM_HEIGHT_METRES..MAXIMUM_HEIGHT_METRES
+        }
+        if (usable.isEmpty()) return null
+
+        val lowest = usable.minOf { it.height }
+        val merged = usable.filter { it.height - lowest <= FloorSelector.MERGE_TOLERANCE_METRES }
+        val totalArea = merged.sumOf { it.area }
+
+        return HorizontalSurface(
+            height = merged.sumOf { it.height * it.area } / totalArea,
+            area = totalArea,
+            planeCount = merged.size,
+        )
+    }
 }
 
 /**
@@ -57,7 +104,7 @@ object FloorSelector {
     /** Below this the "floor" is a scrap and the capture should wait. */
     const val ESTABLISHED_AREA = 1.0
 
-    fun select(planes: List<PlaneObservation>): FloorCandidate? {
+    fun select(planes: List<PlaneObservation>): HorizontalSurface? {
         val usable = planes.filter { it.isUpwardHorizontal && !it.isSubsumed && it.area > 0.0 }
         if (usable.isEmpty()) return null
 
@@ -74,9 +121,9 @@ object FloorSelector {
      * Single-pass clustering over height. The planes are sorted first, so a plane joins
      * the running cluster whenever it is within tolerance of the one before it.
      */
-    private fun cluster(planes: List<PlaneObservation>): List<FloorCandidate> {
+    private fun cluster(planes: List<PlaneObservation>): List<HorizontalSurface> {
         val sorted = planes.sortedBy { it.height }
-        val clusters = mutableListOf<FloorCandidate>()
+        val clusters = mutableListOf<HorizontalSurface>()
 
         var members = mutableListOf(sorted.first())
         for (plane in sorted.drop(1)) {
@@ -95,9 +142,9 @@ object FloorSelector {
      * Area-weighted height, so a large well-observed plane sets the level and a small
      * fragment sitting a couple of centimetres off does not drag it.
      */
-    private fun merge(members: List<PlaneObservation>): FloorCandidate {
+    private fun merge(members: List<PlaneObservation>): HorizontalSurface {
         val totalArea = members.sumOf { it.area }
         val height = members.sumOf { it.height * it.area } / totalArea
-        return FloorCandidate(height = height, area = totalArea, planeCount = members.size)
+        return HorizontalSurface(height = height, area = totalArea, planeCount = members.size)
     }
 }

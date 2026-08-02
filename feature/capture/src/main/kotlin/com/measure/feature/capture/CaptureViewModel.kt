@@ -93,6 +93,20 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     /** Corners in walk order, each already projected onto the floor plane by `:ar`. */
     val roomCorners = mutableStateListOf<SampledPoint>()
 
+    /**
+     * The ceiling height ARCore has seen, if any.
+     *
+     * Latched rather than read at the moment of closing: the ceiling is usually noticed
+     * in passing, somewhere in the middle of the walk, and by the time the loop closes
+     * the phone is pointing at the floor again.
+     */
+    var detectedCeilingHeight by mutableStateOf<Double?>(null)
+        private set
+
+    fun noteCeilingHeight(metres: Double?) {
+        if (metres != null && metres > 0.0) detectedCeilingHeight = metres
+    }
+
     /** Non-null once the perimeter is closed and the correction pipeline has run. */
     var roomSolution by mutableStateOf<RoomSolution?>(null)
         private set
@@ -153,6 +167,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      * so a later undo cannot delete a room the user has moved on from.
      */
     fun restartRoom() {
+        detectedCeilingHeight = null
         roomCorners.clear()
         roomSolution = null
         savedRoomId = null
@@ -338,6 +353,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 solution = solution,
                 measured = measured,
                 sigmas = sigmas,
+                ceilingHeight = detectedCeilingHeight,
             )
         }
 

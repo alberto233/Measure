@@ -18,7 +18,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:editor` | M5 plan editor — pan/zoom, drag corners, lock a wall to a taped length |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M4 and M5 field testing, then M6 openings and heights |
+| Next | Field testing M4–M6, then M7 export |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -35,6 +35,12 @@ has yet written a row on a phone.
 **M5 is implemented and untested on hardware.** The plan editor pans, zooms, selects walls
 and corners, moves corners, and locks a wall to a hand-measured length — which re-solves
 the room around that one certain number, the payoff `docs/ACCURACY.md` M8 was built for.
+
+**M6 is implemented and untested on hardware.** Ceiling height is detected from the
+ceiling plane while capturing and can be typed in the editor; doors and windows sit in
+walls and are drawn as breaks in them; wall area and volume follow. Nothing substitutes a
+typical 2.4 m when no height is known — a guessed paint estimate looks exactly like a
+measured one on screen, and the user would have no way to tell them apart.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -306,8 +312,8 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations are written but never run against real data.** The schema is at version 3
-  with two hand-written migrations (walls table; measured corner positions). Both are
+- **Migrations are written but never run against real data.** The schema is at version 4
+  with three hand-written migrations (walls table; measured corner positions; openings). Both are
   straightforward and Room validates them against the exported schemas at compile time,
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
@@ -321,6 +327,9 @@ A release signing config is an M10 concern.
 - **Floor selection when the floor is barely visible.** `FloorSelector` prefers a lower
   surface over a larger one, which handles the dining-table case. A mezzanine, a sunken
   living room or a staircase landing would defeat it, and none of those is handled.
+- **Sloped and vaulted ceilings.** Wall area is perimeter times a single height, which is
+  a decorator's estimate rather than a surveyor's. A bay window, a chimney breast or a
+  sloped ceiling all make it wrong, and the app says nothing about that yet.
 - **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces.
   Changing this touches the data model, so decide before the editor work in M5.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"?

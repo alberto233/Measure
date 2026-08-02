@@ -1,6 +1,11 @@
 package com.measure.core.data
 
+import com.measure.core.geometry.Opening
+import com.measure.core.geometry.OpeningKind
+import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.RoomSolution
+import com.measure.core.geometry.RoomSurfaces
+import com.measure.core.geometry.SurfaceCalculator
 import com.measure.core.geometry.Vec2
 import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.MeasuredSegment
@@ -54,7 +59,29 @@ data class SavedRoom(
     val misclosure: Double,
     val isReliable: Boolean,
     val ceilingHeight: Double?,
-)
+    /** Doors and windows, grouped by the wall index they sit in. */
+    val openings: Map<Int, List<SavedOpening>>,
+) {
+    /**
+     * Wall area and volume, when a height is known.
+     *
+     * Null without one rather than substituting a typical 2.4 m: a guessed height would
+     * produce a paint estimate indistinguishable from a measured one, and the user would
+     * have no way to tell which they were looking at.
+     */
+    val surfaces: RoomSurfaces?
+        get() {
+            val height = ceilingHeight ?: return null
+            if (outline.size < 3) return null
+            return SurfaceCalculator.compute(
+                polygon = Polygon(outline),
+                ceilingHeight = height,
+                openings = openings.values.flatten().map { it.opening },
+            )
+        }
+}
+
+data class SavedOpening(val id: Long, val wallIndex: Int, val opening: Opening)
 
 data class SavedMeasurement(
     val id: Long,
@@ -91,6 +118,7 @@ class MeasureRepository(
     private val levels = database.levelDao()
     private val rooms = database.roomDao()
     private val walls = database.wallDao()
+    private val openings = database.openingDao()
     private val measurements = database.measurementDao()
 
     // --- projects -------------------------------------------------------------------
@@ -135,11 +163,26 @@ class MeasureRepository(
             rooms.observeRooms(projectId),
             rooms.observeCorners(projectId),
             walls.observeFor(projectId),
+            openings.observeFor(projectId),
             measurements.observeFor(projectId),
-        ) { project, roomRows, cornerRows, wallRows, measurementRows ->
+        ) { values ->
+            @Suppress("UNCHECKED_CAST")
+            val project = values[0] as ProjectEntity?
+            @Suppress("UNCHECKED_CAST")
+            val roomRows = values[1] as List<RoomEntity>
+            @Suppress("UNCHECKED_CAST")
+            val cornerRows = values[2] as List<CornerEntity>
+            @Suppress("UNCHECKED_CAST")
+            val wallRows = values[3] as List<WallEntity>
+            @Suppress("UNCHECKED_CAST")
+            val openingRows = values[4] as List<OpeningEntity>
+            @Suppress("UNCHECKED_CAST")
+            val measurementRows = values[5] as List<MeasurementEntity>
+
             if (project == null) return@combine null
             val cornersByRoom = cornerRows.groupBy { it.roomId }
             val wallsByRoom = wallRows.groupBy { it.roomId }
+            val openingsByRoom = openingRows.groupBy { it.roomId }
             ProjectDetail(
                 id = project.id,
                 name = project.name,
@@ -148,6 +191,7 @@ class MeasureRepository(
                     it.toSavedRoom(
                         corners = cornersByRoom[it.id].orEmpty(),
                         walls = wallsByRoom[it.id].orEmpty(),
+                        openings = openingsByRoom[it.id].orEmpty(),
                     )
                 },
                 measurements = measurementRows.map { it.toSavedMeasurement() },
@@ -204,6 +248,7 @@ class MeasureRepository(
         sigmas: List<Double>,
         ceilingHeight: Double? = null,
     ): Long {
+        @Suppress("NAME_SHADOWING") val ceilingHeight = ceilingHeight?.takeIf { it > 0.0 }
         val level = levels.firstFor(projectId)
             ?: LevelEntity(id = levels.insert(LevelEntity(projectId = projectId, name = "Ground floor", elevation = 0.0)), projectId = projectId, name = "Ground floor", elevation = 0.0)
 
@@ -211,6 +256,7 @@ class MeasureRepository(
             RoomEntity(
                 levelId = level.id,
                 name = name,
+                ceilingHeight = ceilingHeight,
                 area = solution.area.squareMetres,
                 perimeter = solution.perimeter.metres,
                 misclosure = solution.closure.relativeError,
@@ -301,6 +347,40 @@ class MeasureRepository(
         )
     }
 
+    // --- openings and heights -------------------------------------------------------
+
+    suspend fun addOpening(roomId: Long, wallIndex: Int, opening: Opening): Long =
+        openings.insert(
+            OpeningEntity(
+                roomId = roomId,
+                index = wallIndex,
+                kind = opening.kind.name,
+                offset = opening.offset,
+                width = opening.width,
+                height = opening.height,
+                sillHeight = opening.sillHeight,
+            ),
+        )
+
+    suspend fun updateOpening(id: Long, roomId: Long, wallIndex: Int, opening: Opening) =
+        openings.update(
+            OpeningEntity(
+                id = id,
+                roomId = roomId,
+                index = wallIndex,
+                kind = opening.kind.name,
+                offset = opening.offset,
+                width = opening.width,
+                height = opening.height,
+                sillHeight = opening.sillHeight,
+            ),
+        )
+
+    suspend fun deleteOpening(id: Long) = openings.delete(id)
+
+    suspend fun setCeilingHeight(roomId: Long, metres: Double?) =
+        rooms.setCeilingHeight(roomId, metres)
+
     /** Locks a wall to a hand-measured length, or unlocks it when [metres] is null. */
     suspend fun setLockedLength(roomId: Long, wallIndex: Int, metres: Double?) {
         if (metres == null) {
@@ -337,6 +417,7 @@ internal fun String.toUnitSystem(): UnitSystem =
 internal fun RoomEntity.toSavedRoom(
     corners: List<CornerEntity>,
     walls: List<WallEntity> = emptyList(),
+    openings: List<OpeningEntity> = emptyList(),
 ): SavedRoom {
     val ordered = corners.sortedBy { it.index }
     return SavedRoom(
@@ -346,6 +427,8 @@ internal fun RoomEntity.toSavedRoom(
         measured = ordered.map { Vec2(it.measuredX, it.measuredY) },
         sigmas = ordered.map { it.sigma },
         lockedLengths = walls.associate { it.index to it.lockedLength },
+        openings = openings.groupBy { it.index }
+            .mapValues { (_, rows) -> rows.map { it.toSavedOpening() } },
         area = Area(area),
         perimeter = Length(perimeter),
         misclosure = misclosure,
@@ -353,6 +436,18 @@ internal fun RoomEntity.toSavedRoom(
         ceilingHeight = ceilingHeight,
     )
 }
+
+internal fun OpeningEntity.toSavedOpening() = SavedOpening(
+    id = id,
+    wallIndex = index,
+    opening = Opening(
+        kind = runCatching { OpeningKind.valueOf(kind) }.getOrDefault(OpeningKind.DOOR),
+        offset = offset,
+        width = width,
+        height = height,
+        sillHeight = sillHeight,
+    ),
+)
 
 internal fun MeasurementEntity.toSavedMeasurement() = SavedMeasurement(
     id = id,

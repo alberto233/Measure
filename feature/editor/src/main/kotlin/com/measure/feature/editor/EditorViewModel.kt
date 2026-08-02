@@ -8,9 +8,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.measure.core.data.MeasureData
 import com.measure.core.data.ProjectDetail
+import com.measure.core.data.SavedOpening
 import com.measure.core.data.SavedRoom
 import com.measure.core.geometry.CapturedCorner
 import com.measure.core.geometry.LengthConstraint
+import com.measure.core.geometry.Opening
+import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolver
@@ -35,6 +38,7 @@ sealed interface Selection {
     data class Wall(val roomId: Long, val index: Int) : Selection
     data class Corner(val roomId: Long, val index: Int) : Selection
     data class Measurement(val id: Long) : Selection
+    data class Room(val roomId: Long) : Selection
 }
 
 /**
@@ -230,6 +234,67 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun measurementById(id: Long) = project.value?.measurements?.firstOrNull { it.id == id }
 
+    // --- openings and heights ---------------------------------------------------------
+
+    fun addOpening(roomId: Long, wallIndex: Int, kind: OpeningKind) {
+        val room = roomById(roomId) ?: return
+        val wallLength = wallLength(room, wallIndex) ?: return
+        val height = room.ceilingHeight ?: DEFAULT_CEILING_HEIGHT
+
+        viewModelScope.launch {
+            repository.addOpening(roomId, wallIndex, Opening.standard(kind, wallLength, height))
+        }
+    }
+
+    fun resizeOpening(roomId: Long, saved: SavedOpening, width: Double?, height: Double?, sill: Double?) {
+        val room = roomById(roomId) ?: return
+        val wallLength = wallLength(room, saved.wallIndex) ?: return
+        val ceiling = room.ceilingHeight ?: DEFAULT_CEILING_HEIGHT
+
+        val updated = saved.opening.copy(
+            width = width ?: saved.opening.width,
+            height = height ?: saved.opening.height,
+            sillHeight = sill ?: saved.opening.sillHeight,
+        )
+        if (!updated.fitsIn(wallLength, ceiling)) {
+            message = "That will not fit this wall"
+            return
+        }
+        viewModelScope.launch {
+            repository.updateOpening(saved.id, roomId, saved.wallIndex, updated)
+        }
+    }
+
+    fun deleteOpening(id: Long) {
+        viewModelScope.launch { repository.deleteOpening(id) }
+    }
+
+    /**
+     * Sets the room height by hand.
+     *
+     * Needed even with ceiling detection, because a ceiling only gets detected if the
+     * user happened to look up at one that ARCore could fit — which rules out sloped
+     * ceilings, dark rooms and anywhere with something large overhead.
+     */
+    fun setCeilingHeight(roomId: Long, typed: String) {
+        if (typed.isBlank()) {
+            viewModelScope.launch { repository.setCeilingHeight(roomId, null) }
+            return
+        }
+        val parsed = LengthParser.parse(typed, unitSystem())
+        if (parsed == null || parsed.metres <= 0.0) {
+            message = "Could not read \"$typed\" as a height"
+            return
+        }
+        viewModelScope.launch { repository.setCeilingHeight(roomId, parsed.metres) }
+    }
+
+    fun wallLength(room: SavedRoom, wallIndex: Int): Double? {
+        val outline = room.outline
+        if (outline.size < 3 || wallIndex !in outline.indices) return null
+        return outline[wallIndex].distanceTo(outline[(wallIndex + 1) % outline.size])
+    }
+
     fun renameRoom(roomId: Long, name: String) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
@@ -299,6 +364,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun unitSystem(): UnitSystem = project.value?.unitSystem ?: UnitSystem.METRIC
 
+    /** Parses a typed length in the project's units, or null if it is not one. */
+    fun parseLength(text: String): Double? =
+        LengthParser.parse(text, unitSystem())?.metres?.takeIf { it > 0.0 }
+
     fun formatLength(metres: Double): String =
         LengthFormatter.format(Length(metres), unitSystem())
 
@@ -312,6 +381,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
         const val UNDO_DEPTH = 20
+
+        /**
+         * Used only to size a *new* opening sensibly when no height is known yet. Never
+         * shown as a measurement and never stored — a guessed height presented as a
+         * measured one is the dishonesty this app is built to avoid.
+         */
+        const val DEFAULT_CEILING_HEIGHT = 2.4
         const val DEFAULT_SIGMA = 0.02
 
         /**

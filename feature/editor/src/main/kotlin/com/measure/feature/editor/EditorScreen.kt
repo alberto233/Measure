@@ -35,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.geometry.OpeningKind
 import kotlinx.coroutines.delay
 
 /**
@@ -208,7 +209,91 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
             is Selection.Corner -> CornerPanel(viewModel, selection)
             is Selection.Wall -> WallPanel(viewModel, selection)
             is Selection.Measurement -> MeasurementPanel(viewModel, selection)
+            is Selection.Room -> RoomPanel(viewModel, selection)
         }
+    }
+}
+
+/**
+ * The room itself: its height, and what that height makes calculable.
+ *
+ * Wall area and volume appear only once a height is known, and nothing substitutes a
+ * typical 2.4 m in the meantime. A guessed paint estimate is indistinguishable from a
+ * measured one on screen, and the user has no way to tell which they are looking at.
+ */
+@Composable
+private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
+    val room = viewModel.roomById(selection.roomId) ?: return
+    val surfaces = room.surfaces
+
+    var name by remember(room.id, room.name) { mutableStateOf(room.name) }
+    var height by remember(room.id, room.ceilingHeight) {
+        mutableStateOf(room.ceilingHeight?.let { viewModel.formatLength(it) } ?: "")
+    }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Field(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.weight(1f),
+        )
+        Pill("Rename", onClick = { viewModel.renameRoom(room.id, name) })
+    }
+
+    Text(
+        text = "${viewModel.formatArea(room)} floor · ${viewModel.formatLength(room.perimeter.metres)} perimeter",
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Ceiling", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+        Field(
+            value = height,
+            onValueChange = { height = it },
+            numeric = true,
+            modifier = Modifier.weight(1f),
+        )
+        Pill("Set", onClick = { viewModel.setCeilingHeight(room.id, height) })
+    }
+
+    if (surfaces == null) {
+        Text(
+            text = "Set a ceiling height for wall area and volume. Look up while capturing " +
+                "and it fills itself in.",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
+    } else {
+        Text(
+            text = "Walls ${com.measure.core.units.AreaFormatter.format(surfaces.netWallArea, viewModel.unitSystem())}" +
+                " · volume ${com.measure.core.units.VolumeFormatter.format(surfaces.volume, viewModel.unitSystem())}",
+            color = MeasureColours.OnScrim,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (surfaces.openingArea.squareMetres > 0.0) {
+            Text(
+                text = "After taking out " +
+                    com.measure.core.units.AreaFormatter.format(surfaces.openingArea, viewModel.unitSystem()) +
+                    " of doors and windows",
+                color = MeasureColours.OnScrimMuted,
+                fontSize = 12.sp,
+            )
+        }
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill("Delete room", onClick = { viewModel.deleteRoom(room.id) })
+        Pill("Done", onClick = viewModel::clearSelection)
     }
 }
 
@@ -324,18 +409,11 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BasicTextField(
+        Field(
             value = typed,
             onValueChange = { typed = it },
-            singleLine = true,
-            textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 16.sp),
-            cursorBrush = SolidColor(MeasureColours.Ready),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MeasureColours.ScrimSoft)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+            numeric = true,
+            modifier = Modifier.weight(1f),
         )
         Pill(
             label = "Lock",
@@ -347,6 +425,114 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
             Pill("Unlock", onClick = { viewModel.unlockWall(selection.roomId, selection.index) })
         }
     }
+
+    OpeningsSection(viewModel, room, selection.index)
+}
+
+/**
+ * Doors and windows in the selected wall.
+ *
+ * Added at a standard size and adjusted, rather than typed from scratch: a standard
+ * internal door really is about 830 x 2040 mm, and making someone enter four numbers per
+ * doorway is what stops openings being recorded at all — at which point the paint
+ * estimate silently includes the door.
+ */
+@Composable
+private fun OpeningsSection(
+    viewModel: EditorViewModel,
+    room: com.measure.core.data.SavedRoom,
+    wallIndex: Int,
+) {
+    val openings = room.openings[wallIndex].orEmpty()
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (openings.isEmpty()) "No doors or windows" else "In this wall",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("+ Door", onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.DOOR) })
+            Pill("+ Window", onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.WINDOW) })
+        }
+    }
+
+    openings.forEach { saved ->
+        OpeningRow(viewModel, room, saved)
+    }
+}
+
+@Composable
+private fun OpeningRow(
+    viewModel: EditorViewModel,
+    room: com.measure.core.data.SavedRoom,
+    saved: com.measure.core.data.SavedOpening,
+) {
+    var width by remember(saved.id, saved.opening.width) {
+        mutableStateOf(viewModel.formatLength(saved.opening.width))
+    }
+    var height by remember(saved.id, saved.opening.height) {
+        mutableStateOf(viewModel.formatLength(saved.opening.height))
+    }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = saved.opening.kind.label,
+            color = MeasureColours.OnScrim,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+        Field(value = width, onValueChange = { width = it }, numeric = true, modifier = Modifier.weight(1f))
+        Text("×", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+        Field(value = height, onValueChange = { height = it }, numeric = true, modifier = Modifier.weight(1f))
+        Pill(
+            label = "Set",
+            onClick = {
+                viewModel.resizeOpening(
+                    roomId = room.id,
+                    saved = saved,
+                    width = viewModel.parseLength(width),
+                    height = viewModel.parseLength(height),
+                    sill = null,
+                )
+            },
+        )
+        Pill("×", onClick = { viewModel.deleteOpening(saved.id) })
+    }
+}
+
+/** A text field styled like the rest of the panel. */
+@Composable
+private fun Field(
+    value: String,
+    onValueChange: (String) -> Unit,
+    numeric: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 15.sp),
+        cursorBrush = SolidColor(MeasureColours.Ready),
+        keyboardOptions = if (numeric) {
+            KeyboardOptions(keyboardType = KeyboardType.Decimal)
+        } else {
+            KeyboardOptions.Default
+        },
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MeasureColours.ScrimSoft)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+    )
 }
 
 @Composable

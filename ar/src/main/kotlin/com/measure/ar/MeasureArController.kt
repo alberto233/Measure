@@ -30,6 +30,7 @@ import com.measure.ar.render.RibbonRenderer
 import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.CaptureOutcome
 import com.measure.core.geometry.capture.CaptureRejection
+import com.measure.core.geometry.capture.CeilingSelector
 import com.measure.core.geometry.capture.FloorSelector
 import com.measure.core.geometry.capture.PlaneObservation
 import com.measure.core.geometry.capture.PointAggregator
@@ -420,6 +421,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
         val currentScene = scene
         val floor = findFloor(session)
+        val ceilingHeight = findCeilingHeight(session, floor)
 
         // Room corners come only from the floor plane itself, so the point is where the
         // line of sight meets the floor (docs/ACCURACY.md M1 and M2). Flattening some
@@ -473,6 +475,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             anchors = screenAnchors(currentScene, anchor, movingEnd),
             floor = floor,
             offFloor = offFloor,
+            ceilingHeight = ceilingHeight,
         )
     }
 
@@ -494,6 +497,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                         height = plane.centerPose.ty().toDouble(),
                         area = (plane.extentX * plane.extentZ).toDouble(),
                         isUpwardHorizontal = plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING,
+                        isDownwardHorizontal = plane.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING,
                         isSubsumed = plane.subsumedBy != null,
                     )
                 }
@@ -501,6 +505,34 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             return null
         }
         return FloorSelector.select(observations)?.let(FloorState::from)
+    }
+
+    /**
+     * Ceiling height above the floor, when a ceiling has been seen — docs/ACCURACY.md M11.
+     *
+     * Free when it works: the user gets a room height without aiming at anything, simply
+     * by having looked up at some point. Null the rest of the time, and plumb mode is the
+     * fallback that always works.
+     */
+    private fun findCeilingHeight(session: Session, floor: FloorState?): Double? {
+        if (floor == null) return null
+        val observations = try {
+            session.getAllTrackables(Plane::class.java)
+                .filter { it.trackingState == TrackingState.TRACKING }
+                .map { plane ->
+                    PlaneObservation(
+                        id = plane.hashCode().toLong(),
+                        height = plane.centerPose.ty().toDouble(),
+                        area = (plane.extentX * plane.extentZ).toDouble(),
+                        isUpwardHorizontal = plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING,
+                        isDownwardHorizontal = plane.type == Plane.Type.HORIZONTAL_DOWNWARD_FACING,
+                        isSubsumed = plane.subsumedBy != null,
+                    )
+                }
+        } catch (error: Throwable) {
+            return null
+        }
+        return CeilingSelector.select(observations, floor.height)?.let { it.height - floor.height }
     }
 
     private fun assessTracking(session: Session, camera: Camera, frame: Frame): TrackingStatus {
@@ -752,6 +784,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         anchors: List<ScreenAnchor>,
         floor: FloorState? = null,
         offFloor: Boolean = false,
+        ceilingHeight: Double? = null,
     ) {
         val quantisedTarget = target?.copy(range = quantise(target.range, RANGE_STEP))
         val quantisedPreview = preview?.copy(
@@ -775,6 +808,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                     area = quantise(floor.area, AREA_STEP),
                 ),
                 offFloor = offFloor,
+                ceilingHeight = ceilingHeight?.let { quantise(it, RANGE_STEP) },
             )
         }
     }

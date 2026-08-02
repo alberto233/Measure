@@ -83,6 +83,8 @@ fun CaptureScreen(
         viewModel.updateStartProximity(state.target?.position)
     }
 
+    LaunchedEffect(state.ceilingHeight) { viewModel.noteCeilingHeight(state.ceilingHeight) }
+
     Box(modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             // Detached first because this view outlives the AndroidView node that hosts
@@ -338,7 +340,8 @@ private fun RoomReadout(
             )
             Text(
                 text = "Perimeter ${viewModel.formatLength(solution.perimeter.metres)}" +
-                    " · ${solution.polygon.size} walls",
+                    " · ${solution.polygon.size} walls" +
+                    (viewModel.detectedCeilingHeight?.let { " · ${viewModel.formatLength(it)} high" } ?: ""),
                 color = MeasureColours.OnScrimMuted,
                 fontSize = 12.sp,
             )

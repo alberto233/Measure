@@ -177,6 +177,9 @@ interface RoomDao {
     @Query("UPDATE rooms SET name = :name WHERE id = :id")
     suspend fun rename(id: Long, name: String)
 
+    @Query("UPDATE rooms SET ceilingHeight = :metres WHERE id = :id")
+    suspend fun setCeilingHeight(id: Long, metres: Double?)
+
     @Query("DELETE FROM corners WHERE roomId = :roomId")
     suspend fun deleteCorners(roomId: Long)
 
@@ -208,6 +211,30 @@ interface WallDao {
         """,
     )
     fun observeFor(projectId: Long): Flow<List<WallEntity>>
+}
+
+@Dao
+interface OpeningDao {
+
+    @Insert
+    suspend fun insert(opening: OpeningEntity): Long
+
+    @Update
+    suspend fun update(opening: OpeningEntity)
+
+    @Query("DELETE FROM openings WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query(
+        """
+        SELECT o.* FROM openings o
+          JOIN rooms r ON o.roomId = r.id
+          JOIN levels l ON r.levelId = l.id
+         WHERE l.projectId = :projectId
+         ORDER BY o.roomId, o.wallIndex, o.offset
+        """,
+    )
+    fun observeFor(projectId: Long): Flow<List<OpeningEntity>>
 }
 
 @Dao

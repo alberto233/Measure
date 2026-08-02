@@ -167,6 +167,43 @@ data class WallEntity(
 )
 
 /**
+ * A door or window in a wall.
+ *
+ * Attached to a wall by index rather than to a `walls` row, because most walls have no
+ * row: one only appears when a length is locked. Index is the stable identifier for a
+ * wall either way — wall *i* runs from corner *i* to corner *i+1* — so this is the same
+ * convention used everywhere else and needs no row to exist first.
+ *
+ * The position is measured **along the wall**, which is how a person measures it and what
+ * survives the corners moving when the room is re-solved. Room coordinates would mean
+ * every solve quietly slid the doors along the walls.
+ */
+@Entity(
+    tableName = "openings",
+    foreignKeys = [
+        ForeignKey(
+            entity = RoomEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["roomId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("roomId")],
+)
+data class OpeningEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val roomId: Long,
+    @ColumnInfo(name = "wallIndex") val index: Int,
+    /** DOOR, WINDOW or PASSAGE, stored by name. */
+    val kind: String,
+    /** Distance from the wall's starting corner to the near edge, in metres. */
+    val offset: Double,
+    val width: Double,
+    val height: Double,
+    val sillHeight: Double,
+)
+
+/**
  * A standalone measurement, attached to a project rather than to a room.
  *
  * Deliberately independent: "will this sofa fit" is a one-off distance with no room
