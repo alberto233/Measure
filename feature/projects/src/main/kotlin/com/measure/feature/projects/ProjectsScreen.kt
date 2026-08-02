@@ -42,6 +42,7 @@ import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.PlanStyle
 import com.measure.core.designsystem.PlanView
 import com.measure.core.units.AreaFormatter
+import com.measure.core.units.LengthFormatter
 import java.text.DateFormat
 import java.util.Date
 
@@ -208,7 +209,7 @@ private fun ProjectCard(
                 .background(MeasureColours.ScrimSoft),
         ) {
             PlanView(
-                outlines = project.outlines,
+                outlines = project.thumbnailOutlines,
                 modifier = Modifier.fillMaxSize(),
                 style = PlanStyle(
                     strokeWidth = 1.8f,
@@ -254,7 +255,10 @@ private fun ProjectSummary.describeContents(): String {
             add(AreaFormatter.format(totalArea, unitSystem))
         }
         if (measurementCount > 0) {
-            add("$measurementCount ${if (measurementCount == 1) "measurement" else "measurements"}")
+            // The value itself when there is only one, because "1 measurement" tells the
+            // user nothing they wanted to know — the number is the whole point of it.
+            soleMeasurement?.let { add(LengthFormatter.format(it, unitSystem)) }
+                ?: add("$measurementCount ${if (measurementCount == 1) "measurement" else "measurements"}")
         }
     }
     return parts.joinToString(" · ")

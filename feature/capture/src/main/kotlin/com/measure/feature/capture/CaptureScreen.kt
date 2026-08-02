@@ -101,6 +101,9 @@ fun CaptureScreen(
             ready = state.canCapture,
             hasTarget = state.target != null,
             samplingProgress = state.sampling?.fraction,
+            // Only once a measurement is under way. Before that there is no trajectory to
+            // hold, and permanent crosshairs over a camera feed are just clutter.
+            showAlignmentAxes = state.preview != null,
             modifier = Modifier.fillMaxSize(),
         )
 

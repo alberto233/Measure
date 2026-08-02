@@ -34,7 +34,22 @@ sealed interface Selection {
     data object None : Selection
     data class Wall(val roomId: Long, val index: Int) : Selection
     data class Corner(val roomId: Long, val index: Int) : Selection
+    data class Measurement(val id: Long) : Selection
 }
+
+/**
+ * Everything needed to put one room back exactly as it was.
+ *
+ * The observations rather than the solved outline, because those are what a solve starts
+ * from — restoring a solution would reinstate the shape but not the thing that produced
+ * it, and the next edit would then diverge from the room the user thought they had.
+ */
+private data class RoomSnapshot(
+    val roomId: Long,
+    val measured: List<Vec2>,
+    val sigmas: List<Double>,
+    val lockedLengths: Map<Int, Double>,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
@@ -74,6 +89,18 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         private set
 
     data class DragState(val roomId: Long, val index: Int, val position: Vec2)
+
+    /**
+     * One step of undo per edit.
+     *
+     * A dragged corner is a freehand judgement, and the usual outcome of a freehand
+     * judgement is wanting the previous one back. Bounded because this is a safety net
+     * for the last few actions, not a document history.
+     */
+    private val undoStack = ArrayDeque<RoomSnapshot>()
+
+    var canUndo by mutableStateOf(false)
+        private set
 
     fun load(projectId: Long) {
         projectIdFlow.value = projectId
@@ -118,6 +145,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         dragging = null
 
         val room = roomById(drag.roomId) ?: return
+        remember(room)
         // The drag replaces the *observation*, not the solved position. The user is
         // telling us where the corner really is, which supersedes what the camera saw.
         val moved = room.measured.toMutableList()
@@ -150,6 +178,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+        remember(room)
         viewModelScope.launch {
             repository.setLockedLength(roomId, index, parsed.metres)
             resolveWith(room, room.measured, room.sigmas, room.lockedLengths + (index to parsed.metres))
@@ -158,11 +187,48 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun unlockWall(roomId: Long, index: Int) {
         val room = roomById(roomId) ?: return
+        remember(room)
         viewModelScope.launch {
             repository.setLockedLength(roomId, index, null)
             resolveWith(room, room.measured, room.sigmas, room.lockedLengths - index)
         }
     }
+
+    // --- undo ------------------------------------------------------------------------
+
+    private fun remember(room: SavedRoom) {
+        undoStack.addLast(
+            RoomSnapshot(room.id, room.measured, room.sigmas, room.lockedLengths),
+        )
+        while (undoStack.size > UNDO_DEPTH) undoStack.removeFirst()
+        canUndo = true
+    }
+
+    /** Puts the last edited room back as it was, locks included. */
+    fun undo() {
+        val snapshot = undoStack.removeLastOrNull() ?: return
+        canUndo = undoStack.isNotEmpty()
+
+        val room = roomById(snapshot.roomId) ?: return
+        viewModelScope.launch {
+            // Locks are rows of their own, so restoring geometry is not enough — a lock
+            // added by the edit being undone would otherwise survive it and immediately
+            // pull the restored room back out of shape.
+            val currentIndices = room.lockedLengths.keys + snapshot.lockedLengths.keys
+            currentIndices.forEach { index ->
+                repository.setLockedLength(snapshot.roomId, index, snapshot.lockedLengths[index])
+            }
+            resolveWith(room, snapshot.measured, snapshot.sigmas, snapshot.lockedLengths)
+        }
+        selection = Selection.None
+    }
+
+    fun deleteMeasurement(id: Long) {
+        viewModelScope.launch { repository.deleteMeasurement(id) }
+        selection = Selection.None
+    }
+
+    fun measurementById(id: Long) = project.value?.measurements?.firstOrNull { it.id == id }
 
     fun renameRoom(roomId: Long, name: String) {
         val trimmed = name.trim()
@@ -245,6 +311,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+        const val UNDO_DEPTH = 20
         const val DEFAULT_SIGMA = 0.02
 
         /**

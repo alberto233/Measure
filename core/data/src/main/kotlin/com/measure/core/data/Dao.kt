@@ -25,6 +25,16 @@ data class ProjectSummaryRow(
     val totalArea: Double,
 )
 
+/** A standalone measurement reduced to a plan-view line, for list thumbnails. */
+data class MeasurementLineRow(
+    val projectId: Long,
+    val fromX: Double,
+    val fromZ: Double,
+    val toX: Double,
+    val toZ: Double,
+    val metres: Double,
+)
+
 /** One corner of one room, tagged with its project, for drawing list thumbnails. */
 data class OutlinePointRow(
     val projectId: Long,
@@ -70,6 +80,21 @@ interface ProjectDao {
         """,
     )
     fun observeOutlinePoints(): Flow<List<OutlinePointRow>>
+
+    /**
+     * Every standalone measurement as a plan-view line.
+     *
+     * A project can hold measurements and no rooms — "will the sofa fit" is exactly that
+     * — and without these its card would show an empty box, which reads as lost work.
+     */
+    @Query(
+        """
+        SELECT projectId, fromX, fromZ, toX, toZ, valueMetres AS metres
+          FROM measurements
+         ORDER BY projectId, createdAt
+        """,
+    )
+    fun observeMeasurementLines(): Flow<List<MeasurementLineRow>>
 
     @Query("SELECT * FROM projects WHERE id = :id")
     fun observe(id: Long): Flow<ProjectEntity?>

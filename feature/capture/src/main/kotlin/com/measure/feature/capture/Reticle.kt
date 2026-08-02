@@ -27,6 +27,7 @@ internal fun Reticle(
     ready: Boolean,
     hasTarget: Boolean,
     samplingProgress: Float?,
+    showAlignmentAxes: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val colour = when {
@@ -43,6 +44,18 @@ internal fun Reticle(
 
     Canvas(modifier) {
         val centre = Offset(size.width / 2f, size.height / 2f)
+
+        // Full-width alignment axes. They cost almost nothing to draw and they turn the
+        // whole screen into a straight edge: line one up with a skirting board or a door
+        // frame and the phone is square to it, which is how you keep a consistent
+        // trajectory towards a corner you cannot actually see.
+        if (showAlignmentAxes) {
+            val axis = Color.White.copy(alpha = 0.18f)
+            val hairline = 1f.dp.toPx()
+            drawLine(axis, Offset(0f, centre.y), Offset(size.width, centre.y), hairline)
+            drawLine(axis, Offset(centre.x, 0f), Offset(centre.x, size.height), hairline)
+        }
+
         val outer = OUTER_RADIUS_DP.dp.toPx() * radius
         val stroke = STROKE_DP.dp.toPx()
 

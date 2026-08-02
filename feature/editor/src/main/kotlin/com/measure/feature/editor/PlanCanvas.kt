@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import com.measure.core.data.SavedMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.geometry.Polygon
@@ -86,6 +87,7 @@ data class PlanCamera(
 @Composable
 internal fun PlanCanvas(
     rooms: List<SavedRoom>,
+    measurements: List<SavedMeasurement>,
     selection: Selection,
     dragging: EditorViewModel.DragState?,
     formatLength: (Double) -> String,
@@ -99,7 +101,10 @@ internal fun PlanCanvas(
     var camera by remember { mutableStateOf(PlanCamera()) }
     var fitted by remember { mutableStateOf(false) }
 
-    val allPoints = rooms.flatMap { it.outline }
+    // Measurements count towards the fit too: a project holding nothing but a single
+    // distance would otherwise open on an empty canvas with the measurement off-screen.
+    val allPoints = rooms.flatMap { it.outline } +
+        measurements.flatMap { listOf(it.from.toFloorPlane(), it.to.toFloorPlane()) }
 
     // Fit once, when there is both something to show and somewhere to show it. Re-fitting
     // on every change would yank the view out from under someone who has zoomed in.
@@ -127,7 +132,7 @@ internal fun PlanCanvas(
             }
             .pointerInput(rooms, camera) {
                 detectTapGestures { offset ->
-                    onSelect(hitTest(rooms, camera.toPlan(offset, size), touchSlopMetres()))
+                    onSelect(hitTest(rooms, measurements, camera.toPlan(offset, size), touchSlopMetres()))
                 }
             }
             .pointerInput(rooms, camera) {
@@ -144,6 +149,26 @@ internal fun PlanCanvas(
                 )
             },
     ) {
+        // Standalone measurements, drawn under the rooms: they are reference marks rather
+        // than structure, and a "will the sofa fit" line should not obscure a wall.
+        measurements.forEach { measurement ->
+            val from = camera.toScreen(measurement.from.toFloorPlane(), size)
+            val to = camera.toScreen(measurement.to.toFloorPlane(), size)
+            val selected = selection == Selection.Measurement(measurement.id)
+            val colour = if (selected) MeasureColours.Sampling else MeasureColours.Idle
+
+            drawLine(
+                color = colour.copy(alpha = if (selected) 1f else 0.7f),
+                start = from,
+                end = to,
+                strokeWidth = if (selected) 6f else 3f,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                    floatArrayOf(14f, 10f),
+                ),
+            )
+            listOf(from, to).forEach { drawCircle(colour, radius = 5f, center = it) }
+        }
+
         rooms.forEach { room ->
             val outline = room.outline.toMutableList()
             if (dragging?.roomId == room.id && dragging.index in outline.indices) {
@@ -199,6 +224,7 @@ internal fun PlanCanvas(
 private fun Selection.roomId(): Long? = when (this) {
     is Selection.Wall -> roomId
     is Selection.Corner -> roomId
+    is Selection.Measurement -> null
     Selection.None -> null
 }
 
@@ -209,12 +235,26 @@ private fun Selection.roomId(): Long? = when (this) {
  * Corners win over walls because every corner is also on two walls, so the other order
  * would make corners unselectable.
  */
-private fun hitTest(rooms: List<SavedRoom>, point: Vec2, reach: Double): Selection {
+private fun hitTest(
+    rooms: List<SavedRoom>,
+    measurements: List<SavedMeasurement>,
+    point: Vec2,
+    reach: Double,
+): Selection {
     findCorner(rooms, point, reach)?.let { (roomId, index) -> return Selection.Corner(roomId, index) }
 
     rooms.forEach { room ->
         val polygon = room.polygonOrNull() ?: return@forEach
         Segments.nearestEdge(polygon, point, reach)?.let { return Selection.Wall(room.id, it) }
+    }
+
+    measurements.forEach { measurement ->
+        val distance = Segments.distanceToSegment(
+            measurement.from.toFloorPlane(),
+            measurement.to.toFloorPlane(),
+            point,
+        )
+        if (distance <= reach) return Selection.Measurement(measurement.id)
     }
 
     rooms.forEach { room ->

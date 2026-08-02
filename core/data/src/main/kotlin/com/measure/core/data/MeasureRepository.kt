@@ -27,8 +27,15 @@ data class ProjectSummary(
     val totalArea: Area,
     /** One outline per room, in capture order. Enough to draw a plan thumbnail. */
     val outlines: List<List<Vec2>>,
+    /** Standalone measurements as plan-view lines, so they appear on the thumbnail too. */
+    val measurementLines: List<List<Vec2>>,
+    /** The value, when a project holds exactly one measurement and nothing else. */
+    val soleMeasurement: Length?,
 ) {
     val isEmpty: Boolean get() = roomCount == 0 && measurementCount == 0
+
+    /** Everything drawable, for a thumbnail that is never blank when there is work in it. */
+    val thumbnailOutlines: List<List<Vec2>> get() = outlines + measurementLines
 }
 
 data class SavedRoom(
@@ -89,12 +96,19 @@ class MeasureRepository(
     // --- projects -------------------------------------------------------------------
 
     fun observeProjects(): Flow<List<ProjectSummary>> =
-        combine(projects.observeSummaries(), projects.observeOutlinePoints()) { summaries, points ->
+        combine(
+            projects.observeSummaries(),
+            projects.observeOutlinePoints(),
+            projects.observeMeasurementLines(),
+        ) { summaries, points, lines ->
             val outlinesByProject = points
                 .groupBy { it.projectId }
                 .mapValues { (_, rows) -> rows.groupBy { it.roomId }.values.map { room -> room.map { Vec2(it.x, it.y) } } }
 
+            val linesByProject = lines.groupBy { it.projectId }
+
             summaries.map { row ->
+                val projectLines = linesByProject[row.id].orEmpty()
                 ProjectSummary(
                     id = row.id,
                     name = row.name,
@@ -104,6 +118,13 @@ class MeasureRepository(
                     measurementCount = row.measurementCount,
                     totalArea = Area(row.totalArea),
                     outlines = outlinesByProject[row.id].orEmpty(),
+                    measurementLines = projectLines.map {
+                        // Vec3.toFloorPlane negates z, so the plan matches the AR frame.
+                        listOf(Vec2(it.fromX, -it.fromZ), Vec2(it.toX, -it.toZ))
+                    },
+                    soleMeasurement = projectLines.singleOrNull()
+                        ?.takeIf { row.roomCount == 0 }
+                        ?.let { Length(it.metres) },
                 )
             }
         }

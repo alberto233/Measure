@@ -59,10 +59,12 @@ fun EditorScreen(
 
     val project by viewModel.project.collectAsStateWithLifecycle()
     val rooms = project?.rooms.orEmpty()
+    val measurements = project?.measurements.orEmpty()
 
     Box(modifier.fillMaxSize().background(MeasureColours.Surface)) {
         PlanCanvas(
             rooms = rooms,
+            measurements = measurements,
             selection = viewModel.selection,
             dragging = viewModel.dragging,
             formatLength = viewModel::formatLength,
@@ -76,13 +78,15 @@ fun EditorScreen(
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
             TopBar(
                 title = project?.name ?: "",
-                subtitle = rooms.summarise(viewModel),
+                subtitle = summarise(rooms, measurements, viewModel),
                 onBack = onBack,
                 onAddRoom = onAddRoom,
+                canUndo = viewModel.canUndo,
+                onUndo = viewModel::undo,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
-            if (rooms.isEmpty() && project != null) {
+            if (rooms.isEmpty() && measurements.isEmpty() && project != null) {
                 EmptyPlan(Modifier.align(Alignment.Center))
             }
 
@@ -108,14 +112,26 @@ fun EditorScreen(
     }
 }
 
-private fun List<SavedRoom>.summarise(viewModel: EditorViewModel): String {
-    if (isEmpty()) return "No rooms yet"
-    val area = sumOf { it.area.squareMetres }
-    return "$size ${if (size == 1) "room" else "rooms"} · " +
-        com.measure.core.units.AreaFormatter.format(
-            com.measure.core.units.Area(area),
-            viewModel.unitSystem(),
-        )
+private fun summarise(
+    rooms: List<SavedRoom>,
+    measurements: List<com.measure.core.data.SavedMeasurement>,
+    viewModel: EditorViewModel,
+): String {
+    val parts = buildList {
+        if (rooms.isNotEmpty()) {
+            add("${rooms.size} ${if (rooms.size == 1) "room" else "rooms"}")
+            add(
+                com.measure.core.units.AreaFormatter.format(
+                    com.measure.core.units.Area(rooms.sumOf { it.area.squareMetres }),
+                    viewModel.unitSystem(),
+                ),
+            )
+        }
+        if (measurements.isNotEmpty()) {
+            add("${measurements.size} ${if (measurements.size == 1) "measurement" else "measurements"}")
+        }
+    }
+    return if (parts.isEmpty()) "Nothing yet" else parts.joinToString(" · ")
 }
 
 @Composable
@@ -124,6 +140,8 @@ private fun TopBar(
     subtitle: String,
     onBack: () -> Unit,
     onAddRoom: () -> Unit,
+    canUndo: Boolean,
+    onUndo: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -136,7 +154,10 @@ private fun TopBar(
             Text(title, color = MeasureColours.OnScrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
         }
-        Pill("Add room", onClick = onAddRoom)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Undo", enabled = canUndo, onClick = onUndo)
+            Pill("Add", onClick = onAddRoom)
+        }
     }
 }
 
@@ -162,6 +183,7 @@ private fun EmptyPlan(modifier: Modifier = Modifier) {
 @Composable
 private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
     val selection = viewModel.selection
+    val measurementsPresent = viewModel.project.value?.measurements?.isNotEmpty() == true
 
     Column(
         modifier
@@ -174,13 +196,57 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
     ) {
         when (selection) {
             Selection.None -> Text(
-                text = "Pinch to zoom · tap a wall to set its true length · long-press a corner to move it",
+                text = if (measurementsPresent) {
+                    "Pinch to zoom · tap a wall to set its true length · tap a dashed line for a measurement"
+                } else {
+                    "Pinch to zoom · tap a wall to set its true length · long-press a corner to move it"
+                },
                 color = MeasureColours.OnScrimMuted,
                 fontSize = 13.sp,
             )
 
             is Selection.Corner -> CornerPanel(viewModel, selection)
             is Selection.Wall -> WallPanel(viewModel, selection)
+            is Selection.Measurement -> MeasurementPanel(viewModel, selection)
+        }
+    }
+}
+
+/**
+ * A standalone distance, with its tolerance.
+ *
+ * These are drawn and selectable on the plan rather than only counted, because a saved
+ * measurement the app will not show you is a measurement you have to take again.
+ */
+@Composable
+private fun MeasurementPanel(viewModel: EditorViewModel, selection: Selection.Measurement) {
+    val measurement = viewModel.measurementById(selection.id) ?: return
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text(
+                text = com.measure.core.units.LengthFormatter.formatWithUncertainty(
+                    measurement.length,
+                    measurement.sigma,
+                    viewModel.unitSystem(),
+                ),
+                color = MeasureColours.OnScrim,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = measurement.mode.label + " measurement",
+                color = MeasureColours.OnScrimMuted,
+                fontSize = 12.sp,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Delete", onClick = { viewModel.deleteMeasurement(measurement.id) })
+            Pill("Done", onClick = viewModel::clearSelection)
         }
     }
 }

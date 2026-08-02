@@ -661,6 +661,24 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             markerRenderer.draw(listOf(anchor), viewProjection, PENDING, MARKER_SIZE_PX)
         }
 
+        // The trajectory guide: the current wall's line, continued well past the aim
+        // point. When the corner you are heading for is behind a wardrobe you cannot aim
+        // at it, but you can line this up with the skirting board you *can* see and know
+        // the direction is right. CamToPlan has the same idea.
+        if (anchor != null && previewEnd != null) {
+            val along = previewEnd - anchor
+            if (along.lengthSquared > GUIDE_MIN_LENGTH_SQUARED) {
+                val extended = previewEnd + along.normalised() * GUIDE_EXTENSION_METRES
+                ribbonRenderer.draw(
+                    listOf(previewEnd to extended),
+                    viewProjection,
+                    cameraPosition,
+                    GUIDE,
+                    ribbonWidth * 0.5f,
+                )
+            }
+        }
+
         // The surface dot under the reticle. Drawn in 3D rather than as part of the 2D
         // reticle so it visibly lies on the surface and tracks with it.
         val targetDot = previewEnd ?: rawTarget
@@ -806,6 +824,13 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         val PENDING = GlColour.of(0x2ED3B7, 0.95f)
         val RETICLE = GlColour.of(0xFFD166, 0.9f)
         val CLOSING = GlColour.of(0xFFD166, 0.5f)
+        val GUIDE = GlColour.of(0x2ED3B7, 0.35f)
+
+        /** How far past the aim point the trajectory guide continues, in metres. */
+        const val GUIDE_EXTENSION_METRES = 4.0
+
+        /** Below this the segment has no reliable direction to extend. */
+        const val GUIDE_MIN_LENGTH_SQUARED = 0.04
         val START_CORNER = GlColour.of(0xFF6B6B, 0.95f)
     }
 }
