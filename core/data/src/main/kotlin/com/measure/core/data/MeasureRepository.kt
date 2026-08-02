@@ -34,9 +34,14 @@ data class ProjectSummary(
 data class SavedRoom(
     val id: Long,
     val name: String,
+    /** The solved outline. What the plan draws. */
     val outline: List<Vec2>,
+    /** The observed corners. What every re-solve starts from, so edits stay idempotent. */
+    val measured: List<Vec2>,
     /** Per-corner uncertainty, kept so a later re-solve can weight as well as the first. */
     val sigmas: List<Double>,
+    /** Wall index to the length the user measured by hand, for the walls they locked. */
+    val lockedLengths: Map<Int, Double>,
     val area: Area,
     val perimeter: Length,
     val misclosure: Double,
@@ -78,6 +83,7 @@ class MeasureRepository(
     private val projects = database.projectDao()
     private val levels = database.levelDao()
     private val rooms = database.roomDao()
+    private val walls = database.wallDao()
     private val measurements = database.measurementDao()
 
     // --- projects -------------------------------------------------------------------
@@ -107,15 +113,22 @@ class MeasureRepository(
             projects.observe(projectId),
             rooms.observeRooms(projectId),
             rooms.observeCorners(projectId),
+            walls.observeFor(projectId),
             measurements.observeFor(projectId),
-        ) { project, roomRows, cornerRows, measurementRows ->
+        ) { project, roomRows, cornerRows, wallRows, measurementRows ->
             if (project == null) return@combine null
             val cornersByRoom = cornerRows.groupBy { it.roomId }
+            val wallsByRoom = wallRows.groupBy { it.roomId }
             ProjectDetail(
                 id = project.id,
                 name = project.name,
                 unitSystem = project.unitSystem.toUnitSystem(),
-                rooms = roomRows.map { it.toSavedRoom(cornersByRoom[it.id].orEmpty()) },
+                rooms = roomRows.map {
+                    it.toSavedRoom(
+                        corners = cornersByRoom[it.id].orEmpty(),
+                        walls = wallsByRoom[it.id].orEmpty(),
+                    )
+                },
                 measurements = measurementRows.map { it.toSavedMeasurement() },
             )
         }
@@ -166,6 +179,7 @@ class MeasureRepository(
         projectId: Long,
         name: String,
         solution: RoomSolution,
+        measured: List<Vec2>,
         sigmas: List<Double>,
         ceilingHeight: Double? = null,
     ): Long {
@@ -191,6 +205,8 @@ class MeasureRepository(
                     index = index,
                     x = vertex.x,
                     y = vertex.y,
+                    measuredX = measured.getOrElse(index) { vertex }.x,
+                    measuredY = measured.getOrElse(index) { vertex }.y,
                     sigma = sigmas.getOrElse(index) { DEFAULT_SIGMA },
                     // A corner counts as snapped when either wall meeting there was
                     // pulled to an axis, since it is the corner that moved to make that
@@ -225,6 +241,54 @@ class MeasureRepository(
         return id
     }
 
+    // --- editing --------------------------------------------------------------------
+
+    /**
+     * Replaces a room's geometry after an edit.
+     *
+     * The corners are rewritten wholesale rather than updated in place. A room has a
+     * handful of them, the solve moves all of them at once, and matching them up by index
+     * to issue individual updates would be more code for no benefit. Sigmas carry over
+     * unchanged: an edit does not make the original observations better or worse.
+     */
+    suspend fun updateRoomGeometry(
+        roomId: Long,
+        solution: RoomSolution,
+        measured: List<Vec2>,
+        sigmas: List<Double>,
+    ) {
+        rooms.deleteCorners(roomId)
+        rooms.insertCorners(
+            solution.polygon.vertices.mapIndexed { index, vertex ->
+                CornerEntity(
+                    roomId = roomId,
+                    index = index,
+                    x = vertex.x,
+                    y = vertex.y,
+                    measuredX = measured.getOrElse(index) { vertex }.x,
+                    measuredY = measured.getOrElse(index) { vertex }.y,
+                    sigma = sigmas.getOrElse(index) { DEFAULT_SIGMA },
+                    isSnapped = solution.snap.isCornerSnapped(index, solution.polygon.size),
+                )
+            },
+        )
+        rooms.updateGeometry(
+            id = roomId,
+            area = solution.area.squareMetres,
+            perimeter = solution.perimeter.metres,
+            reliable = solution.isReliable,
+        )
+    }
+
+    /** Locks a wall to a hand-measured length, or unlocks it when [metres] is null. */
+    suspend fun setLockedLength(roomId: Long, wallIndex: Int, metres: Double?) {
+        if (metres == null) {
+            walls.unlock(roomId, wallIndex)
+        } else {
+            walls.upsert(WallEntity(roomId = roomId, index = wallIndex, lockedLength = metres))
+        }
+    }
+
     suspend fun deleteRoom(roomId: Long) = rooms.delete(roomId)
 
     suspend fun renameRoom(roomId: Long, name: String) = rooms.rename(roomId, name)
@@ -249,13 +313,18 @@ private fun com.measure.core.geometry.SnapResult?.isCornerSnapped(index: Int, co
 internal fun String.toUnitSystem(): UnitSystem =
     runCatching { UnitSystem.valueOf(this) }.getOrDefault(UnitSystem.METRIC)
 
-internal fun RoomEntity.toSavedRoom(corners: List<CornerEntity>): SavedRoom {
+internal fun RoomEntity.toSavedRoom(
+    corners: List<CornerEntity>,
+    walls: List<WallEntity> = emptyList(),
+): SavedRoom {
     val ordered = corners.sortedBy { it.index }
     return SavedRoom(
         id = id,
         name = name,
         outline = ordered.map { Vec2(it.x, it.y) },
+        measured = ordered.map { Vec2(it.measuredX, it.measuredY) },
         sigmas = ordered.map { it.sigma },
+        lockedLengths = walls.associate { it.index to it.lockedLength },
         area = Area(area),
         perimeter = Length(perimeter),
         misclosure = misclosure,

@@ -24,10 +24,20 @@ class ProjectsActivity : ComponentActivity() {
         setContent {
             ProjectsScreen(
                 onNewMeasurement = { startCapture(projectId = null) },
-                onOpenProject = { startCapture(projectId = it) },
+                // Opening a saved plan goes to the editor, not back to the camera. The
+                // reason to reopen something already measured is almost always to look
+                // at it or correct it; adding another room is a button away from there.
+                onOpenProject = { openEditor(it) },
                 onDeviceCheck = { startActivity(Intent(this, MainActivity::class.java)) },
             )
         }
+    }
+
+    private fun openEditor(projectId: Long) {
+        startActivity(
+            Intent(this, EditorActivity::class.java)
+                .putExtra(EditorActivity.EXTRA_PROJECT_ID, projectId),
+        )
     }
 
     private fun startCapture(projectId: Long?) {

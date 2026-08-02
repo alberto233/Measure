@@ -92,9 +92,19 @@ data class RoomEntity(
 /**
  * A room corner, already projected onto the floor plane, so it is 2D.
  *
- * [sigma] is not decoration: it is the per-point uncertainty from multi-frame sampling
- * and becomes the position-residual weight when the room is re-solved (docs/ACCURACY.md
- * M8). Discarding it would mean a re-solve could never be as good as the original.
+ * **Two positions are kept, and the distinction matters.** `x, y` is where the solve put
+ * the corner and is what the plan draws. `measuredX, measuredY` is where it was observed,
+ * and is what every later solve starts from.
+ *
+ * Re-solving from the previous *solution* looks equivalent and is not. The direction
+ * constraints never fully win against the position residuals, so each pass moves the
+ * corners a little further towards perfect right angles — measured at 2.8 mm per re-solve
+ * on a four-corner room. Every edit would then quietly shift walls the user never
+ * touched, and after enough edits the plan would describe an idealised rectangle rather
+ * than the room. Anchoring to the observations makes a re-solve idempotent.
+ *
+ * [sigma] is not decoration either: it is the per-point uncertainty from multi-frame
+ * sampling and becomes the position-residual weight in that solve (docs/ACCURACY.md M8).
  */
 @Entity(
     tableName = "corners",
@@ -112,11 +122,48 @@ data class CornerEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val roomId: Long,
     @ColumnInfo(name = "cornerIndex") val index: Int,
+    /** Where the solve put this corner. This is what gets drawn. */
     val x: Double,
     val y: Double,
+    /** Where it was actually observed. This is what gets re-solved. */
+    val measuredX: Double,
+    val measuredY: Double,
     val sigma: Double,
     val isSnapped: Boolean = false,
     val isLocked: Boolean = false,
+)
+
+/**
+ * A wall, which exists in the database only once it carries information the geometry
+ * cannot supply — today, a length the user has measured by hand and typed in.
+ *
+ * Walls are otherwise implicit: wall *i* runs from corner *i* to corner *i+1*, so
+ * storing a row per wall by default would be storing something already known. A row
+ * appears when the user locks a length and disappears when they unlock it.
+ *
+ * That locked length is the most valuable number in the room. It is the one measurement
+ * taken with a tape rather than a camera, and the solver treats it as near-certain, so
+ * the whole plan tightens around it (docs/ACCURACY.md M8).
+ */
+@Entity(
+    tableName = "walls",
+    foreignKeys = [
+        ForeignKey(
+            entity = RoomEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["roomId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["roomId", "wallIndex"], unique = true)],
+)
+data class WallEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val roomId: Long,
+    /** Wall *i* runs from corner *i* to corner *i+1*, wrapping at the end. */
+    @ColumnInfo(name = "wallIndex") val index: Int,
+    /** The true length the user typed, in metres. */
+    val lockedLength: Double,
 )
 
 /**

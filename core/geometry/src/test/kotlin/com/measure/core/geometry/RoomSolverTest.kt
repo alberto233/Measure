@@ -102,6 +102,62 @@ class RoomSolverTest {
     }
 
     @Test
+    fun `solving is repeatable, but only from the observations`() {
+        // The plan editor re-solves on every edit, so a solve has to be repeatable.
+        //
+        // Feeding a *solution* back in is not: the direction constraints never fully win
+        // against the position residuals, so each pass shifts the corners a few more
+        // millimetres towards perfect right angles. Measured at 2.8 mm per pass on this
+        // room, which is why the editor anchors every solve to the same observations —
+        // and why corners store the measured position as well as the solved one.
+        val observed = listOf(
+            Vec2(0.02, -0.01), Vec2(4.97, 0.03), Vec2(5.01, 3.98), Vec2(-0.02, 4.02),
+        ).map { CapturedCorner(it, 0.02) }
+
+        val first = RoomSolver.solve(RoomCapture(observed))
+        val again = RoomSolver.solve(RoomCapture(observed))
+
+        first.polygon.vertices.forEachIndexed { index, vertex ->
+            val moved = vertex.distanceTo(again.polygon.vertices[index])
+            assertTrue(moved < 1e-9, "corner " + index + " moved " + moved + " m between identical solves")
+        }
+
+        // And the thing the editor must not do, kept here so the reason is not forgotten.
+        val fromSolution = RoomSolver.solve(
+            RoomCapture(first.polygon.vertices.map { CapturedCorner(it, 0.02) }),
+        )
+        val drift = first.polygon.vertices.indices.maxOf {
+            first.polygon.vertices[it].distanceTo(fromSolution.polygon.vertices[it])
+        }
+        assertTrue(drift > 0.001, "re-solving a solution used to drift; if it no longer does, the editor can be simplified")
+    }
+
+    @Test
+    fun `locking a wall on an already solved room corrects it without tearing it apart`() {
+        // A room measured 2% short throughout, as a scale error would leave it. The user
+        // tapes one wall and types the true 5.00 m.
+        val measured = listOf(
+            Vec2(0.0, 0.0), Vec2(4.9, 0.0), Vec2(4.9, 3.92), Vec2(0.0, 3.92),
+        )
+        val relocked = RoomSolver.solve(
+            RoomCapture(measured.map { CapturedCorner(it, 0.02) }),
+            lockedLengths = listOf(LengthConstraint(fromIndex = 0, toIndex = 1, length = 5.0)),
+        )
+
+        val locked = relocked.polygon.edges[0].length
+        assertTrue(abs(locked - 5.0) < 0.005, "locked wall should sit on 5.000 m, was " + locked)
+
+        // The opposite wall is parallel and unconstrained, so it should follow rather than
+        // stay behind — that following is what "the whole plan tightens" means.
+        val opposite = relocked.polygon.edges[2].length
+        assertTrue(opposite > 4.93, "the opposite wall did not follow: " + opposite)
+
+        // And the room must still be a room: four corners, still near its right angles.
+        assertTrue(relocked.polygon.size == 4, "expected 4 corners, got ${relocked.polygon.size}")
+        assertTrue(relocked.area.squareMetres > 19.0, "area collapsed to " + relocked.area.squareMetres)
+    }
+
+    @Test
     fun `a locked wall length pulls the whole plan`() {
         // The editor feature: tape measure one wall, type it, watch the plan tighten.
         val capture = simulateCapture(rectangle, seed = 11, noiseSigma = 0.05, drift = Vec2(0.15, 0.1))

@@ -15,9 +15,10 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture screen, plus M3 room capture — minimap, closure, solved plan |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
+| `:feature:editor` | M5 plan editor — pan/zoom, drag corners, lock a wall to a taped length |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M4 field testing, then M5 the 2D plan editor |
+| Next | M4 and M5 field testing, then M6 openings and heights |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -30,6 +31,10 @@ tape is still unmeasured — see `docs/ACCURACY.md` §4.
 **M4 is implemented and compiles; the database has not been exercised on hardware.** Room
 validates every query at compile time, so the SQL is known to be well formed, but nothing
 has yet written a row on a phone.
+
+**M5 is implemented and untested on hardware.** The plan editor pans, zooms, selects walls
+and corners, moves corners, and locks a wall to a hand-measured length — which re-solves
+the room around that one certain number, the payoff `docs/ACCURACY.md` M8 was built for.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -193,6 +198,7 @@ registers generated sources the way AGP 9 wants.
                    hit-test ranking, frame sampling, and four small GLES renderers
 :feature:capture   the Compose capture screen
 :feature:projects  the home screen and project list
+:feature:editor    the 2D plan editor
 :app               assembly, and the device capability report
 ```
 
@@ -211,6 +217,23 @@ There is no dependency injection yet. `MeasureData.repository(context)` is the s
 place that knows how a repository is built, and is the seam Hilt slots into when there is
 a graph worth wiring; introducing a framework to hand out one object would be ceremony
 ahead of need.
+
+### A solve is only repeatable from the observations
+
+Corners store **two** positions: where the solve put them, which is what the plan draws,
+and where they were observed, which is what every later solve starts from.
+
+The distinction is not academic. Re-solving a *solution* is not a no-op — the direction
+constraints never fully win against the position residuals, so each pass shifts every
+corner a few millimetres further towards perfect right angles. Measured at **2.8 mm per
+re-solve** on a four-corner room. Since the editor re-solves on every edit, that would
+mean each edit silently moving walls the user never touched, and a plan that after enough
+edits describes an idealised rectangle rather than the room.
+
+Anchoring every solve to the same observations makes editing idempotent: lock a wall,
+unlock it, and you get exactly the room you started with. `RoomSolverTest` asserts both
+halves of this, including that re-solving a solution *does* drift — so if that ever stops
+being true, the test says the editor can be simplified rather than quietly rotting.
 
 ### Plans are drawn, never stored as images
 
@@ -283,9 +306,12 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations.** The schema is at version 1 and no migration has ever been written or
-  tested. The first schema change after anyone has real saved work needs one, and the
-  exported JSON in `core/data/schemas` is what makes writing it possible.
+- **Migrations are written but never run against real data.** The schema is at version 3
+  with two hand-written migrations (walls table; measured corner positions). Both are
+  straightforward and Room validates them against the exported schemas at compile time,
+  but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
+  is deliberately not used: re-measuring a room means walking it again with a tape, which
+  is exactly the work this app exists to save.
 - **Corners hidden behind clutter.** Room corners are now taken only from the floor
   plane, so a pile of laundry in front of a corner no longer drags the point to the front
   of the pile — but it does mean the shutter goes dead until the user aims somewhere the

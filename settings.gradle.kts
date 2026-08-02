@@ -42,5 +42,6 @@ include(":ar")
 // The AR capture screen.
 include(":feature:capture")
 include(":feature:projects")
+include(":feature:editor")
 
 include(":app")

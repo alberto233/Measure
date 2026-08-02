@@ -3,6 +3,7 @@ package com.measure.core.data
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
@@ -150,6 +151,38 @@ interface RoomDao {
 
     @Query("UPDATE rooms SET name = :name WHERE id = :id")
     suspend fun rename(id: Long, name: String)
+
+    @Query("DELETE FROM corners WHERE roomId = :roomId")
+    suspend fun deleteCorners(roomId: Long)
+
+    @Query(
+        """
+        UPDATE rooms
+           SET areaSquareMetres = :area, perimeterMetres = :perimeter, isReliable = :reliable
+         WHERE id = :id
+        """,
+    )
+    suspend fun updateGeometry(id: Long, area: Double, perimeter: Double, reliable: Boolean)
+}
+
+@Dao
+interface WallDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(wall: WallEntity)
+
+    @Query("DELETE FROM walls WHERE roomId = :roomId AND wallIndex = :index")
+    suspend fun unlock(roomId: Long, index: Int)
+
+    @Query(
+        """
+        SELECT w.* FROM walls w
+          JOIN rooms r ON w.roomId = r.id
+          JOIN levels l ON r.levelId = l.id
+         WHERE l.projectId = :projectId
+        """,
+    )
+    fun observeFor(projectId: Long): Flow<List<WallEntity>>
 }
 
 @Dao

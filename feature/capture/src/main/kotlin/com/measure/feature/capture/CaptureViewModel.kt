@@ -329,8 +329,17 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
         roomSolution = solution
         isNearStartCorner = false
+        val measured = roomCorners.map { it.position.toFloorPlane() }
         val sigmas = roomCorners.map { it.sigma }
-        autosave { savedRoomId = repository.saveRoom(it, repository.nextRoomName(it), solution, sigmas) }
+        autosave {
+            savedRoomId = repository.saveRoom(
+                projectId = it,
+                name = repository.nextRoomName(it),
+                solution = solution,
+                measured = measured,
+                sigmas = sigmas,
+            )
+        }
 
         // A large misclosure means something went wrong during the walk, and quietly
         // smearing it away would be dishonest. Say so and let the user decide.
