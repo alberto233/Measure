@@ -100,6 +100,8 @@ data class ArUiState(
     val preview: MeasurementPreview? = null,
     val anchors: List<ScreenAnchor> = emptyList(),
     val floor: FloorState? = null,
+    /** Room capture, aiming at something that is not the floor. Nothing can be placed. */
+    val offFloor: Boolean = false,
     val failure: ArFailure? = null,
 ) {
     /** True when a tap should be allowed to start a sample burst. */

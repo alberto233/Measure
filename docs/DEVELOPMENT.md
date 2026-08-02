@@ -286,6 +286,12 @@ A release signing config is an M10 concern.
 - **Migrations.** The schema is at version 1 and no migration has ever been written or
   tested. The first schema change after anyone has real saved work needs one, and the
   exported JSON in `core/data/schemas` is what makes writing it possible.
+- **Corners hidden behind clutter.** Room corners are now taken only from the floor
+  plane, so a pile of laundry in front of a corner no longer drags the point to the front
+  of the pile — but it does mean the shutter goes dead until the user aims somewhere the
+  floor is actually visible. The real answer is wall-face capture (docs/ACCURACY.md M10):
+  fit the two adjacent walls and intersect them, which needs no sight of the corner at
+  all. Until M10 this is a gap, and it is the common case in an occupied room.
 - **Floor selection when the floor is barely visible.** `FloorSelector` prefers a lower
   surface over a larger one, which handles the dining-table case. A mezzanine, a sunken
   living room or a staircase landing would defeat it, and none of those is handled.

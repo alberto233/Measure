@@ -81,9 +81,12 @@ internal fun AimAdvice(
     advice: RangeAdvice,
     source: HitSource?,
     rangeText: String?,
+    offFloor: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val lines = buildList {
+        // First, because it is the one that explains a dead shutter.
+        if (offFloor) add("Aim at the floor — that is not on it" to MeasureColours.Warning)
         advice.message?.let { add(it to MeasureColours.Warning) }
         if (source != null && !source.isStructural) {
             add("Reading from ${source.label}" to MeasureColours.OnScrimMuted)

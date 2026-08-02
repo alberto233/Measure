@@ -97,6 +97,9 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     var roomSolution by mutableStateOf<RoomSolution?>(null)
         private set
 
+    /** The database row the current solution was written to, so undo can take it back. */
+    private var savedRoomId: Long? = null
+
     val isRoomClosed: Boolean get() = roomSolution != null
 
     /**
@@ -142,12 +145,28 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      */
     fun closeRoom() = solveRoom(closingObservation = null)
 
+    /**
+     * Start a fresh room, keeping the one just finished.
+     *
+     * Distinct from [undo]: a completed room is a legitimate part of the project and
+     * several of them in one plan is the normal multi-room case. Only the id is dropped,
+     * so a later undo cannot delete a room the user has moved on from.
+     */
     fun restartRoom() {
         roomCorners.clear()
         roomSolution = null
+        savedRoomId = null
         isNearStartCorner = false
         notice = null
         pushScene()
+    }
+
+    private fun discardSavedRoom() {
+        val id = savedRoomId ?: return
+        savedRoomId = null
+        viewModelScope.launch {
+            runCatching { repository.deleteRoom(id) }
+        }
     }
 
     /** Tracks whether the next tap would close the loop, so the interface can say so. */
@@ -190,8 +209,14 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 // Undoing a closed room reopens it rather than deleting a corner: the
                 // solved result is the thing most likely to be wrong, and losing a
                 // corner as well would punish a user who just wanted another look.
+                //
+                // Autosave means the closed room is already a row in the database, so
+                // reopening it has to take that row back. Without this, closing and
+                // undoing repeatedly left a stack of abandoned attempts in the project,
+                // all drawn on top of each other in the list thumbnail.
                 if (roomSolution != null) {
                     roomSolution = null
+                    discardSavedRoom()
                 } else if (roomCorners.isNotEmpty()) {
                     roomCorners.removeAt(roomCorners.lastIndex)
                 }
@@ -212,6 +237,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     fun clear() {
         pending = null
         segments.clear()
+        discardSavedRoom()
         restartRoom()
     }
 
@@ -304,7 +330,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         roomSolution = solution
         isNearStartCorner = false
         val sigmas = roomCorners.map { it.sigma }
-        autosave { repository.saveRoom(it, repository.nextRoomName(it), solution, sigmas) }
+        autosave { savedRoomId = repository.saveRoom(it, repository.nextRoomName(it), solution, sigmas) }
 
         // A large misclosure means something went wrong during the walk, and quietly
         // smearing it away would be dishonest. Say so and let the user decide.

@@ -242,6 +242,7 @@ private fun TopBar(
             advice = state.rangeAdvice,
             source = state.target?.source,
             rangeText = state.target?.let { "${viewModel.formatLength(it.range)} away" },
+            offFloor = state.offFloor,
         )
     }
 }
@@ -365,6 +366,7 @@ private fun RoomReadout(
         Text(
             text = when {
                 state.floor?.isEstablished != true -> "Point at the floor and move slowly"
+                state.offFloor -> "Corners come from the floor, not from what is stacked on it"
                 corners == 0 -> "Then walk round, tapping each corner"
                 viewModel.isNearStartCorner -> "Closing here measures the drift and corrects the plan"
                 corners < 3 -> "Keep going round the room"

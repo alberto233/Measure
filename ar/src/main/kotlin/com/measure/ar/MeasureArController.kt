@@ -421,16 +421,20 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         val currentScene = scene
         val floor = findFloor(session)
 
-        // In room mode every corner is pulled onto the one floor plane before it is
-        // used for anything — sampling, preview, drawing — so what the user sees while
-        // aiming is exactly what gets recorded (docs/ACCURACY.md M2).
-        val hit = hitTestCentre(frame)?.let { raw ->
-            if (currentScene.captureMode == CaptureMode.ROOM && floor?.isEstablished == true) {
-                raw.copy(position = Vec3(raw.position.x, floor.height, raw.position.z))
-            } else {
-                raw
-            }
+        // Room corners come only from the floor plane itself, so the point is where the
+        // line of sight meets the floor (docs/ACCURACY.md M1 and M2). Flattening some
+        // other surface's hit onto the floor height was the earlier approach and it put
+        // corners underneath whatever was piled in front of them.
+        val hits = safeHitTest(frame)
+        val roomCapture = currentScene.captureMode == CaptureMode.ROOM && floor?.isEstablished == true
+        val hit = if (roomCapture) {
+            HitRanking.bestOnFloor(hits, floor.height)
+        } else {
+            HitRanking.best(hits)
         }
+        // Aiming at something that is not the floor during a room capture. The user needs
+        // telling, because the reticle looks perfectly happy and the shutter does not.
+        val offFloor = roomCapture && hit == null && HitRanking.best(hits) != null
 
         // The fixed end of the rubber-band line: the placed point in distance mode, the
         // last corner in room mode.
@@ -468,6 +472,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             preview = preview,
             anchors = screenAnchors(currentScene, anchor, movingEnd),
             floor = floor,
+            offFloor = offFloor,
         )
     }
 
@@ -521,12 +526,13 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         )
     }
 
-    private fun hitTestCentre(frame: Frame): RankedHit? {
-        if (viewportWidth == 0 || viewportHeight == 0) return null
+    /** Hit tests the screen centre, which is where the reticle is drawn. */
+    private fun safeHitTest(frame: Frame): List<com.google.ar.core.HitResult> {
+        if (viewportWidth == 0 || viewportHeight == 0) return emptyList()
         return try {
-            HitRanking.best(frame.hitTest(viewportWidth / 2f, viewportHeight / 2f))
+            frame.hitTest(viewportWidth / 2f, viewportHeight / 2f)
         } catch (error: Throwable) {
-            null
+            emptyList()
         }
     }
 
@@ -727,6 +733,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         preview: MeasurementPreview?,
         anchors: List<ScreenAnchor>,
         floor: FloorState? = null,
+        offFloor: Boolean = false,
     ) {
         val quantisedTarget = target?.copy(range = quantise(target.range, RANGE_STEP))
         val quantisedPreview = preview?.copy(
@@ -749,6 +756,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                     height = quantise(floor.height, RANGE_STEP),
                     area = quantise(floor.area, AREA_STEP),
                 ),
+                offFloor = offFloor,
             )
         }
     }

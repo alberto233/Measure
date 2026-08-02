@@ -8,6 +8,7 @@ import com.google.ar.core.Point
 import com.google.ar.core.TrackingState
 import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.HitSource
+import kotlin.math.abs
 
 /** A hit test result, classified and reduced to the values the rest of the app uses. */
 data class RankedHit(
@@ -27,6 +28,48 @@ data class RankedHit(
  * change is worth more accuracy than any amount of filtering afterwards.
  */
 internal object HitRanking {
+
+    /** How far off the established floor height a plane may sit and still be the floor. */
+    private const val FLOOR_HEIGHT_TOLERANCE = 0.12
+
+    /**
+     * The best hit **on the floor plane**, ignoring everything else — even things nearer.
+     *
+     * Room capture needs this rather than [best]. Aiming at a floor corner in an occupied
+     * room means aiming past whatever is piled in front of it, and ARCore will happily fit
+     * a vertical plane to the front of a wardrobe and hand that back as the nearest hit.
+     * Taking it and flattening its height onto the floor puts the corner under the
+     * wardrobe's front face, a foot or more from where the user was pointing.
+     *
+     * Restricting to the floor makes the ray do the work: the point is where the line of
+     * sight actually meets the floor, which is what "tap that corner" means. When nothing
+     * on the floor is in the ray's path the caller gets null and says so, rather than
+     * inventing a corner from the nearest available surface — a corner that is not on the
+     * detected floor is almost always a mis-tap (docs/ACCURACY.md M1).
+     */
+    fun bestOnFloor(hits: List<HitResult>, floorHeight: Double): RankedHit? =
+        hits.mapNotNull { hit -> classifyFloorHit(hit, floorHeight) }
+            .minWithOrNull(compareBy({ it.source.ordinal }, { it.range }))
+
+    private fun classifyFloorHit(hit: HitResult, floorHeight: Double): RankedHit? {
+        if (hit.distance <= 0f) return null
+        val plane = hit.trackable as? Plane ?: return null
+        if (plane.trackingState != TrackingState.TRACKING) return null
+        if (plane.type != Plane.Type.HORIZONTAL_UPWARD_FACING) return null
+
+        val pose = hit.hitPose
+        // A table top is also an upward horizontal plane. Only the one at the room's
+        // established floor height counts.
+        if (abs(pose.ty() - floorHeight) > FLOOR_HEIGHT_TOLERANCE) return null
+
+        return RankedHit(
+            // Snapped to the floor exactly, so a corner carries none of the plane fit's
+            // residual vertical wobble into the plan.
+            position = Vec3(pose.tx().toDouble(), floorHeight, pose.tz().toDouble()),
+            range = hit.distance.toDouble(),
+            source = if (plane.isPoseInPolygon(pose)) HitSource.PLANE_POLYGON else HitSource.PLANE_INFINITE,
+        )
+    }
 
     fun best(hits: List<HitResult>): RankedHit? =
         hits.mapNotNull(::classify)
