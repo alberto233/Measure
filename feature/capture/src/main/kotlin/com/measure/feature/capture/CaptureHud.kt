@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.measure.core.designsystem.MeasureColours
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.RangeAdvice
 import com.measure.core.geometry.capture.TrackingIssue
@@ -36,7 +37,7 @@ internal fun TrackingChip(
     depthEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val colour = CaptureColours.forQuality(tracking.quality)
+    val colour = MeasureColours.forQuality(tracking.quality)
     // When there is nothing to act on, say so. "Tracking fair" reads as a warning to
     // anyone who has not seen the enum, and it was on screen through a capture that
     // closed to within half a percent — the chip was the only thing suggesting a problem.
@@ -50,7 +51,7 @@ internal fun TrackingChip(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -58,14 +59,14 @@ internal fun TrackingChip(
         Box(Modifier.size(9.dp).clip(CircleShape).background(colour))
         Text(
             text = text,
-            color = CaptureColours.OnScrim,
+            color = MeasureColours.OnScrim,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
         )
         // Worth surfacing: with depth, hit tests work on surfaces ARCore has not yet
         // fitted a plane to, which is most of the room for the first few seconds.
         if (depthEnabled) {
-            Text("· depth", color = CaptureColours.OnScrimMuted, fontSize = 12.sp)
+            Text("· depth", color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
         }
     }
 }
@@ -83,12 +84,12 @@ internal fun AimAdvice(
     modifier: Modifier = Modifier,
 ) {
     val lines = buildList {
-        advice.message?.let { add(it to CaptureColours.Warning) }
+        advice.message?.let { add(it to MeasureColours.Warning) }
         if (source != null && !source.isStructural) {
-            add("Reading from ${source.label}" to CaptureColours.OnScrimMuted)
+            add("Reading from ${source.label}" to MeasureColours.OnScrimMuted)
         }
         if (rangeText != null && advice == RangeAdvice.IDEAL && isEmpty()) {
-            add(rangeText to CaptureColours.OnScrimMuted)
+            add(rangeText to MeasureColours.OnScrimMuted)
         }
     }
     if (lines.isEmpty()) return
@@ -96,7 +97,7 @@ internal fun AimAdvice(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(CaptureColours.ScrimSoft)
+            .background(MeasureColours.ScrimSoft)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -118,9 +119,9 @@ internal fun MeasurementLabel(
         text = text,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (emphasised) CaptureColours.Scrim else CaptureColours.ScrimSoft)
+            .background(if (emphasised) MeasureColours.Scrim else MeasureColours.ScrimSoft)
             .padding(horizontal = 10.dp, vertical = 5.dp),
-        color = if (emphasised) CaptureColours.Ready else CaptureColours.OnScrim,
+        color = if (emphasised) MeasureColours.Ready else MeasureColours.OnScrim,
         fontSize = if (emphasised) 16.sp else 14.sp,
         fontWeight = FontWeight.SemiBold,
     )

@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.measure.core.designsystem.MeasureColours
 
 /**
  * The aiming reticle: a ring at the exact centre of the screen, which is also the pixel
@@ -29,10 +30,10 @@ internal fun Reticle(
     modifier: Modifier = Modifier,
 ) {
     val colour = when {
-        samplingProgress != null -> CaptureColours.Sampling
-        !ready -> CaptureColours.Blocked
-        hasTarget -> CaptureColours.Ready
-        else -> CaptureColours.Idle
+        samplingProgress != null -> MeasureColours.Sampling
+        !ready -> MeasureColours.Blocked
+        hasTarget -> MeasureColours.Ready
+        else -> MeasureColours.Idle
     }
 
     val radius by animateFloatAsState(
@@ -67,7 +68,7 @@ internal fun Reticle(
         if (samplingProgress != null) {
             val sweepRadius = outer + stroke * 2.5f
             drawArc(
-                color = CaptureColours.Sampling,
+                color = MeasureColours.Sampling,
                 startAngle = -90f,
                 sweepAngle = 360f * samplingProgress,
                 useCenter = false,

@@ -46,6 +46,7 @@ import com.measure.ar.ArUiState
 import com.measure.ar.MeasureArController
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.delay
+import com.measure.core.designsystem.MeasureColours
 
 /**
  * The M1 capture screen: point at something, tap, point at the other end, tap, read the
@@ -59,8 +60,12 @@ import kotlinx.coroutines.delay
 fun CaptureScreen(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Continue an existing project, or null to start a new one on the first save. */
+    projectId: Long? = null,
     viewModel: CaptureViewModel = viewModel(),
 ) {
+    LaunchedEffect(projectId) { viewModel.attachToProject(projectId) }
+
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val state by viewModel.controller.state.collectAsStateWithLifecycle()
@@ -316,21 +321,21 @@ private fun RoomReadout(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (solution != null) {
             Text(
                 text = viewModel.formatArea(solution),
-                color = CaptureColours.OnScrim,
+                color = MeasureColours.OnScrim,
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = "Perimeter ${viewModel.formatLength(solution.perimeter.metres)}" +
                     " · ${solution.polygon.size} walls",
-                color = CaptureColours.OnScrimMuted,
+                color = MeasureColours.OnScrimMuted,
                 fontSize = 12.sp,
             )
             Text(
@@ -339,7 +344,7 @@ private fun RoomReadout(
                 } else {
                     "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
                 },
-                color = if (solution.isReliable) CaptureColours.OnScrimMuted else CaptureColours.Warning,
+                color = if (solution.isReliable) MeasureColours.OnScrimMuted else MeasureColours.Warning,
                 fontSize = 12.sp,
             )
             return@Column
@@ -353,7 +358,7 @@ private fun RoomReadout(
                 viewModel.isNearStartCorner -> "Tap to close the room"
                 else -> "$corners ${if (corners == 1) "corner" else "corners"}"
             },
-            color = if (viewModel.isNearStartCorner) CaptureColours.Ready else CaptureColours.OnScrim,
+            color = if (viewModel.isNearStartCorner) MeasureColours.Ready else MeasureColours.OnScrim,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -365,7 +370,7 @@ private fun RoomReadout(
                 corners < 3 -> "Keep going round the room"
                 else -> "Return to the first corner to close"
             },
-            color = CaptureColours.OnScrimMuted,
+            color = MeasureColours.OnScrimMuted,
             fontSize = 12.sp,
         )
     }
@@ -379,20 +384,20 @@ private fun LatestMeasurement(viewModel: CaptureViewModel, modifier: Modifier = 
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = viewModel.format(latest),
-            color = CaptureColours.OnScrim,
+            color = MeasureColours.OnScrim,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
         )
         val suffix = if (viewModel.segments.size > 1) " · ${viewModel.segments.size} measurements" else ""
         Text(
             text = latest.mode.label + suffix,
-            color = CaptureColours.OnScrimMuted,
+            color = MeasureColours.OnScrimMuted,
             fontSize = 12.sp,
         )
     }
@@ -471,11 +476,11 @@ private fun Notice(viewModel: CaptureViewModel, modifier: Modifier = Modifier) {
         text = notice.text,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         color = when (notice) {
-            is CaptureNotice.Warning -> CaptureColours.Warning
-            is CaptureNotice.Advice -> CaptureColours.OnScrim
+            is CaptureNotice.Warning -> MeasureColours.Warning
+            is CaptureNotice.Advice -> MeasureColours.OnScrim
         },
         fontSize = 14.sp,
         textAlign = TextAlign.Center,
@@ -508,7 +513,7 @@ private fun SessionProblem(
     ) {
         Text(
             text = title,
-            color = CaptureColours.OnScrim,
+            color = MeasureColours.OnScrim,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -517,7 +522,7 @@ private fun SessionProblem(
             Text(
                 text = it,
                 modifier = Modifier.padding(top = 10.dp),
-                color = CaptureColours.OnScrimMuted,
+                color = MeasureColours.OnScrimMuted,
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,
             )

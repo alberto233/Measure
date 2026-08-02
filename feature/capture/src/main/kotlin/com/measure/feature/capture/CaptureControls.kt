@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.measure.ar.CaptureMode
 import com.measure.core.geometry.capture.MeasurementMode
+import com.measure.core.designsystem.MeasureColours
 
 /** Free / Level / Plumb. Three states, so a segmented control beats a dropdown. */
 @Composable
@@ -36,7 +37,7 @@ internal fun ModeSelector(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -46,10 +47,10 @@ internal fun ModeSelector(
                 text = mode.label,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(if (active) CaptureColours.Ready else Color.Transparent)
+                    .background(if (active) MeasureColours.Ready else Color.Transparent)
                     .clickable { onSelect(mode) }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                color = if (active) Color(0xFF06231F) else CaptureColours.OnScrimMuted,
+                color = if (active) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -67,7 +68,7 @@ internal fun CaptureModeSelector(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -77,10 +78,10 @@ internal fun CaptureModeSelector(
                 text = if (mode == CaptureMode.DISTANCE) "Distance" else "Room",
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))
-                    .background(if (active) CaptureColours.OnScrim else Color.Transparent)
+                    .background(if (active) MeasureColours.OnScrim else Color.Transparent)
                     .clickable { onSelect(mode) }
                     .padding(horizontal = 18.dp, vertical = 8.dp),
-                color = if (active) Color(0xFF14181C) else CaptureColours.OnScrimMuted,
+                color = if (active) Color(0xFF14181C) else MeasureColours.OnScrimMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -113,7 +114,7 @@ internal fun CaptureButton(
             .scale(scale)
             .alpha(if (enabled || sampling) 1f else 0.45f)
             .clip(CircleShape)
-            .background(CaptureColours.Scrim)
+            .background(MeasureColours.Scrim)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -121,7 +122,7 @@ internal fun CaptureButton(
             Modifier
                 .size(56.dp)
                 .clip(CircleShape)
-                .background(if (sampling) CaptureColours.Sampling else CaptureColours.Ready)
+                .background(if (sampling) MeasureColours.Sampling else MeasureColours.Ready)
                 .border(3.dp, Color.White.copy(alpha = 0.85f), CircleShape),
         )
     }
@@ -141,10 +142,10 @@ internal fun PillButton(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.4f)
             .clip(RoundedCornerShape(50))
-            .background(if (highlighted) CaptureColours.Sampling else CaptureColours.Scrim)
+            .background(if (highlighted) MeasureColours.Sampling else MeasureColours.Scrim)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        color = if (highlighted) Color(0xFF2A1F00) else CaptureColours.OnScrim,
+        color = if (highlighted) Color(0xFF2A1F00) else MeasureColours.OnScrim,
         fontSize = 13.sp,
         fontWeight = FontWeight.Medium,
     )

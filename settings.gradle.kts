@@ -32,6 +32,8 @@ rootProject.name = "Measure"
 // free of any Android dependency so they can be built and unit tested on the JVM.
 include(":core:units")
 include(":core:geometry")
+include(":core:data")
+include(":core:designsystem")
 
 // ARCore session handling and AR rendering. Everything that imports com.google.ar
 // lives here, so the rest of the app never depends on ARCore directly.
@@ -39,5 +41,6 @@ include(":ar")
 
 // The AR capture screen.
 include(":feature:capture")
+include(":feature:projects")
 
 include(":app")

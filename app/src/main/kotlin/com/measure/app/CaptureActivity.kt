@@ -39,12 +39,24 @@ class CaptureActivity : ComponentActivity() {
         try {
             enableEdgeToEdge()
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            // Absent means "start a new plan", which the capture screen creates lazily
+            // on the first thing worth saving.
+            val projectId = intent
+                ?.takeIf { it.hasExtra(EXTRA_PROJECT_ID) }
+                ?.getLongExtra(EXTRA_PROJECT_ID, NO_PROJECT)
+                ?.takeIf { it != NO_PROJECT }
+
             setContent {
-                CaptureScreen(onExit = { finish() })
+                CaptureScreen(onExit = { finish() }, projectId = projectId)
             }
         } catch (error: Throwable) {
             showStartupFailure(error)
         }
+    }
+
+    companion object {
+        const val EXTRA_PROJECT_ID = "com.measure.app.PROJECT_ID"
+        private const val NO_PROJECT = -1L
     }
 
     private fun showStartupFailure(error: Throwable) {

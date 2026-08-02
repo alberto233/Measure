@@ -11,10 +11,13 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry` | Implemented, 95 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
+| `:core:data` | Room database, repository. Autosave, project list queries |
+| `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture screen, plus M3 room capture — minimap, closure, solved plan |
-| `:app` | Capability gate, which launches the capture screen once the device passes |
+| `:feature:projects` | The home screen: saved plans with drawn thumbnails |
+| `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M3 field testing, then M4 persistence |
+| Next | M4 field testing, then M5 the 2D plan editor |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -23,6 +26,10 @@ were retuned off that session — see §8 for what is still a guess.
 **M3 is validated on the A36.** Floor lock is immediate, the live plan matches the room,
 and a closed four-corner capture came in at 0.4% misclosure. Per-wall accuracy against a
 tape is still unmeasured — see `docs/ACCURACY.md` §4.
+
+**M4 is implemented and compiles; the database has not been exercised on hardware.** Room
+validates every query at compile time, so the SQL is known to be well formed, but nothing
+has yet written a row on a phone.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -109,6 +116,8 @@ Do not bump these casually. Each one is load-bearing.
 | Compose BOM | 2026.06.01 | |
 | `androidx.lifecycle` | **2.10.0** | **Capped by `compileSdk`.** 2.11.0 declares a minimum compileSdk of 37 and fails AAR metadata checking against 36. Bumping to 2.11 means bumping `compileSdk` to 37 in every module and installing that platform in the setup script |
 | `androidx.activity` | 1.13.0 | |
+| KSP | **2.2.10-2.0.2** | **Must match AGP's embedded Kotlin**, exactly as `composeCompiler` does, and for the same reason: it is a compiler plugin loading into AGP's own compiler |
+| Room | 2.8.4 | Schemas exported to `core/data/schemas` and checked in |
 
 ### The root build declares no plugins
 
@@ -153,17 +162,38 @@ classes — which is exactly why the version has to match that compiler and not 
 > To check a suspect module: `javap -c` the class and look at the `setContent$default`
 > descriptor. `Function2` is correct; `Function0` means the plugin did not run.
 
+### KSP needs an opt-out under AGP 9
+
+KSP registers its generated sources through the `kotlin.sourceSets` DSL, which AGP 9's
+built-in Kotlin support rejects outright:
+
+```
+Using kotlin.sourceSets DSL to add Kotlin sources is not allowed with built-in Kotlin.
+```
+
+The fix is AGP's own documented escape hatch, in `gradle.properties`:
+
+```properties
+android.disallowKotlinSourceSets=false
+```
+
+Without it, no annotation processing works at all — Room included. Remove it once KSP
+registers generated sources the way AGP 9 wants.
+
 ## 4a. Module map
 
 ```
-:core:units       length/area formatting and imperial parsing — pure Kotlin
-:core:geometry    snapping, loop closure, constraint solver, and the capture maths
-                  (multi-frame sampling, uncertainty model, tracking assessment,
-                  range gating, measurement modes) — pure Kotlin, all JVM tested
-:ar               the only module that imports com.google.ar. Session lifecycle,
-                  hit-test ranking, frame sampling, and four small GLES renderers
-:feature:capture  the Compose capture screen
-:app              capability gate, and assembly
+:core:units        length/area formatting and imperial parsing — pure Kotlin
+:core:geometry     snapping, loop closure, constraint solver, and the capture maths
+                   (multi-frame sampling, uncertainty model, tracking assessment,
+                   range gating, floor selection, measurement modes) — pure Kotlin
+:core:data         Room database, entities, repository. The only module with SQL
+:core:designsystem palette, and the one plan renderer everything draws plans with
+:ar                the only module that imports com.google.ar. Session lifecycle,
+                   hit-test ranking, frame sampling, and four small GLES renderers
+:feature:capture   the Compose capture screen
+:feature:projects  the home screen and project list
+:app               assembly, and the device capability report
 ```
 
 Two rules hold this together and are worth defending:
@@ -174,6 +204,20 @@ Two rules hold this together and are worth defending:
   OpenGL, which are the parts a JVM test could not reach anyway.
 - **Nothing outside `:ar` imports ARCore.** `:feature:capture` talks to `MeasureArController`
   and reads `ArUiState`; it has never heard of a `Frame`.
+- **Nothing outside `:core:data` imports a Room entity.** The repository speaks in
+  geometry and unit types, so a schema change is not a UI change.
+
+There is no dependency injection yet. `MeasureData.repository(context)` is the single
+place that knows how a repository is built, and is the seam Hilt slots into when there is
+a graph worth wiring; introducing a framework to hand out one object would be ceremony
+ahead of need.
+
+### Plans are drawn, never stored as images
+
+Project thumbnails render from the stored corners with the same composable as the live
+capture minimap. No files to write, none to clean up on delete, nothing to go stale, and
+a room cannot look like one shape while capturing and another in the list. This is the
+same reasoning `TECHNICAL_DESIGN.md` §5 applies to PNG export.
 
 ### On SceneView
 
@@ -239,6 +283,9 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
+- **Migrations.** The schema is at version 1 and no migration has ever been written or
+  tested. The first schema change after anyone has real saved work needs one, and the
+  exported JSON in `core/data/schemas` is what makes writing it possible.
 - **Floor selection when the floor is barely visible.** `FloorSelector` prefers a lower
   surface over a larger one, which handles the dining-table case. A mezzanine, a sunken
   living room or a staircase landing would defeat it, and none of those is handled.

@@ -8,6 +8,9 @@ composeBom = "2026.06.01"
 # compiler, and a Compose compiler plugin from a different line refuses to load into it.
 composeCompiler = "2.2.10"
 lifecycle = "2.10.0"
+# Must match AGP's embedded Kotlin, for the same reason as composeCompiler.
+ksp = "2.2.10-2.0.2"
+room = "2.8.4"
 # Capped by AGP 9.3, whose built-in Kotlin compiler is on the 2.2 line and reads class
 # metadata up to version 2.3.0. Kotlin 2.4.x emits 2.4.0 metadata, which makes the core
 # modules unreadable from :app. 2.3.21 is the newest that stays within range.
@@ -33,6 +36,9 @@ kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version = "1.11.4" }
 
@@ -40,6 +46,7 @@ junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "composeCompiler" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 # No kotlin-android entry: AGP 9 compiles Kotlin itself and rejects that plugin.
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

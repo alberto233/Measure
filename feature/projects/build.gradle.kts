@@ -4,17 +4,10 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.capture"
+    namespace = "com.measure.feature.projects"
     compileSdk = 36
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    buildFeatures {
-        compose = true
-    }
-
+    defaultConfig { minSdk = 26 }
+    buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -28,16 +21,14 @@ kotlin {
 }
 
 dependencies {
-    api(project(":ar"))
-    api(project(":core:designsystem"))
-    implementation(project(":core:data"))
+    api(project(":core:data"))
+    implementation(project(":core:designsystem"))
     implementation(project(":core:units"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
-    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 }

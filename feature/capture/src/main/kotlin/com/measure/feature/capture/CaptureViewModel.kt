@@ -11,6 +11,8 @@ import com.measure.ar.ArScene
 import com.measure.ar.ArSegment
 import com.measure.ar.CaptureMode
 import com.measure.ar.MeasureArController
+import com.measure.core.data.MeasureData
+import com.measure.core.data.MeasureRepository
 import com.measure.core.geometry.CapturedCorner
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolution
@@ -43,6 +45,22 @@ sealed interface CaptureNotice {
 class CaptureViewModel(application: Application) : AndroidViewModel(application) {
 
     val controller = MeasureArController(application)
+
+    private val repository: MeasureRepository = MeasureData.repository(application)
+
+    /**
+     * The project everything captured here is saved into.
+     *
+     * Created lazily, on the first thing worth saving. Opening the camera and changing
+     * your mind should not leave an empty plan in the list to be tidied up later.
+     */
+    var projectId: Long? = null
+        private set
+
+    /** Set when the screen is opened from an existing project, before anything is saved. */
+    fun attachToProject(existing: Long?) {
+        if (existing != null && projectId == null) projectId = existing
+    }
 
     var mode by mutableStateOf(MeasurementMode.FREE)
         private set
@@ -285,6 +303,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
         roomSolution = solution
         isNearStartCorner = false
+        val sigmas = roomCorners.map { it.sigma }
+        autosave { repository.saveRoom(it, repository.nextRoomName(it), solution, sigmas) }
 
         // A large misclosure means something went wrong during the walk, and quietly
         // smearing it away would be dishonest. Say so and let the user decide.
@@ -315,6 +335,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         )
         segments += segment
         pending = null
+        autosave { repository.saveMeasurement(it, segment) }
 
         // A large constraint correction means the user aimed somewhere this mode does
         // not permit. Saying so is the honest alternative to silently snapping it.
@@ -324,6 +345,25 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             )
         } else {
             null
+        }
+    }
+
+    /**
+     * Writes immediately, on the first save creating the project to write into.
+     *
+     * There is no save button and there should not be one: a room that took a minute of
+     * walking to capture must survive the phone ringing, and the only way to guarantee
+     * that is to have already written it. Failures are surfaced rather than swallowed —
+     * silently losing work is worse than saying so.
+     */
+    private fun autosave(write: suspend (projectId: Long) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val id = projectId ?: repository.createDefaultProject(unitSystem).also { projectId = it }
+                write(id)
+            } catch (error: Throwable) {
+                notice = CaptureNotice.Warning("Could not save — ${error.javaClass.simpleName}")
+            }
         }
     }
 
