@@ -131,7 +131,7 @@ data class ArSegment(val id: Long, val from: Vec3, val to: Vec3)
  * crosses the thread boundary.
  */
 data class ArScene(
-    val captureMode: CaptureMode = CaptureMode.DISTANCE,
+    val captureMode: CaptureMode = CaptureMode.ROOM,
     val segments: List<ArSegment> = emptyList(),
     val pendingAnchor: Vec3? = null,
     val mode: MeasurementMode = MeasurementMode.FREE,

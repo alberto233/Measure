@@ -64,7 +64,12 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     // --- room capture ---------------------------------------------------------------
 
-    var captureMode by mutableStateOf(CaptureMode.DISTANCE)
+    /**
+     * Room, not distance. "How big is this room?" is the first use case in the product
+     * plan and the reason most people open a measuring app at all; a one-off distance is
+     * the thing you reach for second.
+     */
+    var captureMode by mutableStateOf(CaptureMode.ROOM)
         private set
 
     /** Corners in walk order, each already projected onto the floor plane by `:ar`. */

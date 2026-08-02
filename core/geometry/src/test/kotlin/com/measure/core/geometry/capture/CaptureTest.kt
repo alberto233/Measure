@@ -163,6 +163,13 @@ class TrackingAssessorTest {
     }
 
     @Test
+    fun `a textured floor at arm's length reads as good`() {
+        // Herringbone parquet at 1.6 m on the test device. This is about as much texture
+        // as a domestic scene offers, so if it does not read as good, nothing will.
+        assertEquals(TrackingQuality.GOOD, TrackingAssessor.assess(true, TrackingIssue.NONE, 2, 30).quality)
+    }
+
+    @Test
     fun `every issue carries advice the user can act on`() {
         TrackingIssue.entries.forEach { assertTrue(it.advice.isNotBlank(), "$it has no advice") }
     }

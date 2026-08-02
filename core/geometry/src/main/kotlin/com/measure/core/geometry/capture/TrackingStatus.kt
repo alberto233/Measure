@@ -53,8 +53,15 @@ object TrackingAssessor {
     /** Below this, the frame is too sparse for a hit test to be worth anything. */
     const val SPARSE_FEATURE_THRESHOLD = 10
 
-    /** Above this the frame is rich enough that feature count stops being the limit. */
-    const val HEALTHY_FEATURE_THRESHOLD = 45
+    /**
+     * Above this the frame is rich enough that feature count stops being the limit.
+     *
+     * Lowered twice against the test device. A herringbone parquet floor at 1.6 m — about
+     * as textured as a domestic scene gets — still came in under 45, so the per-frame
+     * cloud is smaller than either guess assumed. This wants replacing with a figure
+     * measured off the recorded-session corpus rather than another estimate.
+     */
+    const val HEALTHY_FEATURE_THRESHOLD = 25
 
     fun assess(
         isTracking: Boolean,

@@ -20,9 +20,9 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
 were retuned off that session — see §8 for what is still a guess.
 
-**M3 is implemented but not yet validated on hardware.** Floor lock, corner-by-corner
-capture, the live minimap and the full correction pipeline are wired up; nobody has walked
-a real room with it.
+**M3 is validated on the A36.** Floor lock is immediate, the live plan matches the room,
+and a closed four-corner capture came in at 0.4% misclosure. Per-wall accuracy against a
+tape is still unmeasured — see `docs/ACCURACY.md` §4.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability

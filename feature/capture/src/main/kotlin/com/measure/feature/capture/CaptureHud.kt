@@ -37,10 +37,14 @@ internal fun TrackingChip(
     modifier: Modifier = Modifier,
 ) {
     val colour = CaptureColours.forQuality(tracking.quality)
-    val text = if (tracking.issue == TrackingIssue.NONE) {
-        "Tracking ${tracking.quality.name.lowercase()}"
-    } else {
-        tracking.issue.advice
+    // When there is nothing to act on, say so. "Tracking fair" reads as a warning to
+    // anyone who has not seen the enum, and it was on screen through a capture that
+    // closed to within half a percent — the chip was the only thing suggesting a problem.
+    // The dot still carries the gradation for anyone watching for it.
+    val text = when {
+        tracking.issue != TrackingIssue.NONE -> tracking.issue.advice
+        tracking.canCapture -> "Ready"
+        else -> "Tracking ${tracking.quality.name.lowercase()}"
     }
 
     Row(
