@@ -32,36 +32,6 @@ data class ArFailure(
 enum class CaptureMode { DISTANCE, ROOM }
 
 /**
- * How a room's corners are obtained — docs/ACCURACY.md M10.
- *
- * Two genuinely different capture actions, not two renderings of one. Tapping is faster
- * and needs the junction to be visible; taking walls needs neither, which is what makes
- * it the answer in an occupied room where the corner is behind the furniture.
- */
-enum class CornerMethod(val label: String, val hint: String) {
-    TAP_FLOOR("Corners", "Tap each corner of the room in order"),
-    WALL_FACES("Walls", "Point at each wall in turn — the corners work themselves out"),
-}
-
-/** The wall under the reticle, reduced to what the interface has to say about it. */
-data class AimedWallState(
-    val id: Long,
-    /** How much of the wall has been fitted, in metres. */
-    val extent: Double,
-    val range: Double,
-    /** True when this is a wall already taken for this room. */
-    val alreadyTaken: Boolean,
-    /**
-     * True when it came from depth rather than from a tracked plane.
-     *
-     * Worth surfacing. A depth-fitted wall is the app working harder on a surface ARCore
-     * gave up on, and it is meaningfully less certain — the user should be able to see
-     * which kind of wall they just took.
-     */
-    val fromDepth: Boolean = false,
-)
-
-/**
  * The dominant floor, once one has been found — docs/ACCURACY.md M2.
  *
  * Room corners are projected onto this single height, which removes all vertical jitter
@@ -134,8 +104,6 @@ data class ArUiState(
     val offFloor: Boolean = false,
     /** Ceiling height above the floor, if a ceiling has come into view. */
     val ceilingHeight: Double? = null,
-    /** Wall-face capture: the wall being pointed at, if any. */
-    val aimedWall: AimedWallState? = null,
     val failure: ArFailure? = null,
 ) {
     /** True when a tap should be allowed to start a sample burst. */
@@ -153,19 +121,6 @@ data class ArUiState(
      */
     val canCaptureCorner: Boolean
         get() = canCapture && floor?.isEstablished == true
-
-    /**
-     * Taking a wall needs no floor and no reticle hit — only a wall.
-     *
-     * That is the entire point. A corner tap needs the floor established so the point has
-     * somewhere to land; a wall is its own reference, which is why this works in a room
-     * where the floor is covered.
-     */
-    val canTakeWall: Boolean
-        get() = phase == ArPhase.RUNNING &&
-            tracking.canCapture &&
-            aimedWall != null &&
-            !aimedWall.alreadyTaken
 }
 
 /** One committed measurement, in the form the renderer needs. */
@@ -186,16 +141,6 @@ data class ArScene(
     val mode: MeasurementMode = MeasurementMode.FREE,
     /** Room corners in order, already projected onto the floor plane. */
     val roomCorners: List<Vec3> = emptyList(),
-    val cornerMethod: CornerMethod = CornerMethod.TAP_FLOOR,
-    /**
-     * Wall-face capture: the walls already taken.
-     *
-     * Held as geometry rather than as a set of ids because a depth-fitted wall has no
-     * persistent identity — and neither, really, does an ARCore plane, which is re-fitted
-     * and re-identified as the user walks. Whether this is a wall already taken is a
-     * question about where it is, so it is answered that way.
-     */
-    val takenWalls: List<com.measure.core.geometry.capture.WallFace> = emptyList(),
     /** True once the perimeter has been closed and there is nothing left to add. */
     val roomClosed: Boolean = false,
     val showPlanes: Boolean = true,

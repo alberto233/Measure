@@ -9,11 +9,11 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 193 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 168 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
-| `:feature:capture` | M1 capture, M3 room capture, M6 ceilings, M11 wall-face capture |
+| `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
 | `:feature:editor` | M5 plan editor, plus M6 openings, wall area and volume |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
@@ -70,54 +70,33 @@ Compose owns the inset.
 
 The plumb measurement still breaks beyond about 2 m of range — see §8.
 
-**M11 wall-face capture is implemented. Field tested once, and it did not work at all:**
-ARCore fits no vertical plane to a plain painted wall, because plane detection tracks
-visual features and a blank white wall has none. That is the room where the corners are
-also hidden behind furniture, so the mechanism failed hardest exactly where the feature
-was needed most.
+**M11 wall-face capture was built, field tested twice, and removed.** It is not in the
+tree; this note is here so nobody rebuilds it without knowing what happened.
 
-The fix now in the tree is to stop depending on ARCore's plane fitting. When no tracked
-vertical plane is under the reticle, `DepthWallFitter` fires a grid of 28 hit tests across
-the middle of the screen, keeps whatever ARCore's depth estimates at those pixels are, and
-fits a **line** to them on the floor plan — a vertical wall seen from above is a line, so
-fitting in 2D enforces verticality for free and is far better conditioned than a 3D plane
-fit. `WallLineFitter` does it by RANSAC, because some samples land on the floor, on a
-picture frame or on a person walking past, and least squares would let any of those drag
-the result. It reports how many points agreed, and refuses when fewer than 60% did.
+The idea was to point at each wall in turn and intersect consecutive pairs, so a corner
+hidden behind furniture never has to be aimed at. The geometry worked and was tested. The
+perception did not.
 
-**Whether this works is the open question of the next field session.** Depth on the A36 is
-motion-derived, and a featureless wall is hard for that too. The pure part is tested; what
-cannot be tested here is whether the device returns usable depth on a white wall at all.
-If it does not, the honest move is to delete wall-face capture rather than ship a mode
-that works in showrooms. The user has already said as much: a good fix or remove it.
+- **First session: nothing at all.** ARCore fits no vertical plane to a plain painted
+  wall, because plane detection tracks visual features and a blank white wall has none.
+  That is also the room whose corners are hidden, so the mechanism failed hardest exactly
+  where the feature was needed.
+- **Second session, with a depth fallback: spotty, and wrong when it did fire.** A grid of
+  28 hit tests was fitted to a line on the floor plan by RANSAC — a genuine second
+  mechanism, not a retuned threshold. It produced a wall sometimes, and the walls it
+  produced were not where the walls were.
 
-Room capture has two methods, chosen per room:
+The second result is the one that settled it. A feature that silently fails is
+disappointing; a feature that intermittently returns a *wrong* number is worse than not
+having it, in an app whose entire positioning is that its numbers can be trusted
+(`docs/PRODUCT_PLAN.md` §5). There was no threshold left to move: both mechanisms were
+being asked for information the sensor does not have on a textureless surface at
+domestic ranges.
 
-- **Corners** — tap each corner, as before.
-- **Walls** — point at each wall in turn. Every consecutive pair of walls is intersected
-  to give a corner, so each wall after the first ends one corner and begins the next, and
-  the junction itself is never aimed at. This is the answer to three field sessions'
-  worth of corners hidden behind furniture.
-
-The geometry is `WallFace`, `WallIntersection` and `WallChain` in `:core:geometry`, all
-pure and tested (40 tests). `:ar`'s `WallAiming` is deliberately stricter than
-`HitRanking`: only a tracked, unsubsumed, `VERTICAL` plane with the aim **inside** its
-fitted polygon counts, because the value of the method is that ARCore fitted a plane over
-many frames — an extension hit would let a user take a wall by pointing at the sofa.
-
-Two things to know about its accuracy:
-
-- **A corner's uncertainty is not its walls' uncertainty.** Two lines crossing at a
-  shallow angle locate their intersection badly however well each line is known; at 20
-  degrees the corner is three times less certain than the walls. `WallIntersection`
-  divides by the sine and refuses below 20 degrees, and the readout quotes the worst
-  corner's tolerance rather than a misclosure.
-- **A wall-face room has no misclosure, and now says so.** The loop shuts geometrically
-  because the last wall is intersected with the first, so there is nothing to check the
-  walk against. Reporting the 0.0% that falls out of that would be claiming a check never
-  performed. The same bug existed on the corner-mode **Close** button — pressing it
-  instead of re-reading the first corner also leaves drift unmeasured — and both now say
-  so plainly.
+What this rules out, so it does not get retried: ARCore vertical planes on painted walls,
+and motion-derived depth on the same, on a mid-range handset with no time-of-flight
+sensor. A device with a lidar-class sensor is a different experiment. So is a learned
+plane-from-image model, which is a different project.
 
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to
@@ -128,8 +107,7 @@ tell them apart.
 M5 editing (corner drag, rename, re-solve), and the first round of M6 fixes — plumb
 without a surface, the quietened plane overlay and the openings panel all behaved.
 **What is not:** every migration, the locked-wall re-solve actually improving other
-walls, ceiling detection working at all, the second round of M6 fixes above, and the
-whole of M11.
+walls, and ceiling detection working at all.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -408,29 +386,18 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
-- **Corner methods cannot yet be mixed within one room.** `docs/ACCURACY.md` M10 asks
-  for tapped corners and wall-derived corners in the same capture, per wall, and that is
-  right — a room with one corner behind a wardrobe and three in plain sight wants three
-  taps and one pair of walls. It is not implemented: a chain of walls and a list of taps
-  are different structures, because every wall after the first serves two corners and a
-  tapped point never does. The method is therefore chosen per room and the app refuses to
-  switch mid-capture. Mixing means a corner sequence whose entries have different
-  provenance and different neighbours, and getting it wrong yields plans that are quietly
-  wrong rather than visibly wrong.
-- **Does depth see a white wall?** This is now the question M11 lives or dies on.
-  ARCore's plane detection provably does not — one field session settled that. The depth
-  fallback is a genuine second mechanism rather than a retuned threshold, but ARCore's
-  depth on a device with no time-of-flight sensor is derived from motion, and motion
-  stereo has its own trouble with textureless surfaces. If the next session shows the
-  same nothing, wall-face capture should be deleted, not tuned. The gates worth watching
-  either way are `WallFace.MINIMUM_EXTENT_METRES` (0.5 m, so a cupboard door is not a
-  wall), `WallIntersection.MINIMUM_SINE` (20 degrees) and
-  `WallLineFitter.MINIMUM_INLIER_SHARE` (60%). All reasoned, none measured.
-- **Plumb still fails on a white ceiling past about 2 m**, and it is the same root cause
-  as the wall problem: no features, so no surface. If the depth line fit turns out to work
-  on walls, the identical trick fits a *horizontal* plane for a ceiling and would fix
-  heights too. Worth trying only after the wall question is answered — one experiment at a
-  time, or a negative result teaches nothing.
+- **Corners hidden behind furniture are still unsolved, and there is now no candidate.**
+  Four field sessions have named this as the app's real limitation. Wall-face capture was
+  the answer and it did not survive contact with a white wall (see above). What remains is
+  a workaround rather than a fix: capture the corners you *can* see, then drag the hidden
+  one in the plan editor and lock a wall you measured with a tape, which pulls the whole
+  room towards that one certain number. The trajectory guide helps aim past an obstruction
+  while capturing. Neither is the same as being able to capture the corner.
+- **Plumb fails on a white ceiling past about 2 m**, and it is the same root cause as the
+  wall problem was: no features, so no surface. The depth trick that failed on walls would
+  fail here for the same reason, so that avenue is closed too. The remaining option is
+  ARCore's ceiling detection, which already exists and works when a ceiling has enough
+  texture to be fitted.
   Three consecutive field-test sessions have ended with this feature as the answer: the corner behind a laundry pile, corners occluded by furniture generally, and
   cluttered rooms producing floor planes where there is no floor. Fitting the two adjacent
   wall planes and intersecting them needs no sight of the corner at all

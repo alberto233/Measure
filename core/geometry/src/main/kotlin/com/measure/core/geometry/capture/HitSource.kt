@@ -29,18 +29,6 @@ enum class HitSource(
     val label: String,
 ) {
     PLANE_POLYGON(0.008, 0.004, 0.80, "surface"),
-
-    /**
-     * A wall's own plane, taken as a line on the floor plan rather than as a point.
-     *
-     * Slightly worse than a hit inside a plane's polygon because the corner it helps
-     * derive is usually *outside* the fitted region — the junction is the part of the
-     * wall nobody can see, which is the whole reason for capturing it this way. The
-     * correlation is the highest of any source: two corners at either end of one wall
-     * share that wall's entire error, so it cancels out of the wall's length exactly.
-     */
-    WALL_FACE(0.012, 0.005, 0.85, "wall"),
-
     PLANE_INFINITE(0.015, 0.008, 0.75, "surface (extended)"),
     DEPTH(0.020, 0.012, 0.50, "depth"),
 
@@ -55,18 +43,6 @@ enum class HitSource(
      * else.
      */
     PLUMB(0.024, 0.016, 0.40, "plumb"),
-
-    /**
-     * A wall line fitted to depth points, when ARCore would not fit a plane to it.
-     *
-     * Ranked below a single depth hit, which looks wrong for a fit over two dozen points
-     * and is not. Averaging beats down the *random* part of each point's error, but on a
-     * blank painted wall — the only place this is ever used — what dominates is the depth
-     * map's bias on a textureless surface, and bias does not average away. Claiming the
-     * fit is better than its ingredients would be exactly the overconfidence this table
-     * exists to prevent.
-     */
-    WALL_DEPTH(0.030, 0.016, 0.55, "wall (depth)"),
     FEATURE_POINT(0.030, 0.020, 0.20, "feature"),
     INSTANT_PLACEMENT(0.060, 0.040, 0.60, "estimate"),
     ;

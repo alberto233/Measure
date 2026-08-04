@@ -131,19 +131,24 @@ revised order below.
 
 | # | Milestone | Rough effort | Exit criteria |
 | --- | --- | --- | --- |
-| **M11** | Wall-face capture | 2 wks | Fit the two wall planes meeting at a corner and intersect them, so a corner can be captured without ever being visible. Falls back to the current floor-hit corner when only one wall is found |
+| ~~**M11**~~ | ~~Wall-face capture~~ | — | **Attempted and withdrawn.** Built, field tested twice, removed. ARCore fits no vertical plane to a plain painted wall, and a depth-based line fit was intermittent and inaccurate. See `docs/DEVELOPMENT.md` §1 for what was ruled out |
 | **M12** | Plan measuring tool | 1 wk | Tap two points anywhere on a saved plan to measure between them, snapped to walls, corners and opening edges. Kept as an annotation, shown with its own tolerance and visually distinct from a captured measurement. Plus the room's bounding width x depth and largest clear span, always on |
 | **M13** | Finding a plan | 0.5 wk | Sort and search the project list; one free-text field per project (client, address) with filter chips |
 | **M14** | Grouping plans | 1.5 wks | A tier above the project, once M13 has shown whether people want folders or tags |
 
-**Revised order after the second field session: M11, M12, M7, then the rest.**
+**Revised order: M12, M7, then the rest.**
 
-Wall-face capture moves ahead of export because three consecutive field sessions ended
-with it as the answer. Corners behind furniture, corners behind a laundry pile, and
-cluttered rooms producing floor planes where there is no floor are all the same problem,
-and the current mitigation — taking corners only from the floor plane — trades a wrong
-corner for no corner. Export operates on plans, so anything that makes plans better is
-worth more before export than after it.
+M11 was to come first, on the strength of three field sessions naming hidden corners as
+the app's real limitation. It was built and then removed: the sensor does not supply the
+information the method needs on a plain painted wall, and a feature that intermittently
+returns a *wrong* corner is worse than one that is absent, given what §5 claims about
+this app's numbers. Hidden corners are therefore still unsolved, with the plan editor as
+the workaround — capture what is visible, drag the rest, lock a tape-measured wall.
+
+The lesson is worth keeping for the next perception feature. The geometry was correct,
+tested and finished quickly; the whole risk sat in what the camera could actually see,
+and only walking into a room with it could answer that. Build the perception probe before
+the pipeline that depends on it.
 
 ### M12, and why a derived distance is not a measurement
 

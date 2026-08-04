@@ -10,7 +10,6 @@ import androidx.lifecycle.viewModelScope
 import com.measure.ar.ArScene
 import com.measure.ar.ArSegment
 import com.measure.ar.CaptureMode
-import com.measure.ar.CornerMethod
 import com.measure.ar.MeasureArController
 import com.measure.core.data.MeasureData
 import com.measure.core.data.MeasureRepository
@@ -25,10 +24,6 @@ import com.measure.core.geometry.capture.LoopClosure
 import com.measure.core.geometry.capture.MeasuredSegment
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.SampledPoint
-import com.measure.core.geometry.capture.WallCaptureOutcome
-import com.measure.core.geometry.capture.WallChain
-import com.measure.core.geometry.capture.WallFace
-import com.measure.core.geometry.capture.WallPairProblem
 import com.measure.core.units.LengthFormatter
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.launch
@@ -101,24 +96,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     val roomCorners = mutableStateListOf<SampledPoint>()
 
     /**
-     * How corners are being obtained — docs/ACCURACY.md M10.
-     *
-     * Per room rather than per wall. The accuracy document wants the two mixed within one
-     * capture, and that is right, but a chain of walls and a list of tapped points are
-     * different structures: every wall after the first serves two corners, which a tapped
-     * point never does. Mixing them means a corner list whose entries have different
-     * provenance and different neighbours, and getting that wrong would produce plans
-     * that are quietly wrong rather than visibly wrong. Recorded in DEVELOPMENT.md §8.
-     */
-    var cornerMethod by mutableStateOf(CornerMethod.TAP_FLOOR)
-        private set
-
-    /** Wall-face capture: the walls taken so far, in the order they were taken. */
-    val capturedWalls = mutableStateListOf<WallFace>()
-
-    val isWallMode: Boolean get() = cornerMethod == CornerMethod.WALL_FACES
-
-    /**
      * The ceiling height ARCore has seen, if any.
      *
      * Latched rather than read at the moment of closing: the ceiling is usually noticed
@@ -164,9 +141,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             controller.outcomes.collect(::onCaptureOutcome)
         }
-        viewModelScope.launch {
-            controller.walls.collect(::onWallOutcome)
-        }
         pushScene()
     }
 
@@ -187,27 +161,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Switch between tapping corners and taking walls.
-     *
-     * Refused mid-room rather than silently converting: the two produce corner lists with
-     * different provenance, and half a room of each would be a plan whose accuracy nobody
-     * could describe.
-     */
-    fun selectCornerMethod(next: CornerMethod) {
-        if (next == cornerMethod) return
-        if (roomCorners.isNotEmpty() || capturedWalls.isNotEmpty() || isRoomClosed) {
-            notice = CaptureNotice.Warning("Finish or clear this room before changing method")
-            return
-        }
-        cornerMethod = next
-        notice = CaptureNotice.Advice(next.hint)
-        pushScene()
-    }
-
-    /** Take the wall under the reticle — docs/ACCURACY.md M10. */
-    fun captureWall() = controller.requestWall()
-
-    /**
      * Close the perimeter without re-measuring the first corner.
      *
      * This costs accuracy and the user should know it: without a second reading of the
@@ -216,9 +169,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      * raw observations. Walking back to the first corner is always the better option,
      * which is why it is the one the interface nudges towards.
      */
-    fun closeRoom() {
-        if (isWallMode) closeWallRoom() else solveRoom(closingObservation = null)
-    }
+    fun closeRoom() = solveRoom(closingObservation = null)
 
     /**
      * Start a fresh room, keeping the one just finished.
@@ -230,7 +181,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     fun restartRoom() {
         detectedCeilingHeight = null
         roomCorners.clear()
-        capturedWalls.clear()
         roomSolution = null
         savedRoomId = null
         isNearStartCorner = false
@@ -249,7 +199,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     /** Tracks whether the next tap would close the loop, so the interface can say so. */
     fun updateStartProximity(reticle: com.measure.core.geometry.Vec3?) {
-        val intent = if (isRoomClosed || isWallMode) {
+        val intent = if (isRoomClosed) {
             ClosingIntent.ADD_CORNER
         } else {
             LoopClosure.classify(roomCorners.size, distanceToStart(reticle))
@@ -301,8 +251,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 if (roomSolution != null) {
                     roomSolution = null
                     discardSavedRoom()
-                } else if (isWallMode) {
-                    if (capturedWalls.isNotEmpty()) capturedWalls.removeAt(capturedWalls.lastIndex)
                 } else if (roomCorners.isNotEmpty()) {
                     roomCorners.removeAt(roomCorners.lastIndex)
                 }
@@ -327,17 +275,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         restartRoom()
     }
 
-    /** True when there is enough taken to attempt a close. */
-    val canCloseRoom: Boolean
-        get() = if (isWallMode) {
-            capturedWalls.size >= WallChain.MINIMUM_WALLS_FOR_ROOM
-        } else {
-            roomCorners.size >= LoopClosure.MINIMUM_CORNERS
-        }
+    /** True when there is enough of a perimeter to attempt a close. */
+    val canCloseRoom: Boolean get() = roomCorners.size >= LoopClosure.MINIMUM_CORNERS
 
     /** True when undo has something to take back. */
-    val canUndoRoom: Boolean
-        get() = isRoomClosed || roomCorners.isNotEmpty() || capturedWalls.isNotEmpty()
+    val canUndoRoom: Boolean get() = isRoomClosed || roomCorners.isNotEmpty()
 
     fun dismissNotice() {
         notice = null
@@ -413,92 +355,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // --- wall-face capture ------------------------------------------------------------
-
-    private fun onWallOutcome(outcome: WallCaptureOutcome) {
-        when (outcome) {
-            is WallCaptureOutcome.Rejected -> notice = CaptureNotice.Warning(outcome.reason.message)
-            is WallCaptureOutcome.Accepted -> addWall(outcome.face)
-        }
-        pushScene()
-    }
-
-    /**
-     * Takes a wall, provided it makes a corner with the one before it.
-     *
-     * Checked here and not only when the room closes, because the moment of the mistake
-     * is the only moment the user can fix it — they are standing in front of both walls.
-     * Discovering four walls later that two of them never met would mean starting again.
-     */
-    private fun addWall(face: WallFace) {
-        if (isRoomClosed) return
-
-        val previous = capturedWalls.lastOrNull()
-        capturedWalls += face
-
-        if (previous != null) {
-            val problem = WallChain.corners(capturedWalls, closed = false)
-                .unresolved[capturedWalls.lastIndex - 1]
-            if (problem != null) {
-                capturedWalls.removeAt(capturedWalls.lastIndex)
-                notice = CaptureNotice.Warning(
-                    when (problem) {
-                        WallPairProblem.SAME_WALL -> "That is the wall you just took — turn to the next one"
-                        WallPairProblem.TOO_SHALLOW ->
-                            "Those two walls are too nearly parallel to find a corner between them"
-                    },
-                )
-                return
-            }
-        }
-
-        notice = when (capturedWalls.size) {
-            1 -> CaptureNotice.Advice("Now turn to the next wall")
-            WallChain.MINIMUM_WALLS_FOR_ROOM ->
-                CaptureNotice.Advice("Keep going, then tap Close when the last wall is taken")
-            else -> null
-        }
-    }
-
-    /** Corners derived from the walls taken so far. Each pair of walls gives one. */
-    fun wallCorners(closed: Boolean = isRoomClosed): List<Vec2> =
-        WallChain.corners(capturedWalls, closed).corners.map { it.position }
-
-    /**
-     * Close a wall-face room.
-     *
-     * The wrap-around pair — the last wall against the first — is what shuts the loop,
-     * and it does so geometrically rather than by re-observation. That means there is no
-     * misclosure to distribute and none to report: the honest figure for this capture is
-     * the worst corner's own tolerance, which is what the readout shows instead.
-     */
-    private fun closeWallRoom() {
-        if (capturedWalls.size < WallChain.MINIMUM_WALLS_FOR_ROOM) {
-            notice = CaptureNotice.Warning("A room needs at least three walls")
-            return
-        }
-
-        val chain = WallChain.corners(capturedWalls, closed = true)
-        if (!chain.isComplete) {
-            notice = CaptureNotice.Warning(
-                "The last wall does not meet the first — take the wall that closes the room",
-            )
-            return
-        }
-
-        val corners = chain.corners.map { CapturedCorner(it.position, it.sigma) }
-        finishRoom(
-            capture = RoomCapture(corners = corners),
-            measured = chain.corners.map { it.position },
-            sigmas = chain.corners.map { it.sigma },
-        ) {
-            val worst = chain.worstSigma
-            CaptureNotice.Advice(
-                if (worst == null) "Room closed" else "Room closed — corners to ±${formatLength(worst)}",
-            )
-        }
-    }
-
     // --- solving ------------------------------------------------------------------------
 
     private fun solveRoom(closingObservation: SampledPoint?) {
@@ -564,8 +420,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** Plan-view corners for the minimap: solved if we have a solution, raw if not. */
-    fun planOutline(): List<Vec2> = roomSolution?.polygon?.vertices
-        ?: if (isWallMode) wallCorners(closed = false) else roomCorners.map { it.position.toFloorPlane() }
+    fun planOutline(): List<Vec2> =
+        roomSolution?.polygon?.vertices ?: roomCorners.map { it.position.toFloorPlane() }
 
     fun percent(fraction: Double): String =
         String.format(java.util.Locale.getDefault(), "%.1f%%", fraction * 100)
@@ -614,25 +470,13 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun pushScene() {
-        // Wall mode has no tapped corners to draw, so the renderer is given the derived
-        // ones instead. They are laid on the floor because that is where the walls meet
-        // it, and because every other piece of room drawing already lives there.
-        val floorHeight = controller.state.value.floor?.height ?: 0.0
-        val corners = if (isWallMode) {
-            wallCorners().map { com.measure.core.geometry.Vec3(it.x, floorHeight, -it.y) }
-        } else {
-            roomCorners.map { it.position }
-        }
-
         controller.updateScene(
             ArScene(
                 captureMode = captureMode,
                 segments = segments.map { ArSegment(it.id, it.from.position, it.to.position) },
                 pendingAnchor = pending?.position,
                 mode = mode,
-                roomCorners = corners,
-                cornerMethod = cornerMethod,
-                takenWalls = capturedWalls.toList(),
+                roomCorners = roomCorners.map { it.position },
                 roomClosed = isRoomClosed,
                 showPlanes = showPlanes,
             ),
