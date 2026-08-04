@@ -19,6 +19,8 @@ import com.measure.core.geometry.RoomSolution
 import com.measure.core.geometry.RoomSolver
 import com.measure.core.geometry.Vec2
 import com.measure.core.geometry.capture.CaptureOutcome
+import com.measure.core.geometry.capture.ClosingIntent
+import com.measure.core.geometry.capture.LoopClosure
 import com.measure.core.geometry.capture.MeasuredSegment
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.SampledPoint
@@ -123,6 +125,16 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     var isNearStartCorner by mutableStateOf(false)
         private set
 
+    /**
+     * True in the band around the first corner where a tap is *not* taken as a close.
+     *
+     * Worth showing, because this is exactly where the interface has to be explicit: the
+     * user is back near where they started, so they need to know whether the next tap
+     * adds a corner or finishes the room.
+     */
+    var isApproachingStart by mutableStateOf(false)
+        private set
+
     private var nextSegmentId = 1L
 
     init {
@@ -172,6 +184,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         roomSolution = null
         savedRoomId = null
         isNearStartCorner = false
+        isApproachingStart = false
         notice = null
         pushScene()
     }
@@ -186,12 +199,18 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     /** Tracks whether the next tap would close the loop, so the interface can say so. */
     fun updateStartProximity(reticle: com.measure.core.geometry.Vec3?) {
-        val start = roomCorners.firstOrNull()?.position
-        isNearStartCorner = start != null &&
-            reticle != null &&
-            !isRoomClosed &&
-            roomCorners.size >= MINIMUM_CORNERS &&
-            start.horizontalDistanceTo(reticle) <= CLOSING_RADIUS_METRES
+        val intent = if (isRoomClosed) {
+            ClosingIntent.ADD_CORNER
+        } else {
+            LoopClosure.classify(roomCorners.size, distanceToStart(reticle))
+        }
+        isNearStartCorner = intent == ClosingIntent.CLOSE_LOOP
+        isApproachingStart = intent == ClosingIntent.APPROACHING_START
+    }
+
+    private fun distanceToStart(point: com.measure.core.geometry.Vec3?): Double? {
+        val start = roomCorners.firstOrNull()?.position ?: return null
+        return point?.let { start.horizontalDistanceTo(it) }
     }
 
     /**
@@ -307,25 +326,31 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private fun addCorner(point: SampledPoint) {
         if (isRoomClosed) return
 
-        val start = roomCorners.firstOrNull()
-        val closesTheLoop = start != null &&
-            roomCorners.size >= MINIMUM_CORNERS &&
-            start.position.horizontalDistanceTo(point.position) <= CLOSING_RADIUS_METRES
-
-        if (closesTheLoop) {
+        val intent = LoopClosure.classify(roomCorners.size, distanceToStart(point.position))
+        if (intent == ClosingIntent.CLOSE_LOOP) {
             solveRoom(closingObservation = point)
-        } else {
-            roomCorners += point
-            notice = when (roomCorners.size) {
-                1 -> CaptureNotice.Advice("Walk to the next corner and tap again")
-                MINIMUM_CORNERS -> CaptureNotice.Advice("Keep going, then return to the first corner to close")
-                else -> null
-            }
+            return
+        }
+
+        roomCorners += point
+        notice = when {
+            // Near the start but not on it. This used to close the room, and half a metre
+            // of slack is wide enough to swallow a real corner — an alcove, a chimney
+            // breast, the corner of a fitted unit next to the doorway you began at. The
+            // corner is taken, and the way to finish is the button that says so.
+            intent == ClosingIntent.APPROACHING_START ->
+                CaptureNotice.Advice("Corner added — tap Close to finish, or the first corner itself")
+
+            roomCorners.size == 1 -> CaptureNotice.Advice("Walk to the next corner and tap again")
+            roomCorners.size == LoopClosure.MINIMUM_CORNERS ->
+                CaptureNotice.Advice("Keep going, then return to the first corner to close")
+
+            else -> null
         }
     }
 
     private fun solveRoom(closingObservation: SampledPoint?) {
-        if (roomCorners.size < MINIMUM_CORNERS) {
+        if (roomCorners.size < LoopClosure.MINIMUM_CORNERS) {
             notice = CaptureNotice.Warning("A room needs at least three corners")
             return
         }
@@ -344,6 +369,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
         roomSolution = solution
         isNearStartCorner = false
+        isApproachingStart = false
         val measured = roomCorners.map { it.position.toFloorPlane() }
         val sigmas = roomCorners.map { it.sigma }
         autosave {
@@ -430,14 +456,6 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 showPlanes = showPlanes,
             ),
         )
-    }
-
-    private companion object {
-        /** A polygon needs three corners before it encloses anything. */
-        const val MINIMUM_CORNERS = 3
-
-        /** Tap within this of the first corner and the loop closes instead of growing. */
-        const val CLOSING_RADIUS_METRES = 0.45
     }
 
     override fun onCleared() {

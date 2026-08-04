@@ -92,7 +92,34 @@ data class SavedMeasurement(
     val sigma: Length,
     val label: String?,
     val createdAt: Long,
-)
+) {
+    /**
+     * Whether this is essentially a height, and so has no length on a floor plan.
+     *
+     * A plan discards the vertical axis, so a plumb measurement projects onto it as a
+     * single point. Anything drawing measurements on a plan has to know that, or a room
+     * height appears as a dot — which is what a project holding two of them looked like.
+     *
+     * Judged as a share of the true length rather than against a fixed distance, so a
+     * genuinely short horizontal measurement, the width of a doorframe say, is still the
+     * short line it is. The mode is not enough on its own: a free measurement taken up a
+     * wall is just as vertical as a plumb one, and only the geometry says so.
+     */
+    val isVerticalOnPlan: Boolean
+        get() {
+            val planLength = from.toFloorPlane().distanceTo(to.toFloorPlane())
+            return planLength < DEGENERATE_PLAN_METRES ||
+                (length.metres > 0.0 && planLength < length.metres * VERTICAL_PLAN_SHARE)
+        }
+
+    private companion object {
+        /** Shorter than this on the plan and there is nothing to draw a line between. */
+        const val DEGENERATE_PLAN_METRES = 0.02
+
+        /** Below this share of its true length, a measurement is a height, not a distance. */
+        const val VERTICAL_PLAN_SHARE = 0.25
+    }
+}
 
 data class ProjectDetail(
     val id: Long,

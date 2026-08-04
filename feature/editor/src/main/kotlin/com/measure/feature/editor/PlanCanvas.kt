@@ -11,7 +11,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -23,6 +27,8 @@ import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.Segments
 import com.measure.core.geometry.Vec2
+import kotlin.math.atan2
+import kotlin.math.hypot
 
 /**
  * Maps between metres on the plan and pixels on the screen.
@@ -63,7 +69,10 @@ data class PlanCamera(
             val usableHeight = (size.height - 2 * marginPx).coerceAtLeast(1)
 
             return PlanCamera(
-                metresPerPixel = maxOf(spanX / usableWidth, spanY / usableHeight),
+                // Clamped to the same range pinching allows, so the view never opens at a
+                // zoom the user cannot get back to.
+                metresPerPixel = maxOf(spanX / usableWidth, spanY / usableHeight)
+                    .coerceIn(FINEST, COARSEST),
                 centre = Vec2((minX + maxX) / 2.0, (minY + maxY) / 2.0),
             )
         }
@@ -158,16 +167,25 @@ internal fun PlanCanvas(
             val selected = selection == Selection.Measurement(measurement.id)
             val colour = if (selected) MeasureColours.Sampling else MeasureColours.Idle
 
-            drawLine(
-                color = colour.copy(alpha = if (selected) 1f else 0.7f),
-                start = from,
-                end = to,
-                strokeWidth = if (selected) 6f else 3f,
-                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
-                    floatArrayOf(14f, 10f),
-                ),
-            )
-            listOf(from, to).forEach { drawCircle(colour, radius = 5f, center = it) }
+            if (measurement.isVerticalOnPlan) {
+                // A plumb measurement is almost all height, and a floor plan discards
+                // height. Drawn as a line it collapsed to nothing, so a project holding
+                // two room heights showed two bare dots on an empty canvas.
+                drawHeightMark(
+                    centre = Offset((from.x + to.x) / 2f, (from.y + to.y) / 2f),
+                    colour = colour,
+                    selected = selected,
+                )
+            } else {
+                drawLine(
+                    color = colour.copy(alpha = if (selected) 1f else 0.7f),
+                    start = from,
+                    end = to,
+                    strokeWidth = if (selected) 6f else 3f,
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 10f)),
+                )
+                listOf(from, to).forEach { drawCircle(colour, radius = 5f, center = it) }
+            }
         }
 
         rooms.forEach { room ->
@@ -187,11 +205,14 @@ internal fun PlanCanvas(
             }
             drawPath(path, MeasureColours.Ready.copy(alpha = if (isSelected) 0.20f else 0.10f))
 
+            val polygon = Polygon(outline)
+
             outline.indices.forEach { index ->
                 val from = screen[index]
                 val to = screen[(index + 1) % screen.size]
                 val locked = room.lockedLengths.containsKey(index)
                 val selected = selection == Selection.Wall(room.id, index)
+                val wallStroke = if (selected || locked) 6f else 3.5f
 
                 drawLine(
                     color = when {
@@ -201,35 +222,32 @@ internal fun PlanCanvas(
                     },
                     start = from,
                     end = to,
-                    strokeWidth = if (selected || locked) 6f else 3.5f,
+                    strokeWidth = wallStroke,
                 )
 
-                // Openings are drawn over the wall as a break in it, which is how they
-                // appear on any floor plan and is far quicker to read than a list.
-                val wallLength = outline[index].distanceTo(outline[(index + 1) % outline.size])
-                if (wallLength > 0.0) {
-                    room.openings[index].orEmpty().forEach { saved ->
-                        val startFraction = (saved.opening.offset / wallLength).coerceIn(0.0, 1.0)
-                        val endFraction =
-                            ((saved.opening.offset + saved.opening.width) / wallLength).coerceIn(0.0, 1.0)
+                val openings = room.openings[index].orEmpty()
+                if (openings.isEmpty()) return@forEach
 
-                        drawLine(
-                            color = MeasureColours.Surface,
-                            start = lerp(from, to, startFraction.toFloat()),
-                            end = lerp(from, to, endFraction.toFloat()),
-                            strokeWidth = 9f,
-                        )
-                        drawLine(
-                            color = if (saved.opening.kind == OpeningKind.WINDOW) {
-                                MeasureColours.Idle
-                            } else {
-                                MeasureColours.Ready
-                            },
-                            start = lerp(from, to, startFraction.toFloat()),
-                            end = lerp(from, to, endFraction.toFloat()),
-                            strokeWidth = 4f,
-                        )
-                    }
+                val wallLength = outline[index].distanceTo(outline[(index + 1) % outline.size])
+                val wallPixels = hypot(to.x - from.x, to.y - from.y)
+                if (wallLength <= 0.0 || wallPixels < 1f) return@forEach
+
+                val along = Offset((to.x - from.x) / wallPixels, (to.y - from.y) / wallPixels)
+                val inward = Segments.inwardNormal(polygon, index)?.toScreenVector() ?: return@forEach
+
+                openings.forEach { saved ->
+                    val startFraction = (saved.opening.offset / wallLength).coerceIn(0.0, 1.0)
+                    val endFraction =
+                        ((saved.opening.offset + saved.opening.width) / wallLength).coerceIn(0.0, 1.0)
+
+                    drawOpening(
+                        kind = saved.opening.kind,
+                        jambA = lerp(from, to, startFraction.toFloat()),
+                        jambB = lerp(from, to, endFraction.toFloat()),
+                        along = along,
+                        inward = inward,
+                        wallStroke = wallStroke,
+                    )
                 }
             }
 
@@ -245,15 +263,120 @@ internal fun PlanCanvas(
         }
     }
 
-    // Wall lengths are text, so they are drawn as composables over the canvas rather than
-    // with drawText — same reasoning as the AR overlay's labels.
-    WallLabels(rooms, camera, size, dragging, selection, formatLength)
+    // Lengths are text, so they are drawn as composables over the canvas rather than with
+    // drawText — same reasoning as the AR overlay's labels.
+    PlanLabels(
+        wallLabels(rooms, camera, size, dragging, selection, formatLength) +
+            measurementLabels(measurements, camera, size, selection, formatLength),
+    )
 }
 
 private fun lerp(from: Offset, to: Offset, t: Float) = Offset(
     x = from.x + (to.x - from.x) * t,
     y = from.y + (to.y - from.y) * t,
 )
+
+// --- symbols --------------------------------------------------------------------------
+
+/**
+ * Draws an opening the way a floor plan does, rather than as a coloured stripe.
+ *
+ * The point is instant recognition. A door and a window drawn as two differently tinted
+ * segments of wall are told apart only by remembering which colour meant which; the
+ * conventional symbols — a swing arc for a door, a framed gap for a window — are the
+ * notation everyone who has ever looked at a plan already reads, and they carry
+ * information a stripe cannot, namely which way the door opens.
+ */
+private fun DrawScope.drawOpening(
+    kind: OpeningKind,
+    jambA: Offset,
+    jambB: Offset,
+    /** Unit vector along the wall, from [jambA] towards [jambB]. */
+    along: Offset,
+    /** Unit vector across the wall, pointing into the room. */
+    inward: Offset,
+    wallStroke: Float,
+) {
+    val width = hypot(jambB.x - jambA.x, jambB.y - jambA.y)
+    if (width < MINIMUM_SYMBOL_PX) return
+
+    // Cut the wall away. Every other mark sits on this gap, and on a real plan the gap
+    // alone already says "there is a hole in this wall here".
+    drawLine(MeasureColours.Surface, jambA, jambB, strokeWidth = wallStroke + GAP_OVERDRAW_PX)
+
+    // Jambs across the wall, so the opening reads as a framed hole rather than a stretch
+    // of missing wall.
+    listOf(jambA, jambB).forEach { jamb ->
+        drawLine(
+            color = MeasureColours.OnScrim,
+            start = jamb - inward * JAMB_HALF_PX,
+            end = jamb + inward * JAMB_HALF_PX,
+            strokeWidth = 3f,
+        )
+    }
+
+    when (kind) {
+        OpeningKind.DOOR -> {
+            // Leaf standing open at right angles, with the quarter-circle it sweeps. The
+            // leaf is hinged at the near jamb because that is where the opening's offset
+            // is measured from, so the symbol and the number agree.
+            val leaf = jambA + inward * width
+            drawLine(MeasureColours.Ready, jambA, leaf, strokeWidth = 4f)
+            drawArc(
+                color = MeasureColours.Ready.copy(alpha = 0.75f),
+                startAngle = screenAngle(inward),
+                sweepAngle = quarterTurn(inward, along),
+                useCenter = false,
+                topLeft = Offset(jambA.x - width, jambA.y - width),
+                size = Size(width * 2f, width * 2f),
+                style = Stroke(width = 2f),
+            )
+        }
+
+        OpeningKind.WINDOW -> {
+            // The frame seen from above: two lines spanning the gap, inside the jambs.
+            listOf(-GLAZING_HALF_PX, GLAZING_HALF_PX).forEach { offset ->
+                drawLine(
+                    color = MeasureColours.Idle,
+                    start = jambA + inward * offset,
+                    end = jambB + inward * offset,
+                    strokeWidth = 2.5f,
+                )
+            }
+        }
+
+        // An archway is a hole with nothing in it, and that is exactly how it is drawn.
+        OpeningKind.PASSAGE -> Unit
+    }
+}
+
+/** A height, which a floor plan cannot show as a length: a double arrow where it was taken. */
+private fun DrawScope.drawHeightMark(centre: Offset, colour: Color, selected: Boolean) {
+    val radius = if (selected) 15f else 12f
+    drawCircle(colour.copy(alpha = 0.18f), radius = radius, center = centre)
+    drawCircle(colour, radius = radius, center = centre, style = Stroke(width = if (selected) 3f else 2f))
+
+    val reach = radius * 0.62f
+    val head = radius * 0.32f
+    val top = Offset(centre.x, centre.y - reach)
+    val bottom = Offset(centre.x, centre.y + reach)
+    drawLine(colour, top, bottom, strokeWidth = 2.5f)
+    listOf(top to 1f, bottom to -1f).forEach { (tip, sign) ->
+        drawLine(colour, tip, Offset(tip.x - head, tip.y + head * sign), strokeWidth = 2.5f)
+        drawLine(colour, tip, Offset(tip.x + head, tip.y + head * sign), strokeWidth = 2.5f)
+    }
+}
+
+/** Plan +y is "away"; screen +y is down. Lengths are preserved, so a unit stays a unit. */
+private fun Vec2.toScreenVector() = Offset(x.toFloat(), -y.toFloat())
+
+/** Compose measures arc angles from 3 o'clock, sweeping the way screen y grows. */
+private fun screenAngle(vector: Offset): Float =
+    Math.toDegrees(atan2(vector.y.toDouble(), vector.x.toDouble())).toFloat()
+
+/** The signed quarter turn from [from] to [to], which are always perpendicular here. */
+private fun quarterTurn(from: Offset, to: Offset): Float =
+    if (from.x * to.y - from.y * to.x >= 0f) 90f else -90f
 
 private fun Selection.roomId(): Long? = when (this) {
     is Selection.Wall -> roomId
@@ -312,3 +435,15 @@ internal fun SavedRoom.polygonOrNull(): Polygon? =
 
 /** Fingers are blunt; this is the radius within which a tap counts as "on" something. */
 private const val TOUCH_SLOP_PX = 28.0
+
+/** An opening narrower than this on screen has no room for a symbol inside it. */
+private const val MINIMUM_SYMBOL_PX = 4f
+
+/** Enough wider than the wall stroke that the gap is a clean break, not a smudge. */
+private const val GAP_OVERDRAW_PX = 3f
+
+/** Half the length of the tick drawn across the wall at each side of an opening. */
+private const val JAMB_HALF_PX = 5f
+
+/** Half the separation between the two lines of a window's frame. */
+private const val GLAZING_HALF_PX = 2.5f

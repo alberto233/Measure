@@ -187,7 +187,8 @@ private fun EmptyPlan(modifier: Modifier = Modifier) {
 @Composable
 private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
     val selection = viewModel.selection
-    val measurementsPresent = viewModel.project.value?.measurements?.isNotEmpty() == true
+    val project by viewModel.project.collectAsStateWithLifecycle()
+    val measurements = project?.measurements.orEmpty()
 
     Column(
         modifier
@@ -207,15 +208,15 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         when (selection) {
-            Selection.None -> Text(
-                text = if (measurementsPresent) {
-                    "Pinch to zoom · tap a wall to set its true length · tap a dashed line for a measurement"
-                } else {
-                    "Pinch to zoom · tap a wall to set its true length · long-press a corner to move it"
-                },
-                color = MeasureColours.OnScrimMuted,
-                fontSize = 13.sp,
-            )
+            Selection.None -> {
+                MeasurementList(viewModel, measurements)
+                Text(
+                    text = "Pinch to zoom · tap a wall to set its true length · " +
+                        "long-press a corner to move it",
+                    color = MeasureColours.OnScrimMuted,
+                    fontSize = 13.sp,
+                )
+            }
 
             is Selection.Corner -> CornerPanel(viewModel, selection)
             is Selection.Wall -> WallPanel(viewModel, selection)
@@ -305,6 +306,59 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Pill("Delete room", onClick = { viewModel.deleteRoom(room.id) })
         Pill("Done", onClick = viewModel::clearSelection)
+    }
+}
+
+/**
+ * Every standalone measurement, as a list.
+ *
+ * A plan is the wrong shape for these and no amount of drawing fixes it: a room height is
+ * vertical, and a floor plan has no vertical. Two heights measured one after the other
+ * projected onto the floor as two dots a few centimetres apart, which told the user
+ * nothing they had measured. The values are the content, so the values are what is shown,
+ * and each row selects its measurement on the plan so the two views agree.
+ */
+@Composable
+private fun MeasurementList(
+    viewModel: EditorViewModel,
+    measurements: List<com.measure.core.data.SavedMeasurement>,
+) {
+    if (measurements.isEmpty()) return
+
+    Text(
+        text = "${measurements.size} ${if (measurements.size == 1) "measurement" else "measurements"}",
+        color = MeasureColours.OnScrim,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+
+    measurements.forEach { measurement ->
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(MeasureColours.ScrimSoft)
+                .clickable { viewModel.select(Selection.Measurement(measurement.id)) }
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = com.measure.core.units.LengthFormatter.formatWithUncertainty(
+                    measurement.length,
+                    measurement.sigma,
+                    viewModel.unitSystem(),
+                ),
+                color = MeasureColours.OnScrim,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = measurement.mode.label,
+                color = MeasureColours.OnScrimMuted,
+                fontSize = 12.sp,
+            )
+        }
     }
 }
 

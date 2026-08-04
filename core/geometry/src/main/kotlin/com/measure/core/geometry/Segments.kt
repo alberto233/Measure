@@ -78,4 +78,48 @@ object Segments {
         }
         return inside
     }
+
+    /**
+     * The unit normal of edge [edgeIndex], pointing into the polygon.
+     *
+     * Which side of a wall the room is on cannot be inferred from the edge alone: a room
+     * captured clockwise and the same room captured anticlockwise have opposite normals,
+     * and which one a user gets depends only on which way they happened to walk. So this
+     * probes — it steps a little way off the wall's midpoint and asks whether it landed
+     * inside. That is exact for the convex-ish polygons rooms actually are, and it is
+     * what stops a door being drawn swinging out through the wall into nothing.
+     *
+     * Returns null for a degenerate edge, which has no direction to be normal to.
+     */
+    fun inwardNormal(polygon: Polygon, edgeIndex: Int): Vec2? {
+        if (polygon.size < 3 || edgeIndex !in polygon.vertices.indices) return null
+
+        val from = polygon.vertices[edgeIndex]
+        val to = polygon.vertices[(edgeIndex + 1) % polygon.size]
+        val along = to - from
+        if (along.length < Vec2.EPSILON) return null
+
+        val candidate = along.perpendicular().normalised()
+        // The probe must land inside the room, so it is capped by the room itself as well
+        // as by a comfortable absolute distance: a shallow alcove is only centimetres
+        // deep, and a fixed 5 cm step would sail straight through it and report the wrong
+        // side of the wall.
+        val step = minOf(INWARD_PROBE_METRES, along.length * PROBE_SHARE, polygon.narrowestSpan * PROBE_SHARE)
+        val midpoint = (from + to) * 0.5
+        return if (contains(polygon, midpoint + candidate * step)) candidate else -candidate
+    }
+
+    /** The shorter side of the polygon's bounding box: an upper bound on how deep it is. */
+    private val Polygon.narrowestSpan: Double
+        get() {
+            val xs = vertices.map { it.x }
+            val ys = vertices.map { it.y }
+            return minOf(xs.max() - xs.min(), ys.max() - ys.min())
+        }
+
+    /** Far enough in to clear the wall, near enough to stay in the room it belongs to. */
+    private const val INWARD_PROBE_METRES = 0.05
+
+    /** What fraction of the smallest available distance a probe may use. */
+    private const val PROBE_SHARE = 0.25
 }

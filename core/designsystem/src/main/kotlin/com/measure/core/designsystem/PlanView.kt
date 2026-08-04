@@ -72,16 +72,29 @@ fun PlanView(
             val isLast = outlineIndex == outlines.lastIndex
             val screen = outline.map(::project)
 
+            // Fewer than three points cannot enclose anything, so it is a line rather than
+            // a room — a standalone measurement, on a thumbnail that mixes the two.
+            // Closing it would double it back on itself, and a vertical measurement
+            // projects to a single point, which draws as nothing at all unless its ends
+            // are marked.
+            val isPolyline = outline.size < 3
+
             if (screen.size >= 2) {
                 val path = Path().apply {
                     moveTo(screen.first().x, screen.first().y)
                     screen.drop(1).forEach { lineTo(it.x, it.y) }
-                    if (closed) close()
+                    if (closed && !isPolyline) close()
                 }
-                if (style.filled && closed) {
+                if (style.filled && closed && !isPolyline) {
                     drawPath(path, MeasureColours.Ready.copy(alpha = 0.22f))
                 }
                 drawPath(path, MeasureColours.OnScrim, style = Stroke(width = style.strokeWidth))
+            }
+
+            if (isPolyline) {
+                screen.forEach {
+                    drawCircle(MeasureColours.OnScrim, radius = style.strokeWidth * 1.6f, center = it)
+                }
             }
 
             if (isLast && preview != null) {

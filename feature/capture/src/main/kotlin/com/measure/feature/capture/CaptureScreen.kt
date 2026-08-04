@@ -363,6 +363,7 @@ private fun RoomReadout(
                 state.floor?.isEstablished != true -> "Finding the floor…"
                 corners == 0 -> "Tap the first corner"
                 viewModel.isNearStartCorner -> "Tap to close the room"
+                viewModel.isApproachingStart -> "Back near the start"
                 else -> "$corners ${if (corners == 1) "corner" else "corners"}"
             },
             color = if (viewModel.isNearStartCorner) MeasureColours.Ready else MeasureColours.OnScrim,
@@ -375,6 +376,10 @@ private fun RoomReadout(
                 state.offFloor -> "Corners come from the floor, not from what is stacked on it"
                 corners == 0 -> "Then walk round, tapping each corner"
                 viewModel.isNearStartCorner -> "Closing here measures the drift and corrects the plan"
+                // Only the first corner itself closes the room. A tap anywhere else here
+                // is a corner, which is what makes an alcove beside the doorway you began
+                // at possible to record at all.
+                viewModel.isApproachingStart -> "Aim at the first corner to close, or tap Close"
                 corners < 3 -> "Keep going round the room"
                 else -> "Return to the first corner to close"
             },
