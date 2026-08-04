@@ -9,16 +9,16 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 168 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 182 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
-| `:feature:editor` | M5 plan editor, plus M6 openings, wall area and volume |
+| `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **M12 plan measuring tool**, then M7 export — see §8 |
+| Next | **M7 export** — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -97,6 +97,35 @@ What this rules out, so it does not get retried: ARCore vertical planes on paint
 and motion-derived depth on the same, on a mid-range handset with no time-of-flight
 sensor. A device with a lidar-class sensor is a different experiment. So is a learned
 plane-from-image model, which is a different project.
+
+**M12 measuring on the plan is implemented and untested on hardware.** Tap **Measure**
+in the editor, then tap two points; corners and walls pull the point onto them. Schema is
+now v5, with `plan_measurements` added by `MIGRATION_4_5`.
+
+Two design decisions carry the weight:
+
+- **Ends are stored as anchors, not coordinates.** A corner reference, or a wall plus how
+  far along it — the same choice `OpeningEntity` makes, for the same reason. Locking a
+  wall or dragging a corner re-solves the whole polygon, and a measurement pinned to
+  absolute coordinates would keep displaying a number while no longer pointing at what it
+  measured. `PlanSnapper.resolve` places anchors against the plan as it currently is, and
+  returns null when the geometry has gone, in which case the editor stops drawing it and
+  says so rather than showing a stale line.
+- **It is visibly not a measurement.** Drawn in amber where captured measurements are
+  white, labelled with a leading `~`, and the panel says "off the plan, not measured in
+  the room". The tolerance is real: a free end contributes `PLACEMENT_SIGMA` (5 cm),
+  because a finger on a plan is a measurement of nothing, and no correlation discount is
+  applied even between two corners of one room. When either end sits on a corner the
+  rectilinear solve moved, the panel says that too.
+
+The UX was built rather than retrofitted, since three of the last four rounds of field
+faults were interaction faults rather than maths ones. Concretely: measuring is a mode
+with a lit button and an on-screen banner, never an ambiguous tap; the first end is drawn
+large the moment it lands and the banner names what it caught, because a touch screen has
+no hover and the second tap is what commits; "Redo point" is offered before that second
+tap; two taps in the same place are refused with a reason instead of saved as a dot; and
+the end marks are three different shapes so a corner anchor, a wall anchor and a free
+point cannot be confused for each other on the drawing.
 
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to
@@ -379,9 +408,9 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations are written but never run against real data.** The schema is at version 4
-  with three hand-written migrations (walls table; measured corner positions; openings).
-  All three are straightforward and Room validates them against the exported schemas at
+- **Migrations are written but never run against real data.** The schema is at version 5
+  with four hand-written migrations (walls table; measured corner positions; openings;
+  plan measurements). All four are straightforward and Room validates them against the exported schemas at
   compile time,
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which

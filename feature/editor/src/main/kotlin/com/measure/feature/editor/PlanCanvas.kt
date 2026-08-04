@@ -21,12 +21,15 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import com.measure.core.data.SavedMeasurement
+import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.Segments
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.ResolvedPoint
+import com.measure.core.geometry.plan.SnapKind
 import kotlin.math.atan2
 import kotlin.math.hypot
 
@@ -98,10 +101,15 @@ data class PlanCamera(
 internal fun PlanCanvas(
     rooms: List<SavedRoom>,
     measurements: List<SavedMeasurement>,
+    planMeasurements: List<SavedPlanMeasurement>,
     selection: Selection,
     dragging: EditorViewModel.DragState?,
+    /** Non-null while measuring: the mode, and the first end if one is down. */
+    measuring: Boolean,
+    pendingEnd: ResolvedPoint?,
     formatLength: (Double) -> String,
     onSelect: (Selection) -> Unit,
+    onMeasureTap: (point: Vec2, reach: Double) -> Unit,
     onBeginDrag: (roomId: Long, index: Int, position: Vec2) -> Unit,
     onDrag: (Vec2) -> Unit,
     onEndDrag: () -> Unit,
@@ -114,7 +122,9 @@ internal fun PlanCanvas(
     // Measurements count towards the fit too: a project holding nothing but a single
     // distance would otherwise open on an empty canvas with the measurement off-screen.
     val allPoints = rooms.flatMap { it.outline } +
-        measurements.flatMap { listOf(it.from.toFloorPlane(), it.to.toFloorPlane()) }
+        measurements.flatMap { listOf(it.from.toFloorPlane(), it.to.toFloorPlane()) } +
+        planMeasurements.mapNotNull { it.measurement }
+            .flatMap { listOf(it.from.position, it.to.position) }
 
     // Fit once, when there is both something to show and somewhere to show it. Re-fitting
     // on every change would yank the view out from under someone who has zoomed in.
@@ -140,9 +150,14 @@ internal fun PlanCanvas(
                     )
                 }
             }
-            .pointerInput(rooms, camera) {
+            .pointerInput(rooms, camera, measuring) {
                 detectTapGestures { offset ->
-                    onSelect(hitTest(rooms, measurements, camera.toPlan(offset, size), touchSlopMetres()))
+                    val plan = camera.toPlan(offset, size)
+                    if (measuring) {
+                        onMeasureTap(plan, touchSlopMetres())
+                    } else {
+                        onSelect(hitTest(rooms, measurements, planMeasurements, plan, touchSlopMetres()))
+                    }
                 }
             }
             .pointerInput(rooms, camera) {
@@ -261,13 +276,41 @@ internal fun PlanCanvas(
                 drawCircle(MeasureColours.Surface, radius = if (selected) 5f else 3f, center = point)
             }
         }
+
+        // Distances drawn on the plan, over the rooms because they are usually measured
+        // *to* a wall and would otherwise be hidden by it.
+        planMeasurements.forEach { saved ->
+            val measurement = saved.measurement ?: return@forEach
+            val selected = selection == Selection.PlanMeasurementSelection(saved.id)
+            val from = camera.toScreen(measurement.from.position, size)
+            val to = camera.toScreen(measurement.to.position, size)
+            val colour = if (selected) MeasureColours.Sampling else MeasureColours.Warning
+
+            drawLine(
+                color = colour,
+                start = from,
+                end = to,
+                strokeWidth = if (selected) 5f else 3f,
+            )
+            drawEndMark(from, measurement.from.kind, colour, selected)
+            drawEndMark(to, measurement.to.kind, colour, selected)
+        }
+
+        // The half-placed end, while measuring. Big, and marked with what it caught, so a
+        // mis-tap is visible before the second tap builds a number on top of it.
+        pendingEnd?.let { end ->
+            val point = camera.toScreen(end.position, size)
+            drawCircle(MeasureColours.Sampling.copy(alpha = 0.25f), radius = 20f, center = point)
+            drawEndMark(point, end.kind, MeasureColours.Sampling, selected = true)
+        }
     }
 
     // Lengths are text, so they are drawn as composables over the canvas rather than with
     // drawText — same reasoning as the AR overlay's labels.
     PlanLabels(
         wallLabels(rooms, camera, size, dragging, selection, formatLength) +
-            measurementLabels(measurements, camera, size, selection, formatLength),
+            measurementLabels(measurements, camera, size, selection, formatLength) +
+            planMeasurementLabels(planMeasurements, camera, size, selection, formatLength),
     )
 }
 
@@ -350,6 +393,45 @@ private fun DrawScope.drawOpening(
     }
 }
 
+/**
+ * The end of a plan measurement, drawn as what it is attached to.
+ *
+ * The shape carries the information: a ring means it is on a corner and will move with
+ * it, a bar across means it is on a wall, a plain cross means it is nowhere in particular
+ * and is only as good as the finger that placed it. Without this the three are
+ * indistinguishable, and a measurement whose end merely *looks* like it is on the corner
+ * is exactly the sort of thing that gets trusted and should not be.
+ */
+private fun DrawScope.drawEndMark(
+    centre: Offset,
+    kind: SnapKind,
+    colour: Color,
+    selected: Boolean,
+) {
+    val radius = if (selected) 8f else 6f
+    when (kind) {
+        SnapKind.CORNER -> {
+            drawCircle(colour, radius = radius, center = centre, style = Stroke(width = 2.5f))
+            drawCircle(colour, radius = radius * 0.35f, center = centre)
+        }
+
+        SnapKind.WALL -> {
+            drawCircle(colour, radius = radius * 0.45f, center = centre)
+            drawLine(
+                color = colour,
+                start = Offset(centre.x - radius, centre.y),
+                end = Offset(centre.x + radius, centre.y),
+                strokeWidth = 2.5f,
+            )
+        }
+
+        SnapKind.FREE -> {
+            drawLine(colour, Offset(centre.x - radius, centre.y - radius), Offset(centre.x + radius, centre.y + radius), strokeWidth = 2.5f)
+            drawLine(colour, Offset(centre.x - radius, centre.y + radius), Offset(centre.x + radius, centre.y - radius), strokeWidth = 2.5f)
+        }
+    }
+}
+
 /** A height, which a floor plan cannot show as a length: a double arrow where it was taken. */
 private fun DrawScope.drawHeightMark(centre: Offset, colour: Color, selected: Boolean) {
     val radius = if (selected) 15f else 12f
@@ -382,6 +464,7 @@ private fun Selection.roomId(): Long? = when (this) {
     is Selection.Wall -> roomId
     is Selection.Corner -> roomId
     is Selection.Measurement -> null
+    is Selection.PlanMeasurementSelection -> null
     is Selection.Room -> roomId
     Selection.None -> null
 }
@@ -396,9 +479,23 @@ private fun Selection.roomId(): Long? = when (this) {
 private fun hitTest(
     rooms: List<SavedRoom>,
     measurements: List<SavedMeasurement>,
+    planMeasurements: List<SavedPlanMeasurement>,
     point: Vec2,
     reach: Double,
 ): Selection {
+    // Plan measurements are checked before room geometry, unlike everything else, because
+    // they lie *on* the walls and corners they were drawn to. Any other order would make a
+    // measurement to a corner impossible to select afterwards.
+    planMeasurements.forEach { saved ->
+        val measurement = saved.measurement ?: return@forEach
+        val distance = Segments.distanceToSegment(
+            measurement.from.position,
+            measurement.to.position,
+            point,
+        )
+        if (distance <= reach) return Selection.PlanMeasurementSelection(saved.id)
+    }
+
     findCorner(rooms, point, reach)?.let { (roomId, index) -> return Selection.Corner(roomId, index) }
 
     rooms.forEach { room ->

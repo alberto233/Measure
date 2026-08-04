@@ -238,3 +238,47 @@ data class MeasurementEntity(
     val label: String? = null,
     val createdAt: Long,
 )
+
+/**
+ * A distance drawn on a saved plan — docs/PRODUCT_PLAN.md M12.
+ *
+ * Each end is stored as **what it is attached to**, not as a pair of coordinates. This is
+ * the same decision [OpeningEntity] makes and for the same reason: rooms move. Locking a
+ * wall or dragging a corner re-solves the whole polygon, and a measurement pinned to
+ * absolute coordinates would carry on displaying a number while no longer pointing at the
+ * thing it was measuring. Anchored, it moves with the wall it was taken from.
+ *
+ * `kind` is CORNER, WALL or FREE. `index` is the corner or wall it holds, `t` how far
+ * along that wall, and `x`/`y` are used only by a free end. Flattened into columns rather
+ * than serialised, so a future query can reach inside them.
+ */
+@Entity(
+    tableName = "plan_measurements",
+    foreignKeys = [
+        ForeignKey(
+            entity = ProjectEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["projectId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("projectId")],
+)
+data class PlanMeasurementEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val projectId: Long,
+    val fromKind: String,
+    val fromRoomId: Long?,
+    val fromIndex: Int,
+    val fromT: Double,
+    val fromX: Double,
+    val fromY: Double,
+    val toKind: String,
+    val toRoomId: Long?,
+    val toIndex: Int,
+    val toT: Double,
+    val toX: Double,
+    val toY: Double,
+    val label: String? = null,
+    val createdAt: Long,
+)

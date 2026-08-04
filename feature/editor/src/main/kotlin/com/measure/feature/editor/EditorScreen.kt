@@ -72,10 +72,14 @@ fun EditorScreen(
         PlanCanvas(
             rooms = rooms,
             measurements = measurements,
+            planMeasurements = project?.planMeasurements.orEmpty(),
             selection = viewModel.selection,
             dragging = viewModel.dragging,
+            measuring = viewModel.mode == EditorMode.MEASURE,
+            pendingEnd = viewModel.pendingEnd,
             formatLength = viewModel::formatLength,
             onSelect = viewModel::select,
+            onMeasureTap = viewModel::tapWhileMeasuring,
             onBeginDrag = viewModel::beginDrag,
             onDrag = viewModel::updateDrag,
             onEndDrag = viewModel::endDrag,
@@ -83,15 +87,25 @@ fun EditorScreen(
         )
 
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            TopBar(
-                title = project?.name ?: "",
-                subtitle = summarise(rooms, measurements, viewModel),
-                onBack = onBack,
-                onAddRoom = onAddRoom,
-                canUndo = viewModel.canUndo,
-                onUndo = viewModel::undo,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
+            Column(Modifier.align(Alignment.TopCenter)) {
+                TopBar(
+                    title = project?.name ?: "",
+                    subtitle = summarise(rooms, measurements, viewModel),
+                    onBack = onBack,
+                    onAddRoom = onAddRoom,
+                    canUndo = viewModel.canUndo,
+                    onUndo = viewModel::undo,
+                    measuring = viewModel.mode == EditorMode.MEASURE,
+                    onToggleMeasure = {
+                        viewModel.selectMode(
+                            if (viewModel.mode == EditorMode.MEASURE) EditorMode.SELECT else EditorMode.MEASURE,
+                        )
+                    },
+                )
+                if (viewModel.mode == EditorMode.MEASURE) {
+                    MeasuringBanner(viewModel)
+                }
+            }
 
             if (rooms.isEmpty() && measurements.isEmpty() && project != null) {
                 EmptyPlan(Modifier.align(Alignment.Center))
@@ -151,6 +165,8 @@ private fun TopBar(
     onAddRoom: () -> Unit,
     canUndo: Boolean,
     onUndo: () -> Unit,
+    measuring: Boolean,
+    onToggleMeasure: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -164,8 +180,54 @@ private fun TopBar(
             Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Lit while active. A mode that changes what a tap does has to be visible
+            // from the control that turned it on, or the plan simply stops behaving.
+            Pill("Measure", highlighted = measuring, onClick = onToggleMeasure)
             Pill("Undo", enabled = canUndo, onClick = onUndo)
             Pill("Add", onClick = onAddRoom)
+        }
+    }
+}
+
+/**
+ * The state of a measurement being drawn, stated in words while it is being drawn.
+ *
+ * On a touch screen there is no hover, so a tap is the first moment anything can be said
+ * about where a point landed — and the second tap commits a number built on the first.
+ * This is where the user finds out that "corner" meant corner 2 of Room 1, in time to
+ * move it.
+ */
+@Composable
+private fun MeasuringBanner(viewModel: EditorViewModel) {
+    val pending = viewModel.pendingEnd
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MeasureColours.Panel)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = if (pending == null) "Tap the first point" else "Tap the second point",
+                color = MeasureColours.OnScrim,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = pending?.let { "From ${it.description}" }
+                    ?: "Corners and walls pull the point onto them",
+                color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Ready,
+                fontSize = 12.sp,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (pending != null) Pill("Redo point", onClick = viewModel::clearPendingEnd)
+            Pill("Done", onClick = viewModel::cancelMeasuring)
         }
     }
 }
@@ -217,7 +279,7 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
                 MeasurementList(viewModel, measurements)
                 Text(
                     text = "Pinch to zoom · tap a wall to set its true length · " +
-                        "long-press a corner to move it",
+                        "long-press a corner to move it · Measure for a distance across the plan",
                     color = MeasureColours.OnScrimMuted,
                     fontSize = 13.sp,
                 )
@@ -226,6 +288,7 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
             is Selection.Corner -> CornerPanel(viewModel, selection)
             is Selection.Wall -> WallPanel(viewModel, selection)
             is Selection.Measurement -> MeasurementPanel(viewModel, selection)
+            is Selection.PlanMeasurementSelection -> PlanMeasurementPanel(viewModel, selection)
             is Selection.Room -> RoomPanel(viewModel, selection)
         }
     }
@@ -267,6 +330,18 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         color = MeasureColours.OnScrimMuted,
         fontSize = 12.sp,
     )
+
+    // The bounding box, because "will it fit" is asked about a rectangle far more often
+    // than about a floor area. Deliberately not a "largest clear span", which has no
+    // agreed meaning for a room that is not convex and would be a number nobody could
+    // check.
+    viewModel.boundingSize(room)?.let { (width, depth) ->
+        Text(
+            text = "Fits inside ${viewModel.formatLength(width)} × ${viewModel.formatLength(depth)}",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
+    }
 
     Row(
         Modifier.fillMaxWidth(),
@@ -366,6 +441,78 @@ private fun MeasurementList(
                 fontSize = 12.sp,
             )
         }
+    }
+}
+
+/**
+ * A distance read off the plan — docs/PRODUCT_PLAN.md M12.
+ *
+ * Everything here exists to stop this number being mistaken for a measured one. It says
+ * where each end is attached, so "1.24 m" is visibly a distance between a corner and a
+ * point somebody put there by finger rather than two surveyed positions. It carries its
+ * own tolerance, which is dominated by the free end when there is one. And it says when
+ * the geometry underneath it was squared up by the solver, because a span across a
+ * rectilinear-snapped room reflects the model as much as the room.
+ */
+@Composable
+private fun PlanMeasurementPanel(viewModel: EditorViewModel, selection: Selection.PlanMeasurementSelection) {
+    val saved = viewModel.planMeasurementById(selection.id) ?: return
+    val measurement = saved.measurement
+
+    if (measurement == null) {
+        Text(
+            text = "This measurement was attached to geometry that has gone",
+            color = MeasureColours.Warning,
+            fontSize = 14.sp,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
+            Pill("Done", onClick = viewModel::clearSelection)
+        }
+        return
+    }
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text(
+                text = com.measure.core.units.LengthFormatter.formatWithUncertainty(
+                    com.measure.core.units.Length(measurement.length),
+                    com.measure.core.units.Length(measurement.sigma),
+                    viewModel.unitSystem(),
+                ),
+                color = MeasureColours.OnScrim,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Off the plan, not measured in the room",
+                color = MeasureColours.Warning,
+                fontSize = 12.sp,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
+            Pill("Done", onClick = viewModel::clearSelection)
+        }
+    }
+
+    Text(
+        text = "${measurement.from.description} → ${measurement.to.description}",
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
+
+    if (measurement.isModelled) {
+        Text(
+            text = "One end sits on a corner the solver squared up, so part of this " +
+                "distance is the model rather than the room.",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
     }
 }
 

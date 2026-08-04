@@ -9,6 +9,11 @@ import com.measure.core.geometry.SurfaceCalculator
 import com.measure.core.geometry.Vec2
 import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.MeasuredSegment
+import com.measure.core.geometry.plan.PlanAnchor
+import com.measure.core.geometry.plan.PlanMeasurement
+import com.measure.core.geometry.plan.PlanSnapper
+import com.measure.core.geometry.plan.SnapKind
+import com.measure.core.geometry.plan.SnapRoom
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.units.Area
 import com.measure.core.units.Length
@@ -61,6 +66,14 @@ data class SavedRoom(
     val ceilingHeight: Double?,
     /** Doors and windows, grouped by the wall index they sit in. */
     val openings: Map<Int, List<SavedOpening>>,
+    /**
+     * Corners the rectilinear solve moved.
+     *
+     * Kept so that anything derived from this room can say when it is standing on a
+     * modelled position rather than an observed one — a distance measured to a corner the
+     * solver squared up is partly the solver's opinion.
+     */
+    val snappedCorners: Set<Int> = emptySet(),
 ) {
     /**
      * Wall area and volume, when a height is known.
@@ -121,12 +134,39 @@ data class SavedMeasurement(
     }
 }
 
+/**
+ * A distance drawn on the plan, resolved against the plan as it currently is.
+ *
+ * [measurement] is null when an end was anchored to geometry that has since gone — a
+ * corner index past the end of a re-solved room, say. The row is kept rather than deleted
+ * so that undoing the edit brings the measurement back, and the editor simply does not
+ * draw one it cannot place.
+ */
+data class SavedPlanMeasurement(
+    val id: Long,
+    val measurement: PlanMeasurement?,
+    val label: String?,
+    val createdAt: Long,
+)
+
 data class ProjectDetail(
     val id: Long,
     val name: String,
     val unitSystem: UnitSystem,
     val rooms: List<SavedRoom>,
     val measurements: List<SavedMeasurement>,
+    val planMeasurements: List<SavedPlanMeasurement> = emptyList(),
+) {
+    /** The rooms in the form [PlanSnapper] wants, so callers do not each build it. */
+    val snapRooms: List<SnapRoom> get() = rooms.map(SavedRoom::toSnapRoom)
+}
+
+internal fun SavedRoom.toSnapRoom() = SnapRoom(
+    id = id,
+    label = name,
+    outline = outline,
+    cornerSigmas = sigmas,
+    snappedCorners = snappedCorners,
 )
 
 /**
@@ -147,6 +187,7 @@ class MeasureRepository(
     private val walls = database.wallDao()
     private val openings = database.openingDao()
     private val measurements = database.measurementDao()
+    private val planMeasurements = database.planMeasurementDao()
 
     // --- projects -------------------------------------------------------------------
 
@@ -192,6 +233,7 @@ class MeasureRepository(
             walls.observeFor(projectId),
             openings.observeFor(projectId),
             measurements.observeFor(projectId),
+            planMeasurements.observeFor(projectId),
         ) { values ->
             @Suppress("UNCHECKED_CAST")
             val project = values[0] as ProjectEntity?
@@ -205,6 +247,8 @@ class MeasureRepository(
             val openingRows = values[4] as List<OpeningEntity>
             @Suppress("UNCHECKED_CAST")
             val measurementRows = values[5] as List<MeasurementEntity>
+            @Suppress("UNCHECKED_CAST")
+            val planRows = values[6] as List<PlanMeasurementEntity>
 
             if (project == null) return@combine null
             val cornersByRoom = cornerRows.groupBy { it.roomId }
@@ -222,6 +266,18 @@ class MeasureRepository(
                     )
                 },
                 measurements = measurementRows.map { it.toSavedMeasurement() },
+                planMeasurements = planRows.map { row ->
+                    // Resolved here rather than in the editor so that every reader sees a
+                    // measurement placed against the same geometry the plan is drawn from.
+                    val snapRooms = roomRows.map {
+                        it.toSavedRoom(
+                            corners = cornersByRoom[it.id].orEmpty(),
+                            walls = wallsByRoom[it.id].orEmpty(),
+                            openings = openingsByRoom[it.id].orEmpty(),
+                        ).toSnapRoom()
+                    }
+                    row.toSavedPlanMeasurement(snapRooms)
+                },
             )
         }
 
@@ -417,11 +473,54 @@ class MeasureRepository(
         }
     }
 
-    suspend fun deleteRoom(roomId: Long) = rooms.delete(roomId)
+    /**
+     * Deletes a room, and anything on the plan that was measured to it.
+     *
+     * A distance anchored to a room that no longer exists is not a distance to anything.
+     * Leaving it would put a labelled line on the plan pointing into empty space, which
+     * is worse than losing the measurement.
+     */
+    suspend fun deleteRoom(roomId: Long) {
+        planMeasurements.deleteForRoom(roomId)
+        rooms.delete(roomId)
+    }
 
     suspend fun renameRoom(roomId: Long, name: String) = rooms.rename(roomId, name)
 
     suspend fun deleteMeasurement(measurementId: Long) = measurements.deleteById(measurementId)
+
+    // --- distances drawn on the plan ---------------------------------------------------
+
+    suspend fun savePlanMeasurement(
+        projectId: Long,
+        from: PlanAnchor,
+        to: PlanAnchor,
+        label: String? = null,
+    ): Long {
+        val id = planMeasurements.insert(
+            PlanMeasurementEntity(
+                projectId = projectId,
+                fromKind = from.kindName(),
+                fromRoomId = from.roomIdOrNull(),
+                fromIndex = from.indexOrZero(),
+                fromT = from.tOrZero(),
+                fromX = from.freeOrZero().x,
+                fromY = from.freeOrZero().y,
+                toKind = to.kindName(),
+                toRoomId = to.roomIdOrNull(),
+                toIndex = to.indexOrZero(),
+                toT = to.tOrZero(),
+                toX = to.freeOrZero().x,
+                toY = to.freeOrZero().y,
+                label = label,
+                createdAt = now(),
+            ),
+        )
+        projects.touch(projectId, now())
+        return id
+    }
+
+    suspend fun deletePlanMeasurement(id: Long) = planMeasurements.deleteById(id)
 
     private companion object {
         /** Only reached if a solution arrives with fewer sigmas than corners. */
@@ -448,6 +547,7 @@ internal fun RoomEntity.toSavedRoom(
 ): SavedRoom {
     val ordered = corners.sortedBy { it.index }
     return SavedRoom(
+        snappedCorners = ordered.filter { it.isSnapped }.map { it.index }.toSet(),
         id = id,
         name = name,
         outline = ordered.map { Vec2(it.x, it.y) },
@@ -486,3 +586,45 @@ internal fun MeasurementEntity.toSavedMeasurement() = SavedMeasurement(
     label = label,
     createdAt = createdAt,
 )
+
+// --- plan measurement anchors ------------------------------------------------------------
+
+private fun PlanAnchor.kindName(): String = when (this) {
+    is PlanAnchor.Corner -> SnapKind.CORNER.name
+    is PlanAnchor.Wall -> SnapKind.WALL.name
+    is PlanAnchor.Free -> SnapKind.FREE.name
+}
+
+private fun PlanAnchor.roomIdOrNull(): Long? = when (this) {
+    is PlanAnchor.Corner -> roomId
+    is PlanAnchor.Wall -> roomId
+    is PlanAnchor.Free -> null
+}
+
+private fun PlanAnchor.indexOrZero(): Int = when (this) {
+    is PlanAnchor.Corner -> index
+    is PlanAnchor.Wall -> index
+    is PlanAnchor.Free -> 0
+}
+
+private fun PlanAnchor.tOrZero(): Double = if (this is PlanAnchor.Wall) t else 0.0
+
+private fun PlanAnchor.freeOrZero(): Vec2 = if (this is PlanAnchor.Free) position else Vec2.ZERO
+
+private fun anchorFrom(kind: String, roomId: Long?, index: Int, t: Double, x: Double, y: Double): PlanAnchor =
+    when (runCatching { SnapKind.valueOf(kind) }.getOrDefault(SnapKind.FREE)) {
+        SnapKind.CORNER -> roomId?.let { PlanAnchor.Corner(it, index) } ?: PlanAnchor.Free(Vec2(x, y))
+        SnapKind.WALL -> roomId?.let { PlanAnchor.Wall(it, index, t) } ?: PlanAnchor.Free(Vec2(x, y))
+        SnapKind.FREE -> PlanAnchor.Free(Vec2(x, y))
+    }
+
+internal fun PlanMeasurementEntity.toSavedPlanMeasurement(rooms: List<SnapRoom>): SavedPlanMeasurement {
+    val from = PlanSnapper.resolve(rooms, anchorFrom(fromKind, fromRoomId, fromIndex, fromT, fromX, fromY))
+    val to = PlanSnapper.resolve(rooms, anchorFrom(toKind, toRoomId, toIndex, toT, toX, toY))
+    return SavedPlanMeasurement(
+        id = id,
+        measurement = if (from != null && to != null) PlanMeasurement(from, to) else null,
+        label = label,
+        createdAt = createdAt,
+    )
+}

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.measure.core.data.SavedMeasurement
+import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
 
@@ -160,6 +161,44 @@ internal fun measurementLabels(
         )
     }
 }
+
+/**
+ * Distances drawn on the plan.
+ *
+ * Marked with a tilde. These are consequences of the plan rather than observations of the
+ * room, and the difference has to be visible on the drawing itself and not only in a
+ * panel the user may never open — a number that looks exactly like a measured one will be
+ * treated as one.
+ */
+internal fun planMeasurementLabels(
+    planMeasurements: List<SavedPlanMeasurement>,
+    camera: PlanCamera,
+    size: IntSize,
+    selection: Selection,
+    formatLength: (Double) -> String,
+): List<PlanLabel> = buildList {
+    if (size == IntSize.Zero) return@buildList
+
+    planMeasurements.forEach { saved ->
+        val measurement = saved.measurement ?: return@forEach
+        val midpoint = (measurement.from.position + measurement.to.position) * 0.5
+        val screen = camera.toScreen(midpoint, size)
+        val selected = selection == Selection.PlanMeasurementSelection(saved.id)
+
+        add(
+            PlanLabel(
+                text = "~ ${formatLength(measurement.length)}",
+                x = screen.x,
+                y = screen.y - PLAN_MEASUREMENT_LABEL_LIFT_PX,
+                colour = if (selected) MeasureColours.Sampling else MeasureColours.Warning,
+                bold = selected,
+            ),
+        )
+    }
+}
+
+/** Clear of the line itself, which the label would otherwise sit exactly on top of. */
+private const val PLAN_MEASUREMENT_LABEL_LIFT_PX = 16f
 
 /** Walls shorter than this get no label; it would be wider than the wall. */
 private const val MINIMUM_LABELLED_METRES = 0.25

@@ -251,3 +251,24 @@ interface MeasurementDao {
     @Query("DELETE FROM measurements WHERE id = :id")
     suspend fun deleteById(id: Long)
 }
+
+@Dao
+interface PlanMeasurementDao {
+    @Insert
+    suspend fun insert(measurement: PlanMeasurementEntity): Long
+
+    @Query("SELECT * FROM plan_measurements WHERE projectId = :projectId ORDER BY createdAt")
+    fun observeFor(projectId: Long): Flow<List<PlanMeasurementEntity>>
+
+    @Query("DELETE FROM plan_measurements WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    /**
+     * Removes measurements anchored to a room that is being deleted.
+     *
+     * A distance to a room that no longer exists is not a distance to anything, and
+     * leaving it on the plan pointing into space would be worse than losing it.
+     */
+    @Query("DELETE FROM plan_measurements WHERE fromRoomId = :roomId OR toRoomId = :roomId")
+    suspend fun deleteForRoom(roomId: Long)
+}

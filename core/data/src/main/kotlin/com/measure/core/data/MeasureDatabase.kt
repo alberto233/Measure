@@ -25,8 +25,9 @@ import androidx.sqlite.execSQL
         WallEntity::class,
         OpeningEntity::class,
         MeasurementEntity::class,
+        PlanMeasurementEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -37,6 +38,7 @@ abstract class MeasureDatabase : RoomDatabase() {
     abstract fun wallDao(): WallDao
     abstract fun openingDao(): OpeningDao
     abstract fun measurementDao(): MeasurementDao
+    abstract fun planMeasurementDao(): PlanMeasurementDao
 
     companion object {
         private const val NAME = "measure.db"
@@ -112,6 +114,42 @@ abstract class MeasureDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds distances drawn on the plan. A new table, so nothing existing is touched.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `plan_measurements` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `projectId` INTEGER NOT NULL,
+                        `fromKind` TEXT NOT NULL,
+                        `fromRoomId` INTEGER,
+                        `fromIndex` INTEGER NOT NULL,
+                        `fromT` REAL NOT NULL,
+                        `fromX` REAL NOT NULL,
+                        `fromY` REAL NOT NULL,
+                        `toKind` TEXT NOT NULL,
+                        `toRoomId` INTEGER,
+                        `toIndex` INTEGER NOT NULL,
+                        `toT` REAL NOT NULL,
+                        `toX` REAL NOT NULL,
+                        `toY` REAL NOT NULL,
+                        `label` TEXT,
+                        `createdAt` INTEGER NOT NULL,
+                        FOREIGN KEY(`projectId`) REFERENCES `projects`(`id`)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """,
+                )
+                connection.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_plan_measurements_projectId` " +
+                        "ON `plan_measurements` (`projectId`)",
+                )
+            }
+        }
+
         @Volatile
         private var instance: MeasureDatabase? = null
 
@@ -125,7 +163,7 @@ abstract class MeasureDatabase : RoomDatabase() {
                 // Cascading deletes are declared on the entities and are load-bearing:
                 // Room does not switch foreign keys on for you.
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }

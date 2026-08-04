@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.measure.core.data.MeasureData
 import com.measure.core.data.ProjectDetail
 import com.measure.core.data.SavedOpening
+import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.geometry.CapturedCorner
 import com.measure.core.geometry.LengthConstraint
@@ -18,6 +19,10 @@ import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolver
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.PlanAnchor
+import com.measure.core.geometry.plan.PlanMeasurement
+import com.measure.core.geometry.plan.PlanSnapper
+import com.measure.core.geometry.plan.ResolvedPoint
 import com.measure.core.units.AreaFormatter
 import com.measure.core.units.Length
 import com.measure.core.units.LengthFormatter
@@ -38,8 +43,19 @@ sealed interface Selection {
     data class Wall(val roomId: Long, val index: Int) : Selection
     data class Corner(val roomId: Long, val index: Int) : Selection
     data class Measurement(val id: Long) : Selection
+    data class PlanMeasurementSelection(val id: Long) : Selection
     data class Room(val roomId: Long) : Selection
 }
+
+/**
+ * What a tap on the plan does.
+ *
+ * A mode rather than a long-press or a modifier, because a tap that sometimes selects and
+ * sometimes places a point is the kind of ambiguity that produces the "I added the same
+ * door seven times" class of bug. The mode is stated on screen while it is on, and the
+ * only way into it is a button that stays lit.
+ */
+enum class EditorMode { SELECT, MEASURE }
 
 /**
  * Everything needed to put one room back exactly as it was.
@@ -233,6 +249,93 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun measurementById(id: Long) = project.value?.measurements?.firstOrNull { it.id == id }
+
+    // --- measuring on the plan — docs/PRODUCT_PLAN.md M12 -------------------------------
+
+    var mode by mutableStateOf(EditorMode.SELECT)
+        private set
+
+    /**
+     * The first end of a measurement being drawn, waiting for its partner.
+     *
+     * Held resolved rather than as a raw tap so the interface can say what it latched
+     * onto the instant it is placed. On a touch screen there is no hover, so the only
+     * moment to tell the user "that went on corner 2 of Room 1" is straight after the tap
+     * — and if it went somewhere they did not mean, they need to know before the second
+     * tap commits a measurement built on it.
+     */
+    var pendingEnd by mutableStateOf<ResolvedPoint?>(null)
+        private set
+
+    /**
+     * Named `selectMode` rather than `setMode`, which would clash with the property's own
+     * generated setter on the JVM. `CaptureViewModel.selectMode` has the same name for the
+     * same reason.
+     */
+    fun selectMode(next: EditorMode) {
+        if (next == mode) return
+        mode = next
+        pendingEnd = null
+        selection = Selection.None
+    }
+
+    fun cancelMeasuring() {
+        pendingEnd = null
+        mode = EditorMode.SELECT
+    }
+
+    /** Drops the half-placed end without leaving the mode, for a mis-tap. */
+    fun clearPendingEnd() {
+        pendingEnd = null
+    }
+
+    /**
+     * A tap while measuring: the first places an end, the second completes and saves.
+     *
+     * Saved immediately, like everything else in this app, and then selected so the value
+     * and its tolerance are on screen without a further tap.
+     */
+    fun tapWhileMeasuring(point: Vec2, reach: Double) {
+        val rooms = project.value?.snapRooms.orEmpty()
+        val placed = PlanSnapper.snap(rooms, point, reach)
+
+        val first = pendingEnd
+        if (first == null) {
+            pendingEnd = placed
+            return
+        }
+
+        val candidate = PlanMeasurement(first, placed)
+        if (candidate.isDegenerate) {
+            // Refused rather than stored: a zero-length measurement is a double tap, and
+            // silently saving one leaves the user hunting for a line that is a dot.
+            message = "Those two points are the same — put the second one somewhere else"
+            return
+        }
+
+        pendingEnd = null
+        val projectId = projectId
+        viewModelScope.launch {
+            val id = repository.savePlanMeasurement(projectId, first.anchor, placed.anchor)
+            selection = Selection.PlanMeasurementSelection(id)
+        }
+    }
+
+    fun planMeasurementById(id: Long): SavedPlanMeasurement? =
+        project.value?.planMeasurements?.firstOrNull { it.id == id }
+
+    fun deletePlanMeasurement(id: Long) {
+        viewModelScope.launch { repository.deletePlanMeasurement(id) }
+        selection = Selection.None
+    }
+
+    /** The bounding box of a room, which is the number people check a sofa against. */
+    fun boundingSize(room: SavedRoom): Pair<Double, Double>? {
+        if (room.outline.size < 3) return null
+        val xs = room.outline.map { it.x }
+        val ys = room.outline.map { it.y }
+        return (xs.max() - xs.min()) to (ys.max() - ys.min())
+    }
 
     // --- openings and heights ---------------------------------------------------------
 
