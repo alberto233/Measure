@@ -98,7 +98,11 @@ jobs:
           # Kept whole rather than piped straight into a filter, so a mismatch can be
           # diagnosed from the log instead of by re-running this by hand.
           CERTS=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk 2>&1)
-          ACTUAL=$(printf '%s\n' "$CERTS" | awk '/Signer #1 certificate SHA-256 digest/ {print $NF; exit}')
+          # Matched loosely on purpose. Build-tools 36 prints "Signer #1 certificate
+          # SHA-256 digest:" and newer versions print "V2 Signer: certificate SHA-256
+          # digest:", so pinning either spelling ties this check to whichever build-tools
+          # the runner image happens to ship.
+          ACTUAL=$(printf '%s\n' "$CERTS" | awk '/certificate SHA-256 digest/ {print $NF; exit}')
 
           if [ "$ACTUAL" != "$EXPECTED" ]; then
             echo "::error::APK signing key changed - installed builds could not update."
