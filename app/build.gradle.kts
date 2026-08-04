@@ -20,11 +20,39 @@ android {
         applicationId = "com.measure.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Bumped whenever a build goes out for testing. Android will not install a
+        // lower code over a higher one, and a version that never changes gives the user
+        // no way to tell which build is on the phone.
+        versionCode = 2
+        versionName = "0.1.1"
+    }
+
+    // A debug keystore committed to the repository, so every build — CI, local, anyone's
+    // machine — is signed with the same key.
+    //
+    // Without this AGP signs with whatever throwaway key happens to be in
+    // ~/.android/debug.keystore on the build machine. GitHub's runners are ephemeral, so
+    // when the runner image rolled the key changed underneath us, and Android refused to
+    // update an installed app whose signature no longer matched: "App not installed",
+    // with no indication of why. The only recovery is uninstalling, which takes the
+    // user's saved plans with it.
+    //
+    // Committing a *debug* keystore is safe and is the standard fix. Its password is the
+    // published default, it grants nothing, and Play refuses debug-signed uploads
+    // outright. A release key would never go anywhere near version control.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

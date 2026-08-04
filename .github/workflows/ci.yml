@@ -77,6 +77,25 @@ jobs:
           grep -E "^e: |^w: |error:" /tmp/build.log | head -80 || echo "(no diagnostics matched)"
           echo "════════ END DIAGNOSTICS ════════"
 
+      # The signature must not change between builds. If it does, every phone with the
+      # app installed gets "App not installed" on the next update, with no explanation
+      # and no recovery but uninstalling — which takes the user's saved plans with it.
+      # This is what happened before the debug keystore was committed: AGP was signing
+      # with a throwaway key from the runner image, and the key changed when the image
+      # rolled. Checked here rather than trusted, because the failure is silent at build
+      # time and only shows up on a device.
+      - name: Check the APK signature has not changed
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          ACTUAL=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk             | grep -m1 "Signer #1 certificate SHA-256 digest" | awk '{print $NF}')
+          EXPECTED=a2e4157b87138855a12254197276fd8dbabf6c8234f73285755606ab31bbe7f8
+          echo "signer: $ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK signing key changed — installed builds could not update."
+            echo "expected $EXPECTED"
+            exit 1
+          fi
+
       - name: Stage the APK
         run: cp app/build/outputs/apk/debug/app-debug.apk measure-dev.apk
 
@@ -102,7 +121,8 @@ jobs:
           Install straight from your phone: tap the APK below. You will need to allow
           installs from unknown sources for your browser the first time.
 
-          Debug-signed, so this cannot be published to the Play Store as-is."
+          Debug-signed with the repository's fixed key, so updates install over each
+          other. Cannot be published to the Play Store as-is."
 
           if gh release view dev >/dev/null 2>&1; then
             gh release upload dev measure-dev.apk --clobber
