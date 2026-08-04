@@ -241,12 +241,38 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val wallLength = wallLength(room, wallIndex) ?: return
         val height = room.ceilingHeight ?: DEFAULT_CEILING_HEIGHT
 
+        // Refuse once the wall is full rather than stacking openings on top of one
+        // another. Every new one is centred, so a second identical door lands exactly on
+        // the first, and from the plan the two are indistinguishable from one.
+        val existing = room.openings[wallIndex].orEmpty()
+        val used = existing.sumOf { it.opening.width }
+        val candidate = Opening.standard(kind, wallLength, height)
+        if (used + candidate.width > wallLength) {
+            message = "No room left in that wall"
+            return
+        }
+
         viewModelScope.launch {
-            repository.addOpening(roomId, wallIndex, Opening.standard(kind, wallLength, height))
+            // Placed after what is already there rather than centred, so a second opening
+            // is visibly a second one.
+            val placed = if (existing.isEmpty()) {
+                candidate
+            } else {
+                candidate.copy(offset = (used + GAP_BETWEEN_OPENINGS).coerceAtMost(wallLength - candidate.width))
+            }
+            repository.addOpening(roomId, wallIndex, placed)
+            message = "${kind.label} added"
         }
     }
 
-    fun resizeOpening(roomId: Long, saved: SavedOpening, width: Double?, height: Double?, sill: Double?) {
+    fun resizeOpening(
+        roomId: Long,
+        saved: SavedOpening,
+        width: Double? = null,
+        height: Double? = null,
+        offset: Double? = null,
+        sill: Double? = null,
+    ) {
         val room = roomById(roomId) ?: return
         val wallLength = wallLength(room, saved.wallIndex) ?: return
         val ceiling = room.ceilingHeight ?: DEFAULT_CEILING_HEIGHT
@@ -254,6 +280,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val updated = saved.opening.copy(
             width = width ?: saved.opening.width,
             height = height ?: saved.opening.height,
+            offset = offset ?: saved.opening.offset,
             sillHeight = sill ?: saved.opening.sillHeight,
         )
         if (!updated.fitsIn(wallLength, ceiling)) {
@@ -388,6 +415,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
          * measured one is the dishonesty this app is built to avoid.
          */
         const val DEFAULT_CEILING_HEIGHT = 2.4
+
+        /** A little clear wall between one opening and the next. */
+        const val GAP_BETWEEN_OPENINGS = 0.1
         const val DEFAULT_SIGMA = 0.02
 
         /**

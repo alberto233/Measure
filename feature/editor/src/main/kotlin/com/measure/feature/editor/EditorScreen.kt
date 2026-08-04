@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -191,7 +194,15 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
             .fillMaxWidth()
             .padding(16.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MeasureColours.Scrim)
+            // Opaque, not the camera scrim. There is no camera behind this screen, and a
+            // translucent panel let the plan's own lines and labels bleed through the
+            // text, which read as a rendering fault.
+            .background(MeasureColours.Panel)
+            // Capped and scrollable. Adding four doors made the panel taller than the
+            // screen, so the rows confirming each one were off the bottom — which is why
+            // the same door got added again and again.
+            .heightIn(max = PANEL_MAX_HEIGHT)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -429,6 +440,18 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
     OpeningsSection(viewModel, room, selection.index)
 }
 
+private fun describeOpenings(openings: List<com.measure.core.data.SavedOpening>): String {
+    if (openings.isEmpty()) return "No doors or windows"
+    val doors = openings.count { it.opening.kind == OpeningKind.DOOR }
+    val windows = openings.count { it.opening.kind == OpeningKind.WINDOW }
+    val other = openings.size - doors - windows
+    return buildList {
+        if (doors > 0) add("$doors ${if (doors == 1) "door" else "doors"}")
+        if (windows > 0) add("$windows ${if (windows == 1) "window" else "windows"}")
+        if (other > 0) add("$other ${if (other == 1) "opening" else "openings"}")
+    }.joinToString(", ")
+}
+
 /**
  * Doors and windows in the selected wall.
  *
@@ -451,9 +474,10 @@ private fun OpeningsSection(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (openings.isEmpty()) "No doors or windows" else "In this wall",
-            color = MeasureColours.OnScrimMuted,
+            text = describeOpenings(openings),
+            color = if (openings.isEmpty()) MeasureColours.OnScrimMuted else MeasureColours.Ready,
             fontSize = 12.sp,
+            fontWeight = if (openings.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("+ Door", onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.DOOR) })
@@ -461,8 +485,8 @@ private fun OpeningsSection(
         }
     }
 
-    openings.forEach { saved ->
-        OpeningRow(viewModel, room, saved)
+    openings.forEachIndexed { position, saved ->
+        OpeningRow(viewModel, room, saved, position + 1)
     }
 }
 
@@ -471,6 +495,7 @@ private fun OpeningRow(
     viewModel: EditorViewModel,
     room: com.measure.core.data.SavedRoom,
     saved: com.measure.core.data.SavedOpening,
+    position: Int,
 ) {
     var width by remember(saved.id, saved.opening.width) {
         mutableStateOf(viewModel.formatLength(saved.opening.width))
@@ -478,34 +503,50 @@ private fun OpeningRow(
     var height by remember(saved.id, saved.opening.height) {
         mutableStateOf(viewModel.formatLength(saved.opening.height))
     }
+    var offset by remember(saved.id, saved.opening.offset) {
+        mutableStateOf(viewModel.formatLength(saved.opening.offset))
+    }
 
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = saved.opening.kind.label,
-            color = MeasureColours.OnScrim,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-        )
-        Field(value = width, onValueChange = { width = it }, numeric = true, modifier = Modifier.weight(1f))
-        Text("×", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
-        Field(value = height, onValueChange = { height = it }, numeric = true, modifier = Modifier.weight(1f))
-        Pill(
-            label = "Set",
-            onClick = {
-                viewModel.resizeOpening(
-                    roomId = room.id,
-                    saved = saved,
-                    width = viewModel.parseLength(width),
-                    height = viewModel.parseLength(height),
-                    sill = null,
-                )
-            },
-        )
-        Pill("×", onClick = { viewModel.deleteOpening(saved.id) })
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        // Numbered and positioned, because four identical "Door 830 x 2040" rows are
+        // indistinguishable and there is no way to tell which one is the one you meant.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${saved.opening.kind.label} $position",
+                color = MeasureColours.OnScrim,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Pill("Remove", onClick = { viewModel.deleteOpening(saved.id) })
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Field(value = width, onValueChange = { width = it }, numeric = true, modifier = Modifier.weight(1f))
+            Text("×", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+            Field(value = height, onValueChange = { height = it }, numeric = true, modifier = Modifier.weight(1f))
+            Text("at", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+            Field(value = offset, onValueChange = { offset = it }, numeric = true, modifier = Modifier.weight(1f))
+            Pill(
+                label = "Set",
+                onClick = {
+                    viewModel.resizeOpening(
+                        roomId = room.id,
+                        saved = saved,
+                        width = viewModel.parseLength(width),
+                        height = viewModel.parseLength(height),
+                        offset = viewModel.parseLength(offset),
+                        sill = null,
+                    )
+                },
+            )
+        }
     }
 }
 
@@ -567,3 +608,6 @@ private fun Pill(
 }
 
 private const val MESSAGE_DURATION_MS = 3000L
+
+/** Enough for a wall with a few openings, little enough to leave the plan visible. */
+private val PANEL_MAX_HEIGHT = 340.dp

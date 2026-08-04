@@ -31,6 +31,18 @@ enum class HitSource(
     PLANE_POLYGON(0.008, 0.004, 0.80, "surface"),
     PLANE_INFINITE(0.015, 0.008, 0.75, "surface (extended)"),
     DEPTH(0.020, 0.012, 0.50, "depth"),
+
+    /**
+     * Derived from gravity rather than from any surface: the point where the line of
+     * sight passes closest to the vertical through the first point.
+     *
+     * Needs nothing to hit, which is the entire reason it exists — a plain white ceiling
+     * is the surface ARCore is worst at and precisely what a room height is measured to.
+     * The height itself comes from the accelerometer and is very good; the error is in
+     * where along that vertical the aim lands, so it grows with range like everything
+     * else.
+     */
+    PLUMB(0.024, 0.016, 0.40, "plumb"),
     FEATURE_POINT(0.030, 0.020, 0.20, "feature"),
     INSTANT_PLACEMENT(0.060, 0.040, 0.60, "estimate"),
     ;

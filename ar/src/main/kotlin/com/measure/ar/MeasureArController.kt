@@ -32,6 +32,8 @@ import com.measure.core.geometry.capture.CaptureOutcome
 import com.measure.core.geometry.capture.CaptureRejection
 import com.measure.core.geometry.capture.CeilingSelector
 import com.measure.core.geometry.capture.FloorSelector
+import com.measure.core.geometry.capture.HitSource
+import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.PlaneObservation
 import com.measure.core.geometry.capture.PointAggregator
 import com.measure.core.geometry.capture.PointSample
@@ -102,8 +104,11 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
     private val viewProjection = FloatArray(16)
+    private val inverseViewProjection = FloatArray(16)
     private val worldPoint = FloatArray(4)
     private val clipPoint = FloatArray(4)
+    private val nearPoint = FloatArray(4)
+    private val farPoint = FloatArray(4)
 
     private var viewportWidth = 0
     private var viewportHeight = 0
@@ -411,6 +416,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         camera.getProjectionMatrix(projectionMatrix, 0, NEAR_PLANE, FAR_PLANE)
         camera.getViewMatrix(viewMatrix, 0)
         Matrix.multiplyMM(viewProjection, 0, projectionMatrix, 0, viewMatrix, 0)
+        Matrix.invertM(inverseViewProjection, 0, viewProjection, 0)
 
         val cameraPose = camera.pose
         val cameraPosition = Vec3(
@@ -445,18 +451,32 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             CaptureMode.ROOM -> if (currentScene.roomClosed) null else currentScene.roomCorners.lastOrNull()
         }
 
-        // Level and plumb apply to a free-standing distance. A room corner is already
-        // constrained, by the floor.
-        val constrained = if (anchor != null && hit != null && currentScene.captureMode == CaptureMode.DISTANCE) {
-            currentScene.mode.constrain(anchor, hit.position)
+        // Plumb needs no surface at all, and that is the point: a room height is measured
+        // to a plain white ceiling, which is the thing ARCore is least able to fit a plane
+        // to. The second point comes from gravity and the aim ray instead.
+        val plumbHit = if (
+            anchor != null &&
+            currentScene.captureMode == CaptureMode.DISTANCE &&
+            currentScene.mode == MeasurementMode.VERTICAL
+        ) {
+            plumbPoint(anchor, cameraPosition)
         } else {
             null
         }
-        val movingEnd = constrained?.position ?: hit?.position.takeIf { anchor != null }
+        val aim = plumbHit ?: hit
 
-        collectBurstSample(hit, tracking.quality)
+        // Level and plumb apply to a free-standing distance. A room corner is already
+        // constrained, by the floor.
+        val constrained = if (anchor != null && aim != null && currentScene.captureMode == CaptureMode.DISTANCE) {
+            currentScene.mode.constrain(anchor, aim.position)
+        } else {
+            null
+        }
+        val movingEnd = constrained?.position ?: aim?.position.takeIf { anchor != null }
 
-        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, hit?.position)
+        collectBurstSample(aim, tracking.quality)
+
+        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, aim?.position, floor?.height)
 
         val preview = if (anchor != null && movingEnd != null) {
             MeasurementPreview(
@@ -470,7 +490,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
         publish(
             tracking = tracking,
-            target = hit?.let { ReticleTarget(it.position, it.range, it.source) },
+            target = aim?.let { ReticleTarget(it.position, it.range, it.source) },
             preview = preview,
             anchors = screenAnchors(currentScene, anchor, movingEnd),
             floor = floor,
@@ -558,6 +578,65 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         )
     }
 
+    /**
+     * Where the line of sight passes closest to the vertical line through [anchor].
+     *
+     * The classic closest-approach-of-two-lines problem: the aim ray against the plumb
+     * line. Nothing has to be hit, so this works pointing at a blank ceiling, and the
+     * height it returns comes from gravity — which the accelerometer knows to a fraction
+     * of a degree — rather than from anything the camera had to recognise.
+     *
+     * Null when the two are too close to parallel to intersect meaningfully, which is
+     * what happens when the phone is pointed straight up: there is then no single point
+     * on the vertical that the aim picks out.
+     */
+    private fun plumbPoint(anchor: Vec3, cameraPosition: Vec3): RankedHit? {
+        val ray = screenCentreDirection() ?: return null
+        val up = Vec3(0.0, 1.0, 0.0)
+
+        val w0 = cameraPosition - anchor
+        val b = ray dot up
+        val denominator = 1.0 - b * b
+        if (denominator < PLUMB_MIN_DENOMINATOR) return null
+
+        val d = ray dot w0
+        val e = up dot w0
+        val alongRay = (b * e - d) / denominator
+        if (alongRay <= 0.0) return null // behind the camera
+
+        val alongPlumb = (e - b * d) / denominator
+        val point = Vec3(anchor.x, anchor.y + alongPlumb, anchor.z)
+
+        val range = cameraPosition.distanceTo(point)
+        if (range < RangeGate.MINIMUM_METRES || range > PLUMB_MAX_RANGE) return null
+
+        return RankedHit(position = point, range = range, source = HitSource.PLUMB)
+    }
+
+    /** The world-space direction of the ray through the middle of the screen. */
+    private fun screenCentreDirection(): Vec3? {
+        if (!unproject(-1f, nearPoint) || !unproject(1f, farPoint)) return null
+        val direction = Vec3(
+            (farPoint[0] - nearPoint[0]).toDouble(),
+            (farPoint[1] - nearPoint[1]).toDouble(),
+            (farPoint[2] - nearPoint[2]).toDouble(),
+        )
+        return if (direction.lengthSquared < Vec3.EPSILON) null else direction.normalised()
+    }
+
+    private fun unproject(ndcZ: Float, out: FloatArray): Boolean {
+        clipPoint[0] = 0f
+        clipPoint[1] = 0f
+        clipPoint[2] = ndcZ
+        clipPoint[3] = 1f
+        Matrix.multiplyMV(out, 0, inverseViewProjection, 0, clipPoint, 0)
+        if (out[3] == 0f || out[3].isNaN()) return false
+        out[0] /= out[3]
+        out[1] /= out[3]
+        out[2] /= out[3]
+        return true
+    }
+
     /** Hit tests the screen centre, which is where the reticle is drawn. */
     private fun safeHitTest(frame: Frame): List<com.google.ar.core.HitResult> {
         if (viewportWidth == 0 || viewportHeight == 0) return emptyList()
@@ -633,9 +712,14 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         anchor: Vec3?,
         previewEnd: Vec3?,
         rawTarget: Vec3?,
+        floorHeight: Double?,
     ) {
         if (scene.showPlanes) {
-            planeRenderer.draw(session.getAllTrackables(Plane::class.java), viewProjection)
+            planeRenderer.draw(
+                session.getAllTrackables(Plane::class.java),
+                viewProjection,
+                emphasisHeight = floorHeight,
+            )
         }
 
         val ribbonWidth = RibbonRenderer.widthFactorFor(projectionMatrix, viewportHeight, LINE_WIDTH_PX)
@@ -850,6 +934,12 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         const val LINE_WIDTH_PX = 5f
 
         /** Publication granularity: half a centimetre of range, one millimetre of length. */
+        /** Below this the aim is too near vertical to pick a point on the plumb line. */
+        const val PLUMB_MIN_DENOMINATOR = 0.02
+
+        /** Beyond this a plumb reading is guesswork; no domestic ceiling is this high. */
+        const val PLUMB_MAX_RANGE = 12.0
+
         const val RANGE_STEP = 0.005
         const val LENGTH_STEP = 0.001
         const val AREA_STEP = 0.25

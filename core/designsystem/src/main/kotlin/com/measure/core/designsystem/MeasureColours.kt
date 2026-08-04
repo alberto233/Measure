@@ -31,6 +31,9 @@ object MeasureColours {
     /** The app's own background, where there is no camera image behind the chrome. */
     val Surface = Color(0xFF101317)
 
+    /** Opaque panel, for screens with no camera behind them. */
+    val Panel = Color(0xFF1A1D21)
+
     val Scrim = Color(0xE01A1D21)
     val ScrimSoft = Color(0xB01A1D21)
     val OnScrim = Color(0xFFF5F7FA)

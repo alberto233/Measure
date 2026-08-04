@@ -318,6 +318,13 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+- **Cluttered rooms defeat plane detection.** Field testing in a cluttered room produced
+  planes stacked on planes, a floor plane extending over places with no floor, and a
+  capture full of spurious short walls. Drawing fewer planes makes it *visible* rather
+  than fixed. The floor-extension hits are the mechanism — `HitRanking.bestOnFloor`
+  accepts a hit on the floor plane's infinite extension, which is what lets a corner land
+  somewhere there is no floor. Removing that would make occluded corners impossible
+  instead, so it is a real trade and wall-face capture is the way out of both.
 - **Corners hidden behind clutter.** Room corners are now taken only from the floor
   plane, so a pile of laundry in front of a corner no longer drags the point to the front
   of the pile — but it does mean the shutter goes dead until the user aims somewhere the

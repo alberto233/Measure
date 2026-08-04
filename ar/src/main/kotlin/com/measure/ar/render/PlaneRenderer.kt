@@ -4,6 +4,7 @@ import android.opengl.GLES20
 import android.opengl.Matrix
 import com.google.ar.core.Plane
 import com.google.ar.core.TrackingState
+import kotlin.math.abs
 
 /**
  * Shades detected planes so the user can see what the app has understood.
@@ -35,10 +36,25 @@ internal class PlaneRenderer {
         colourUniform = GLES20.glGetUniformLocation(program, "u_Colour")
     }
 
-    fun draw(planes: Collection<Plane>, viewProjection: FloatArray) {
-        val visible = planes.filter {
-            it.trackingState == TrackingState.TRACKING && it.subsumedBy == null
-        }
+    /**
+     * @param emphasisHeight the floor's height. Planes at that level are drawn solidly
+     *   because they are the ones being measured against; everything else is faded right
+     *   back, because it is context rather than a target.
+     */
+    fun draw(
+        planes: Collection<Plane>,
+        viewProjection: FloatArray,
+        emphasisHeight: Double? = null,
+    ) {
+        // Every tracked plane used to be drawn with a bright outline. In a cluttered room
+        // ARCore finds dozens, and the result was a screen full of crossing teal lines
+        // that hid the camera image and made the app look broken. Restraint here is not
+        // cosmetic: the user has to be able to see the room to aim at it.
+        val visible = planes
+            .filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+            .filter { it.extentX * it.extentZ >= MINIMUM_DRAWN_AREA }
+            .sortedByDescending { it.extentX * it.extentZ }
+            .take(MAXIMUM_DRAWN)
         if (visible.isEmpty()) return
 
         GLES20.glUseProgram(program)
@@ -49,7 +65,7 @@ internal class PlaneRenderer {
         GLES20.glDepthMask(false)
         GLES20.glEnableVertexAttribArray(positionAttribute)
 
-        visible.forEach { plane -> drawPlane(plane, viewProjection) }
+        visible.forEach { plane -> drawPlane(plane, viewProjection, emphasisHeight) }
 
         GLES20.glDisableVertexAttribArray(positionAttribute)
         GLES20.glDepthMask(true)
@@ -57,7 +73,7 @@ internal class PlaneRenderer {
         GlUtil.checkErrors("planes")
     }
 
-    private fun drawPlane(plane: Plane, viewProjection: FloatArray) {
+    private fun drawPlane(plane: Plane, viewProjection: FloatArray, emphasisHeight: Double?) {
         val polygon = plane.polygon ?: return
         polygon.rewind()
         val vertexCount = polygon.limit() / 2
@@ -76,12 +92,26 @@ internal class PlaneRenderer {
         GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertices)
 
         val colour = colourFor(plane)
-        GLES20.glUniform4f(colourUniform, colour.r, colour.g, colour.b, FILL_ALPHA)
+        val emphasised = emphasisHeight != null &&
+            plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
+            abs(plane.centerPose.ty() - emphasisHeight) <= EMPHASIS_TOLERANCE
+
+        GLES20.glUniform4f(
+            colourUniform,
+            colour.r,
+            colour.g,
+            colour.b,
+            if (emphasised) FILL_ALPHA else FILL_ALPHA_MUTED,
+        )
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, vertexCount)
 
-        GLES20.glUniform4f(colourUniform, colour.r, colour.g, colour.b, OUTLINE_ALPHA)
-        GLES20.glLineWidth(OUTLINE_WIDTH_PX)
-        GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, vertexCount)
+        // Only the surface being measured against gets an outline. Outlining everything
+        // is what produced the crossing-lines mess.
+        if (emphasised) {
+            GLES20.glUniform4f(colourUniform, colour.r, colour.g, colour.b, OUTLINE_ALPHA)
+            GLES20.glLineWidth(OUTLINE_WIDTH_PX)
+            GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, vertexCount)
+        }
     }
 
     private fun colourFor(plane: Plane): GlColour = when (plane.type) {
@@ -94,9 +124,22 @@ internal class PlaneRenderer {
         /** A modest room is a handful of planes of a few dozen vertices each. */
         const val INITIAL_VERTEX_CAPACITY = 256
 
-        const val FILL_ALPHA = 0.18f
-        const val OUTLINE_ALPHA = 0.65f
+        const val FILL_ALPHA = 0.16f
+
+        /** Context planes: visible enough to show the app is working, faint enough to see past. */
+        const val FILL_ALPHA_MUTED = 0.06f
+
+        const val OUTLINE_ALPHA = 0.55f
         const val OUTLINE_WIDTH_PX = 3f
+
+        /** Planes at the floor's level within this are drawn as the floor. */
+        const val EMPHASIS_TOLERANCE = 0.12
+
+        /** Smaller than this and a plane is a fragment that only adds noise. */
+        const val MINIMUM_DRAWN_AREA = 0.25
+
+        /** A cluttered room yields dozens; the largest few are all that inform anything. */
+        const val MAXIMUM_DRAWN = 8
 
         val FLOOR = GlColour.of(0x2ED3B7)
         val WALL = GlColour.of(0xFFB020)
