@@ -55,6 +55,18 @@ enum class HitSource(
      * else.
      */
     PLUMB(0.024, 0.016, 0.40, "plumb"),
+
+    /**
+     * A wall line fitted to depth points, when ARCore would not fit a plane to it.
+     *
+     * Ranked below a single depth hit, which looks wrong for a fit over two dozen points
+     * and is not. Averaging beats down the *random* part of each point's error, but on a
+     * blank painted wall — the only place this is ever used — what dominates is the depth
+     * map's bias on a textureless surface, and bias does not average away. Claiming the
+     * fit is better than its ingredients would be exactly the overconfidence this table
+     * exists to prevent.
+     */
+    WALL_DEPTH(0.030, 0.016, 0.55, "wall (depth)"),
     FEATURE_POINT(0.030, 0.020, 0.20, "feature"),
     INSTANT_PLACEMENT(0.060, 0.040, 0.60, "estimate"),
     ;

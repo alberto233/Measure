@@ -432,9 +432,9 @@ private fun WallGuidance(state: ArUiState, viewModel: CaptureViewModel) {
 
     Text(
         text = when {
-            walls == 0 && aimed == null -> "Point at a wall"
             aimed?.alreadyTaken == true -> "Already taken"
             aimed != null -> "Wall ready"
+            walls == 0 -> "Point at a wall"
             else -> "$walls ${if (walls == 1) "wall" else "walls"}"
         },
         color = when {
@@ -451,10 +451,14 @@ private fun WallGuidance(state: ArUiState, viewModel: CaptureViewModel) {
             // enough of the wall for its line to mean anything, and the user can fix a
             // small fit by sweeping the phone along the wall.
             aimed?.alreadyTaken == true -> "Turn to the next wall"
-            aimed != null -> "${viewModel.formatLength(aimed.extent)} of wall found · " +
-                "${viewModel.formatLength(aimed.range)} away"
+            // Saying which kind of wall it is matters: a depth-fitted wall is the app
+            // working on a surface ARCore could not track, and it is less certain. The
+            // user deciding whether to trust the plan deserves to know which they took.
+            aimed != null -> "${viewModel.formatLength(aimed.extent)} of wall · " +
+                "${viewModel.formatLength(aimed.range)} away" +
+                if (aimed.fromDepth) " · from depth" else ""
 
-            walls == 0 -> "Sweep along it until it lights up, then tap"
+            walls == 0 -> "Sweep across it until it lights up, then tap"
             walls < 3 -> "$walls taken · keep going round"
             else -> "Take the last wall, then tap Close"
         },

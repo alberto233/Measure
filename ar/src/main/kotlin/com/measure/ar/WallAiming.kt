@@ -8,7 +8,12 @@ import com.measure.core.geometry.capture.WallFace
 import kotlin.math.abs
 
 /** The wall under the reticle, together with the ARCore plane it came from. */
-internal data class AimedWall(val face: WallFace, val plane: Plane, val range: Double)
+internal data class AimedWall(
+    val face: WallFace,
+    /** The ARCore plane behind it, when there was one. Null for a depth-fitted wall. */
+    val plane: Plane?,
+    val range: Double,
+)
 
 /**
  * Finds the wall the user is pointing at — docs/ACCURACY.md M10.

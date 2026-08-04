@@ -31,10 +31,12 @@ data class WallFace(
     val direction: Vec2,
     /** Unit vector across the wall. Which way it points carries no meaning here. */
     val normal: Vec2,
-    /** How much of the wall ARCore has actually fitted, in metres. */
+    /** How much of the wall has actually been seen, in metres. */
     val extent: Double,
     /** Standard deviation of the wall's position along [normal], in metres. */
     val sigma: Double,
+    /** What produced it — a tracked plane, or a line fitted to depth. */
+    val source: HitSource = HitSource.WALL_FACE,
 ) {
     /** Signed distance from the plan's origin to this wall, along [normal]. */
     val offset: Double get() = normal dot origin
@@ -102,6 +104,30 @@ data class WallFace(
                 normal = unit,
                 extent = extent,
                 sigma = HitSource.WALL_FACE.sigmaAt(range),
+                source = HitSource.WALL_FACE,
+            )
+        }
+
+        /**
+         * From a line fitted to depth samples — see [WallLineFitter].
+         *
+         * The reported uncertainty is never better than the scatter of the points that
+         * produced it. A tight fit to eight points that all happen to be wrong is still
+         * wrong, so the error model sets a floor and the observed residual can only push
+         * it up.
+         */
+        fun fromFittedLine(id: Long, line: WallLine, range: Double): WallFace? {
+            if (line.extent < MINIMUM_EXTENT_METRES) return null
+            if (line.verticalSpread < WallLineFitter.MINIMUM_VERTICAL_SPREAD_METRES) return null
+
+            return WallFace(
+                id = id,
+                origin = line.origin,
+                direction = line.direction,
+                normal = line.normal,
+                extent = line.extent,
+                sigma = maxOf(HitSource.WALL_DEPTH.sigmaAt(range), line.residual),
+                source = HitSource.WALL_DEPTH,
             )
         }
     }

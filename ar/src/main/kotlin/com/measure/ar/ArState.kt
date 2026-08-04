@@ -46,11 +46,19 @@ enum class CornerMethod(val label: String, val hint: String) {
 /** The wall under the reticle, reduced to what the interface has to say about it. */
 data class AimedWallState(
     val id: Long,
-    /** How much of the wall ARCore has fitted, in metres. */
+    /** How much of the wall has been fitted, in metres. */
     val extent: Double,
     val range: Double,
     /** True when this is a wall already taken for this room. */
     val alreadyTaken: Boolean,
+    /**
+     * True when it came from depth rather than from a tracked plane.
+     *
+     * Worth surfacing. A depth-fitted wall is the app working harder on a surface ARCore
+     * gave up on, and it is meaningfully less certain — the user should be able to see
+     * which kind of wall they just took.
+     */
+    val fromDepth: Boolean = false,
 )
 
 /**
@@ -179,8 +187,15 @@ data class ArScene(
     /** Room corners in order, already projected onto the floor plane. */
     val roomCorners: List<Vec3> = emptyList(),
     val cornerMethod: CornerMethod = CornerMethod.TAP_FLOOR,
-    /** Wall-face capture: the planes already taken, so the renderer can mark them. */
-    val takenWallIds: Set<Long> = emptySet(),
+    /**
+     * Wall-face capture: the walls already taken.
+     *
+     * Held as geometry rather than as a set of ids because a depth-fitted wall has no
+     * persistent identity — and neither, really, does an ARCore plane, which is re-fitted
+     * and re-identified as the user walks. Whether this is a wall already taken is a
+     * question about where it is, so it is answered that way.
+     */
+    val takenWalls: List<com.measure.core.geometry.capture.WallFace> = emptyList(),
     /** True once the perimeter has been closed and there is nothing left to add. */
     val roomClosed: Boolean = false,
     val showPlanes: Boolean = true,

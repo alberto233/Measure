@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 184 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 193 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -60,11 +60,38 @@ The second session confirmed all three, and found three more, now fixed:
   a room walked clockwise and the same room walked anticlockwise have opposite windings),
   and a framed double line for a window.
 
-**None of the second session's fixes has itself been tested on hardware.** The plumb
-measurement also breaks beyond about 2 m of range; that is known and deferred.
+**The second session's fixes are validated.** Tight loop closing, the measurement list
+and height symbols, and the architectural door and window symbols all behaved. Two
+interface faults came out of the same session and are fixed: the editor's text fields
+were a shade off the panel behind them and read as gaps rather than inputs, and the
+keyboard pushed the editing panel to the top of the screen because the window resized for
+the IME *and* `safeDrawingPadding` subtracted it again. The activity no longer resizes;
+Compose owns the inset.
 
-**M11 wall-face capture is implemented and untested on hardware.** Room capture now has
-two methods, chosen per room:
+The plumb measurement still breaks beyond about 2 m of range — see §8.
+
+**M11 wall-face capture is implemented. Field tested once, and it did not work at all:**
+ARCore fits no vertical plane to a plain painted wall, because plane detection tracks
+visual features and a blank white wall has none. That is the room where the corners are
+also hidden behind furniture, so the mechanism failed hardest exactly where the feature
+was needed most.
+
+The fix now in the tree is to stop depending on ARCore's plane fitting. When no tracked
+vertical plane is under the reticle, `DepthWallFitter` fires a grid of 28 hit tests across
+the middle of the screen, keeps whatever ARCore's depth estimates at those pixels are, and
+fits a **line** to them on the floor plan — a vertical wall seen from above is a line, so
+fitting in 2D enforces verticality for free and is far better conditioned than a 3D plane
+fit. `WallLineFitter` does it by RANSAC, because some samples land on the floor, on a
+picture frame or on a person walking past, and least squares would let any of those drag
+the result. It reports how many points agreed, and refuses when fewer than 60% did.
+
+**Whether this works is the open question of the next field session.** Depth on the A36 is
+motion-derived, and a featureless wall is hard for that too. The pure part is tested; what
+cannot be tested here is whether the device returns usable depth on a white wall at all.
+If it does not, the honest move is to delete wall-face capture rather than ship a mode
+that works in showrooms. The user has already said as much: a good fix or remove it.
+
+Room capture has two methods, chosen per room:
 
 - **Corners** — tap each corner, as before.
 - **Walls** — point at each wall in turn. Every consecutive pair of walls is intersected
@@ -390,11 +417,20 @@ A release signing config is an M10 concern.
   switch mid-capture. Mixing means a corner sequence whose entries have different
   provenance and different neighbours, and getting it wrong yields plans that are quietly
   wrong rather than visibly wrong.
-- **Wall-face capture is implemented but unproven.** M11 exists and compiles; whether
-  ARCore fits usable vertical planes fast enough in an ordinary room to make it pleasant
-  is exactly the thing only a field session can answer. The gates worth watching are
-  `WallFace.MINIMUM_EXTENT_METRES` (0.5 m, so a cupboard door is not a wall) and
-  `WallIntersection.MINIMUM_SINE` (20 degrees). Both are reasoned, neither is measured.
+- **Does depth see a white wall?** This is now the question M11 lives or dies on.
+  ARCore's plane detection provably does not — one field session settled that. The depth
+  fallback is a genuine second mechanism rather than a retuned threshold, but ARCore's
+  depth on a device with no time-of-flight sensor is derived from motion, and motion
+  stereo has its own trouble with textureless surfaces. If the next session shows the
+  same nothing, wall-face capture should be deleted, not tuned. The gates worth watching
+  either way are `WallFace.MINIMUM_EXTENT_METRES` (0.5 m, so a cupboard door is not a
+  wall), `WallIntersection.MINIMUM_SINE` (20 degrees) and
+  `WallLineFitter.MINIMUM_INLIER_SHARE` (60%). All reasoned, none measured.
+- **Plumb still fails on a white ceiling past about 2 m**, and it is the same root cause
+  as the wall problem: no features, so no surface. If the depth line fit turns out to work
+  on walls, the identical trick fits a *horizontal* plane for a ceiling and would fix
+  heights too. Worth trying only after the wall question is answered — one experiment at a
+  time, or a negative result teaches nothing.
   Three consecutive field-test sessions have ended with this feature as the answer: the corner behind a laundry pile, corners occluded by furniture generally, and
   cluttered rooms producing floor planes where there is no floor. Fitting the two adjacent
   wall planes and intersecting them needs no sight of the corner at all

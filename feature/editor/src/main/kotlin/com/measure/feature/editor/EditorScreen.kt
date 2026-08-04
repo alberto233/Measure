@@ -1,6 +1,7 @@
 package com.measure.feature.editor
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
@@ -94,7 +97,9 @@ fun EditorScreen(
                 EmptyPlan(Modifier.align(Alignment.Center))
             }
 
-            SelectionPanel(viewModel, Modifier.align(Alignment.BottomCenter))
+            // The panel is the only thing that must clear the keyboard: the plan behind it
+            // should stay where it is rather than being squashed into a letterbox.
+            SelectionPanel(viewModel, Modifier.align(Alignment.BottomCenter).imePadding())
 
             viewModel.message?.let { text ->
                 LaunchedEffect(text) {
@@ -251,6 +256,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         Field(
             value = name,
             onValueChange = { name = it },
+            hint = "Room name",
             modifier = Modifier.weight(1f),
         )
         Pill("Rename", onClick = { viewModel.renameRoom(room.id, name) })
@@ -272,6 +278,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
             value = height,
             onValueChange = { height = it },
             numeric = true,
+            hint = "e.g. 2.4",
             modifier = Modifier.weight(1f),
         )
         Pill("Set", onClick = { viewModel.setCeilingHeight(room.id, height) })
@@ -478,6 +485,7 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
             value = typed,
             onValueChange = { typed = it },
             numeric = true,
+            hint = "True length",
             modifier = Modifier.weight(1f),
         )
         Pill(
@@ -582,11 +590,11 @@ private fun OpeningRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Field(value = width, onValueChange = { width = it }, numeric = true, modifier = Modifier.weight(1f))
+            Field(width, { width = it }, numeric = true, hint = "wide", modifier = Modifier.weight(1f))
             Text("×", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
-            Field(value = height, onValueChange = { height = it }, numeric = true, modifier = Modifier.weight(1f))
+            Field(height, { height = it }, numeric = true, hint = "high", modifier = Modifier.weight(1f))
             Text("at", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
-            Field(value = offset, onValueChange = { offset = it }, numeric = true, modifier = Modifier.weight(1f))
+            Field(offset, { offset = it }, numeric = true, hint = "from", modifier = Modifier.weight(1f))
             Pill(
                 label = "Set",
                 onClick = {
@@ -604,14 +612,25 @@ private fun OpeningRow(
     }
 }
 
-/** A text field styled like the rest of the panel. */
+/**
+ * A text field that looks like one.
+ *
+ * It used to be a rounded rectangle a shade off the panel behind it, which on a dark
+ * panel is no distinction at all: an empty field was indistinguishable from a gap, and
+ * the only sign the app wanted a number was a blinking cursor. A visible edge and a
+ * greyed hint say what the box is for before it is tapped, and the edge lights up when
+ * it has focus so it is obvious which of four boxes the keyboard is typing into.
+ */
 @Composable
 private fun Field(
     value: String,
     onValueChange: (String) -> Unit,
     numeric: Boolean = false,
+    hint: String = "",
     modifier: Modifier = Modifier,
 ) {
+    var focused by remember { mutableStateOf(false) }
+
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -625,8 +644,22 @@ private fun Field(
         },
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(MeasureColours.ScrimSoft)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .background(MeasureColours.Surface)
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) MeasureColours.Ready else MeasureColours.OnScrimMuted.copy(alpha = 0.45f),
+                shape = RoundedCornerShape(8.dp),
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        decorationBox = { field ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    Text(hint, color = MeasureColours.OnScrimMuted.copy(alpha = 0.7f), fontSize = 15.sp)
+                }
+                field()
+            }
+        },
     )
 }
 

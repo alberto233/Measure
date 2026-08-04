@@ -106,6 +106,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     private val planeRenderer = PlaneRenderer()
     private val markerRenderer = MarkerRenderer()
     private val ribbonRenderer = RibbonRenderer()
+    private val depthWallFitter = DepthWallFitter()
 
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
@@ -259,6 +260,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         burstCancelled.set(true)
         captureRequested.set(false)
         wallRequested.set(false)
+        depthWallFitter.reset()
         // The camera is released on pause, so the torch goes out whatever we think.
         sessionConfig?.flashMode = Config.FlashMode.OFF
         _state.update {
@@ -472,7 +474,14 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         val wallMode = currentScene.captureMode == CaptureMode.ROOM &&
             currentScene.cornerMethod == CornerMethod.WALL_FACES &&
             !currentScene.roomClosed
-        val aimedWall = if (wallMode) WallAiming.aimedWall(hits) else null
+        // A tracked plane first: it is fitted over minutes of observation and beats
+        // anything one frame of depth can produce. The depth fit is what happens when
+        // ARCore has not managed one — a plain painted wall, which is most walls.
+        val aimedWall = if (wallMode) {
+            WallAiming.aimedWall(hits) ?: depthWallFitter.fit(frame, viewportWidth, viewportHeight)
+        } else {
+            null
+        }
 
         val roomCapture = currentScene.captureMode == CaptureMode.ROOM &&
             currentScene.cornerMethod == CornerMethod.TAP_FLOOR &&
@@ -560,7 +569,8 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                     id = it.face.id,
                     extent = quantise(it.face.extent, RANGE_STEP),
                     range = quantise(it.range, RANGE_STEP),
-                    alreadyTaken = it.face.id in currentScene.takenWallIds,
+                    alreadyTaken = currentScene.takenWalls.any { taken -> taken.isSameWallAs(it.face) },
+                    fromDepth = it.plane == null,
                 )
             },
         )
@@ -581,7 +591,8 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                 WallCaptureOutcome.Rejected(WallRejection.TRACKING)
 
             aimed == null -> WallCaptureOutcome.Rejected(WallRejection.NO_WALL)
-            aimed.face.id in scene.takenWallIds -> WallCaptureOutcome.Rejected(WallRejection.SAME_WALL)
+            scene.takenWalls.any { it.isSameWallAs(aimed.face) } ->
+                WallCaptureOutcome.Rejected(WallRejection.SAME_WALL)
             else -> WallCaptureOutcome.Accepted(aimed.face)
         }
         _walls.tryEmit(outcome)
@@ -808,7 +819,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                 session.getAllTrackables(Plane::class.java),
                 viewProjection,
                 emphasisHeight = floorHeight,
-                takenWallIds = scene.takenWallIds,
+                takenWallIds = scene.takenWalls.map { it.id }.toSet(),
                 aimedWallId = aimedWallId,
             )
         }

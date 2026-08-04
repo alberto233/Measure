@@ -632,7 +632,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 mode = mode,
                 roomCorners = corners,
                 cornerMethod = cornerMethod,
-                takenWallIds = capturedWalls.map { it.id }.toSet(),
+                takenWalls = capturedWalls.toList(),
                 roomClosed = isRoomClosed,
                 showPlanes = showPlanes,
             ),
