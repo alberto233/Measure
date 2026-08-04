@@ -123,6 +123,57 @@ promising dates.
 | **M9** | 3D view | 1.5 wks | Extruded walls, orbit camera |
 | **M10** | Beta polish | 2 wks | Onboarding, accuracy tutorial, device calibration, localisation, crash reporting, store listing |
 
+### Added after field testing
+
+These were not in the original roadmap. They are numbered from M11 so nothing already
+shipped has to be renumbered, but two of them are sequenced **before** M7 — see the
+revised order below.
+
+| # | Milestone | Rough effort | Exit criteria |
+| --- | --- | --- | --- |
+| **M11** | Wall-face capture | 2 wks | Fit the two wall planes meeting at a corner and intersect them, so a corner can be captured without ever being visible. Falls back to the current floor-hit corner when only one wall is found |
+| **M12** | Plan measuring tool | 1 wk | Tap two points anywhere on a saved plan to measure between them, snapped to walls, corners and opening edges. Kept as an annotation, shown with its own tolerance and visually distinct from a captured measurement. Plus the room's bounding width x depth and largest clear span, always on |
+| **M13** | Finding a plan | 0.5 wk | Sort and search the project list; one free-text field per project (client, address) with filter chips |
+| **M14** | Grouping plans | 1.5 wks | A tier above the project, once M13 has shown whether people want folders or tags |
+
+**Revised order after the second field session: M11, M12, M7, then the rest.**
+
+Wall-face capture moves ahead of export because three consecutive field sessions ended
+with it as the answer. Corners behind furniture, corners behind a laundry pile, and
+cluttered rooms producing floor planes where there is no floor are all the same problem,
+and the current mitigation — taking corners only from the floor plane — trades a wrong
+corner for no corner. Export operates on plans, so anything that makes plans better is
+worth more before export than after it.
+
+### M12, and why a derived distance is not a measurement
+
+The use case is "will the bed fit between this wall and the doorway", asked in a shop
+rather than in the room. It needs no AR session and no new capture: the geometry is
+already there, and `Segments` already has the snapping primitives.
+
+Two things it must get right, both of them §5 positioning rather than polish:
+
+- **A derived distance inherits the solve's uncertainty.** It is a consequence of the
+  plan, not an observation of the room. It carries its own tolerance and its own visual
+  weight, the way a locked wall length is already marked differently from a measured one.
+- **Rectilinear snapping makes some derived numbers partly modelled.** The solver moves
+  corners to square a room, so a span across a snapped room reflects the model as much as
+  the camera. `CornerEntity.isSnapped` already records which corners moved; the tool
+  should say so rather than quietly present the result as observed.
+
+The "distance from the wall to the bed" version of this needs the bed in the plan, which
+means object footprints — a separate feature, deliberately not in M12.
+
+### M13 before M14, deliberately
+
+Nothing on the home screen distinguishes "Plan 3" from "Plan 7", and that is the actual
+complaint a long list produces. Sort, search and one free-text field are an additive
+column and some list UI; they capture most of the value of grouping without committing to
+a shape. Folders are one-to-many and tags are many-to-many, and which one people want is
+not knowable in advance — building the wrong one first costs a migration. Grouping earns
+its place somewhere past twenty plans, which is a month for a surveyor and never for
+someone measuring their own flat.
+
 **Walking skeleton first.** Before M1 proper, get one vertical slice working end to end:
 open an AR session, place two points, show a distance, save it, see it in a list. It
 proves the whole stack — ARCore, rendering, geometry, persistence, UI — and every later
@@ -151,3 +202,8 @@ noisy input, we find out in week three rather than month four.
 - **Wall thickness.** v1 assumes zero-thickness walls and measures interior faces.
   Supporting real thickness affects the data model, so decide before M5 even if we do not
   implement it until later.
+- **Folders or tags for M14.** One-to-many or many-to-many. M13 exists partly to answer
+  this before a schema commits to either.
+- **Object footprints.** Furniture in the plan would make "how far is the bed from the
+  wall" answerable directly, and would carry into the 3D view. It is also a new capture
+  flow, a new entity and a new set of accuracy claims, so it is not folded into M12.

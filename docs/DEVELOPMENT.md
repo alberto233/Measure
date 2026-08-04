@@ -18,7 +18,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:editor` | M5 plan editor, plus M6 openings, wall area and volume |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Wall-face capture, pulled forward from M10** — see §8. Then M7 export |
+| Next | **M11 wall-face capture**, then **M12 plan measuring tool**, then M7 export — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -351,9 +351,9 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
-- **Wall-face capture should come next, ahead of M7 export.** It is scheduled as M10 in
-  the product plan, and three consecutive field-test sessions have ended with it as the
-  answer: the corner behind a laundry pile, corners occluded by furniture generally, and
+- **Wall-face capture should come next, ahead of M7 export.** It is now M11 in the
+  product plan, moved ahead of export, and three consecutive field-test sessions have
+  ended with it as the answer: the corner behind a laundry pile, corners occluded by furniture generally, and
   cluttered rooms producing floor planes where there is no floor. Fitting the two adjacent
   wall planes and intersecting them needs no sight of the corner at all
   (docs/ACCURACY.md M10). Everything downstream — export, multi-room — operates on plans
@@ -386,4 +386,12 @@ A release signing config is an M10 concern.
 - **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces. The
   editor now exists and assumes it too, so changing this is a migration plus an editor
   change rather than just a data-model decision.
+- **A distance derived from a plan is not a measurement.** M12 adds a measuring tool to
+  the plan editor, and the number it produces is a consequence of the solve rather than
+  an observation of the room — worse, rectilinear snapping means a span across a squared
+  room is partly modelled. `CornerEntity.isSnapped` records which corners moved. The tool
+  has to carry its own tolerance and be visually distinct from a captured measurement, or
+  it undermines the one thing the app claims over its competitors.
+- **Folders or tags.** M14 groups plans; M13 exists partly to find out which shape people
+  actually want before a schema commits to one.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"?
