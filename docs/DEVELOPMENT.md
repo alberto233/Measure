@@ -9,16 +9,16 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 95 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 154 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
-| `:feature:capture` | M1 capture screen, plus M3 room capture — minimap, closure, solved plan |
+| `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
-| `:feature:editor` | M5 plan editor — pan/zoom, drag corners, lock a wall to a taped length |
+| `:feature:editor` | M5 plan editor, plus M6 openings, wall area and volume |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | Field testing M4–M6, then M7 export |
+| Next | **Wall-face capture, pulled forward from M10** — see §8. Then M7 export |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -36,11 +36,23 @@ has yet written a row on a phone.
 and corners, moves corners, and locks a wall to a hand-measured length — which re-solves
 the room around that one certain number, the payoff `docs/ACCURACY.md` M8 was built for.
 
-**M6 is implemented and untested on hardware.** Ceiling height is detected from the
-ceiling plane while capturing and can be typed in the editor; doors and windows sit in
-walls and are drawn as breaks in them; wall area and volume follow. Nothing substitutes a
-typical 2.4 m when no height is known — a guessed paint estimate looks exactly like a
-measured one on screen, and the user would have no way to tell them apart.
+**M6 is implemented. Field tested once, and it found three real faults, all now fixed:**
+plumb needed a surface to hit and so failed on the white ceilings it exists to measure
+(it now derives the point from gravity and the aim ray, hitting nothing); the plane
+overlay drew every tracked plane outlined and buried the camera image in a cluttered
+room; and the openings panel was translucent, uncapped and centred every new opening on
+the same spot, so the same door got added four times without visible effect. **None of
+those fixes has itself been tested on hardware.**
+
+Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
+estimate looks exactly like a measured one on screen, and the user would have no way to
+tell them apart.
+
+**What is validated on the A36:** M1 point-to-point (matched a tape), M3 room capture
+(0.4% misclosure on a closed loop), M4 persistence (plans survive, thumbnails correct),
+M5 editing (corner drag, rename, re-solve). **What is not:** every migration, the locked-
+wall re-solve actually improving other walls, ceiling detection working at all, and all
+of the M6 fixes above.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -313,11 +325,19 @@ A release signing config is an M10 concern.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
 - **Migrations are written but never run against real data.** The schema is at version 4
-  with three hand-written migrations (walls table; measured corner positions; openings). Both are
-  straightforward and Room validates them against the exported schemas at compile time,
+  with three hand-written migrations (walls table; measured corner positions; openings).
+  All three are straightforward and Room validates them against the exported schemas at
+  compile time,
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+- **Wall-face capture should come next, ahead of M7 export.** It is scheduled as M10 in
+  the product plan, and three consecutive field-test sessions have ended with it as the
+  answer: the corner behind a laundry pile, corners occluded by furniture generally, and
+  cluttered rooms producing floor planes where there is no floor. Fitting the two adjacent
+  wall planes and intersecting them needs no sight of the corner at all
+  (docs/ACCURACY.md M10). Everything downstream — export, multi-room — operates on plans
+  this would make substantially better.
 - **Cluttered rooms defeat plane detection.** Field testing in a cluttered room produced
   planes stacked on planes, a floor plane extending over places with no floor, and a
   capture full of spurious short walls. Drawing fewer planes makes it *visible* rather
@@ -337,6 +357,7 @@ A release signing config is an M10 concern.
 - **Sloped and vaulted ceilings.** Wall area is perimeter times a single height, which is
   a decorator's estimate rather than a surveyor's. A bay window, a chimney breast or a
   sloped ceiling all make it wrong, and the app says nothing about that yet.
-- **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces.
-  Changing this touches the data model, so decide before the editor work in M5.
+- **Wall thickness.** v1 assumes zero-thickness walls measured at interior faces. The
+  editor now exists and assumes it too, so changing this is a migration plus an editor
+  change rather than just a data-model decision.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"?
