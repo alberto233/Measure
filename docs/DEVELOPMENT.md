@@ -9,16 +9,16 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 168 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 184 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
-| `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
+| `:feature:capture` | M1 capture, M3 room capture, M6 ceilings, M11 wall-face capture |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
 | `:feature:editor` | M5 plan editor, plus M6 openings, wall area and volume |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **M11 wall-face capture**, then **M12 plan measuring tool**, then M7 export — see §8 |
+| Next | **M12 plan measuring tool**, then M7 export — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -63,6 +63,35 @@ The second session confirmed all three, and found three more, now fixed:
 **None of the second session's fixes has itself been tested on hardware.** The plumb
 measurement also breaks beyond about 2 m of range; that is known and deferred.
 
+**M11 wall-face capture is implemented and untested on hardware.** Room capture now has
+two methods, chosen per room:
+
+- **Corners** — tap each corner, as before.
+- **Walls** — point at each wall in turn. Every consecutive pair of walls is intersected
+  to give a corner, so each wall after the first ends one corner and begins the next, and
+  the junction itself is never aimed at. This is the answer to three field sessions'
+  worth of corners hidden behind furniture.
+
+The geometry is `WallFace`, `WallIntersection` and `WallChain` in `:core:geometry`, all
+pure and tested (40 tests). `:ar`'s `WallAiming` is deliberately stricter than
+`HitRanking`: only a tracked, unsubsumed, `VERTICAL` plane with the aim **inside** its
+fitted polygon counts, because the value of the method is that ARCore fitted a plane over
+many frames — an extension hit would let a user take a wall by pointing at the sofa.
+
+Two things to know about its accuracy:
+
+- **A corner's uncertainty is not its walls' uncertainty.** Two lines crossing at a
+  shallow angle locate their intersection badly however well each line is known; at 20
+  degrees the corner is three times less certain than the walls. `WallIntersection`
+  divides by the sine and refuses below 20 degrees, and the readout quotes the worst
+  corner's tolerance rather than a misclosure.
+- **A wall-face room has no misclosure, and now says so.** The loop shuts geometrically
+  because the last wall is intersected with the first, so there is nothing to check the
+  walk against. Reporting the 0.0% that falls out of that would be claiming a check never
+  performed. The same bug existed on the corner-mode **Close** button — pressing it
+  instead of re-reading the first corner also leaves drift unmeasured — and both now say
+  so plainly.
+
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to
 tell them apart.
@@ -72,7 +101,8 @@ tell them apart.
 M5 editing (corner drag, rename, re-solve), and the first round of M6 fixes — plumb
 without a surface, the quietened plane overlay and the openings panel all behaved.
 **What is not:** every migration, the locked-wall re-solve actually improving other
-walls, ceiling detection working at all, and the second round of M6 fixes above.
+walls, ceiling detection working at all, the second round of M6 fixes above, and the
+whole of M11.
 
 **Confirmed on real hardware** (Samsung Galaxy A36 5G, Android 16 / API 36):
 ARCore supported and installed, Depth API **yes**, Raw Depth API **yes**. No capability
@@ -351,9 +381,21 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
-- **Wall-face capture should come next, ahead of M7 export.** It is now M11 in the
-  product plan, moved ahead of export, and three consecutive field-test sessions have
-  ended with it as the answer: the corner behind a laundry pile, corners occluded by furniture generally, and
+- **Corner methods cannot yet be mixed within one room.** `docs/ACCURACY.md` M10 asks
+  for tapped corners and wall-derived corners in the same capture, per wall, and that is
+  right — a room with one corner behind a wardrobe and three in plain sight wants three
+  taps and one pair of walls. It is not implemented: a chain of walls and a list of taps
+  are different structures, because every wall after the first serves two corners and a
+  tapped point never does. The method is therefore chosen per room and the app refuses to
+  switch mid-capture. Mixing means a corner sequence whose entries have different
+  provenance and different neighbours, and getting it wrong yields plans that are quietly
+  wrong rather than visibly wrong.
+- **Wall-face capture is implemented but unproven.** M11 exists and compiles; whether
+  ARCore fits usable vertical planes fast enough in an ordinary room to make it pleasant
+  is exactly the thing only a field session can answer. The gates worth watching are
+  `WallFace.MINIMUM_EXTENT_METRES` (0.5 m, so a cupboard door is not a wall) and
+  `WallIntersection.MINIMUM_SINE` (20 degrees). Both are reasoned, neither is measured.
+  Three consecutive field-test sessions have ended with this feature as the answer: the corner behind a laundry pile, corners occluded by furniture generally, and
   cluttered rooms producing floor planes where there is no floor. Fitting the two adjacent
   wall planes and intersecting them needs no sight of the corner at all
   (docs/ACCURACY.md M10). Everything downstream — export, multi-room — operates on plans

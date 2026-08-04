@@ -32,6 +32,28 @@ data class ArFailure(
 enum class CaptureMode { DISTANCE, ROOM }
 
 /**
+ * How a room's corners are obtained — docs/ACCURACY.md M10.
+ *
+ * Two genuinely different capture actions, not two renderings of one. Tapping is faster
+ * and needs the junction to be visible; taking walls needs neither, which is what makes
+ * it the answer in an occupied room where the corner is behind the furniture.
+ */
+enum class CornerMethod(val label: String, val hint: String) {
+    TAP_FLOOR("Corners", "Tap each corner of the room in order"),
+    WALL_FACES("Walls", "Point at each wall in turn — the corners work themselves out"),
+}
+
+/** The wall under the reticle, reduced to what the interface has to say about it. */
+data class AimedWallState(
+    val id: Long,
+    /** How much of the wall ARCore has fitted, in metres. */
+    val extent: Double,
+    val range: Double,
+    /** True when this is a wall already taken for this room. */
+    val alreadyTaken: Boolean,
+)
+
+/**
  * The dominant floor, once one has been found — docs/ACCURACY.md M2.
  *
  * Room corners are projected onto this single height, which removes all vertical jitter
@@ -104,6 +126,8 @@ data class ArUiState(
     val offFloor: Boolean = false,
     /** Ceiling height above the floor, if a ceiling has come into view. */
     val ceilingHeight: Double? = null,
+    /** Wall-face capture: the wall being pointed at, if any. */
+    val aimedWall: AimedWallState? = null,
     val failure: ArFailure? = null,
 ) {
     /** True when a tap should be allowed to start a sample burst. */
@@ -121,6 +145,19 @@ data class ArUiState(
      */
     val canCaptureCorner: Boolean
         get() = canCapture && floor?.isEstablished == true
+
+    /**
+     * Taking a wall needs no floor and no reticle hit — only a wall.
+     *
+     * That is the entire point. A corner tap needs the floor established so the point has
+     * somewhere to land; a wall is its own reference, which is why this works in a room
+     * where the floor is covered.
+     */
+    val canTakeWall: Boolean
+        get() = phase == ArPhase.RUNNING &&
+            tracking.canCapture &&
+            aimedWall != null &&
+            !aimedWall.alreadyTaken
 }
 
 /** One committed measurement, in the form the renderer needs. */
@@ -141,6 +178,9 @@ data class ArScene(
     val mode: MeasurementMode = MeasurementMode.FREE,
     /** Room corners in order, already projected onto the floor plane. */
     val roomCorners: List<Vec3> = emptyList(),
+    val cornerMethod: CornerMethod = CornerMethod.TAP_FLOOR,
+    /** Wall-face capture: the planes already taken, so the renderer can mark them. */
+    val takenWallIds: Set<Long> = emptySet(),
     /** True once the perimeter has been closed and there is nothing left to add. */
     val roomClosed: Boolean = false,
     val showPlanes: Boolean = true,

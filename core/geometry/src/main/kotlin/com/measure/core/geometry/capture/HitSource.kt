@@ -29,6 +29,18 @@ enum class HitSource(
     val label: String,
 ) {
     PLANE_POLYGON(0.008, 0.004, 0.80, "surface"),
+
+    /**
+     * A wall's own plane, taken as a line on the floor plan rather than as a point.
+     *
+     * Slightly worse than a hit inside a plane's polygon because the corner it helps
+     * derive is usually *outside* the fitted region — the junction is the part of the
+     * wall nobody can see, which is the whole reason for capturing it this way. The
+     * correlation is the highest of any source: two corners at either end of one wall
+     * share that wall's entire error, so it cancels out of the wall's length exactly.
+     */
+    WALL_FACE(0.012, 0.005, 0.85, "wall"),
+
     PLANE_INFINITE(0.015, 0.008, 0.75, "surface (extended)"),
     DEPTH(0.020, 0.012, 0.50, "depth"),
 

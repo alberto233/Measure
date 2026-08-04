@@ -45,16 +45,27 @@ internal class PlaneRenderer {
         planes: Collection<Plane>,
         viewProjection: FloatArray,
         emphasisHeight: Double? = null,
+        /** Walls already taken for the room being captured. */
+        takenWallIds: Set<Long> = emptySet(),
+        /** The wall under the reticle, which a tap would take. */
+        aimedWallId: Long? = null,
     ) {
         // Every tracked plane used to be drawn with a bright outline. In a cluttered room
         // ARCore finds dozens, and the result was a screen full of crossing teal lines
         // that hid the camera image and made the app look broken. Restraint here is not
         // cosmetic: the user has to be able to see the room to aim at it.
-        val visible = planes
+        val candidates = planes
             .filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+        val visible = candidates
             .filter { it.extentX * it.extentZ >= MINIMUM_DRAWN_AREA }
             .sortedByDescending { it.extentX * it.extentZ }
             .take(MAXIMUM_DRAWN)
+            // A taken or aimed wall is drawn whatever its size and whatever else is
+            // larger. During wall-face capture these are the only planes that mean
+            // anything, and one dropping out of the largest-eight list would read as the
+            // app having forgotten it.
+            .plus(candidates.filter { it.hashCode().toLong() in takenWallIds || it.hashCode().toLong() == aimedWallId })
+            .distinct()
         if (visible.isEmpty()) return
 
         GLES20.glUseProgram(program)
@@ -65,7 +76,9 @@ internal class PlaneRenderer {
         GLES20.glDepthMask(false)
         GLES20.glEnableVertexAttribArray(positionAttribute)
 
-        visible.forEach { plane -> drawPlane(plane, viewProjection, emphasisHeight) }
+        visible.forEach { plane ->
+            drawPlane(plane, viewProjection, emphasisHeight, takenWallIds, aimedWallId)
+        }
 
         GLES20.glDisableVertexAttribArray(positionAttribute)
         GLES20.glDepthMask(true)
@@ -73,7 +86,13 @@ internal class PlaneRenderer {
         GlUtil.checkErrors("planes")
     }
 
-    private fun drawPlane(plane: Plane, viewProjection: FloatArray, emphasisHeight: Double?) {
+    private fun drawPlane(
+        plane: Plane,
+        viewProjection: FloatArray,
+        emphasisHeight: Double?,
+        takenWallIds: Set<Long>,
+        aimedWallId: Long?,
+    ) {
         val polygon = plane.polygon ?: return
         polygon.rewind()
         val vertexCount = polygon.limit() / 2
@@ -91,17 +110,30 @@ internal class PlaneRenderer {
         GLES20.glUniformMatrix4fv(mvpUniform, 1, false, mvpMatrix, 0)
         GLES20.glVertexAttribPointer(positionAttribute, 2, GLES20.GL_FLOAT, false, 0, vertices)
 
-        val colour = colourFor(plane)
-        val emphasised = emphasisHeight != null &&
+        val id = plane.hashCode().toLong()
+        val aimed = id == aimedWallId
+        val taken = id in takenWallIds
+        val isFloor = emphasisHeight != null &&
             plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING &&
             abs(plane.centerPose.ty() - emphasisHeight) <= EMPHASIS_TOLERANCE
+
+        val colour = when {
+            taken -> TAKEN
+            aimed -> AIMED
+            else -> colourFor(plane)
+        }
+        val emphasised = isFloor || taken || aimed
 
         GLES20.glUniform4f(
             colourUniform,
             colour.r,
             colour.g,
             colour.b,
-            if (emphasised) FILL_ALPHA else FILL_ALPHA_MUTED,
+            when {
+                taken || aimed -> FILL_ALPHA_WALL
+                isFloor -> FILL_ALPHA
+                else -> FILL_ALPHA_MUTED
+            },
         )
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_FAN, 0, vertexCount)
 
@@ -109,7 +141,7 @@ internal class PlaneRenderer {
         // is what produced the crossing-lines mess.
         if (emphasised) {
             GLES20.glUniform4f(colourUniform, colour.r, colour.g, colour.b, OUTLINE_ALPHA)
-            GLES20.glLineWidth(OUTLINE_WIDTH_PX)
+            GLES20.glLineWidth(if (taken || aimed) WALL_OUTLINE_WIDTH_PX else OUTLINE_WIDTH_PX)
             GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, vertexCount)
         }
     }
@@ -141,9 +173,19 @@ internal class PlaneRenderer {
         /** A cluttered room yields dozens; the largest few are all that inform anything. */
         const val MAXIMUM_DRAWN = 8
 
+        /** A wall being pointed at, and one already taken. Both shout, differently. */
+        const val FILL_ALPHA_WALL = 0.26f
+        const val WALL_OUTLINE_WIDTH_PX = 5f
+
         val FLOOR = GlColour.of(0x2ED3B7)
         val WALL = GlColour.of(0xFFB020)
         val CEILING = GlColour.of(0xA78BFA)
+
+        /** Amber, matching the reticle: this is what a tap would act on. */
+        val AIMED = GlColour.of(0xFFD166)
+
+        /** Teal, matching everything else the app treats as committed. */
+        val TAKEN = GlColour.of(0x2ED3B7)
 
         const val VERTEX_SHADER = """
             uniform mat4 u_ModelViewProjection;

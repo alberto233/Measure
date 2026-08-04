@@ -43,6 +43,8 @@ import com.measure.core.geometry.capture.TrackingAssessor
 import com.measure.core.geometry.capture.TrackingIssue
 import com.measure.core.geometry.capture.TrackingQuality
 import com.measure.core.geometry.capture.TrackingStatus
+import com.measure.core.geometry.capture.WallCaptureOutcome
+import com.measure.core.geometry.capture.WallRejection
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -77,6 +79,10 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     /** Results of sample bursts. Replay 0: a rejection is news once, not on every resume. */
     private val _outcomes = MutableSharedFlow<CaptureOutcome>(extraBufferCapacity = 8)
     val outcomes: SharedFlow<CaptureOutcome> = _outcomes.asSharedFlow()
+
+    /** Results of wall-face captures, which are immediate rather than sampled. */
+    private val _walls = MutableSharedFlow<WallCaptureOutcome>(extraBufferCapacity = 8)
+    val walls: SharedFlow<WallCaptureOutcome> = _walls.asSharedFlow()
 
     @Volatile
     private var scene = ArScene()
@@ -116,6 +122,9 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
     /** Set from the UI thread on tap; consumed once by the GL thread. */
     private val captureRequested = AtomicBoolean(false)
+
+    /** The same, for wall-face capture. A wall needs no burst — see [takeWallIfAsked]. */
+    private val wallRequested = AtomicBoolean(false)
 
     /** GL-thread-only state. The main thread asks for cancellation via [burstCancelled]. */
     private var burst: MutableList<PointSample>? = null
@@ -249,11 +258,19 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         // for it to be abandoned on the next frame.
         burstCancelled.set(true)
         captureRequested.set(false)
+        wallRequested.set(false)
         // The camera is released on pause, so the torch goes out whatever we think.
         sessionConfig?.flashMode = Config.FlashMode.OFF
         _state.update {
             if (it.phase == ArPhase.RUNNING) {
-                it.copy(phase = ArPhase.PAUSED, target = null, preview = null, sampling = null, torchOn = false)
+                it.copy(
+                    phase = ArPhase.PAUSED,
+                    target = null,
+                    preview = null,
+                    sampling = null,
+                    aimedWall = null,
+                    torchOn = false,
+                )
             } else {
                 it.copy(torchOn = false)
             }
@@ -301,6 +318,20 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         }
         if (!allowed) return
         captureRequested.set(true)
+    }
+
+    /**
+     * Ask for the wall under the reticle.
+     *
+     * Unlike a point capture this needs no sample burst, and that is not a shortcut. A
+     * tracked plane *is* an average over many frames and many feature observations —
+     * ARCore has already done the multi-frame work that [collectBurstSample] does for a
+     * single ray, and done it over the whole surface. Sampling it again for half a second
+     * would add nothing but a wait.
+     */
+    fun requestWall() {
+        if (!_state.value.canTakeWall) return
+        wallRequested.set(true)
     }
 
     /**
@@ -434,7 +465,18 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         // other surface's hit onto the floor height was the earlier approach and it put
         // corners underneath whatever was piled in front of them.
         val hits = safeHitTest(frame)
-        val roomCapture = currentScene.captureMode == CaptureMode.ROOM && floor?.isEstablished == true
+
+        // Wall-face capture looks at an entirely different thing: not where the ray lands
+        // but which fitted plane it lands on. Only computed when that mode is active,
+        // because it is a second pass over the hit list.
+        val wallMode = currentScene.captureMode == CaptureMode.ROOM &&
+            currentScene.cornerMethod == CornerMethod.WALL_FACES &&
+            !currentScene.roomClosed
+        val aimedWall = if (wallMode) WallAiming.aimedWall(hits) else null
+
+        val roomCapture = currentScene.captureMode == CaptureMode.ROOM &&
+            currentScene.cornerMethod == CornerMethod.TAP_FLOOR &&
+            floor?.isEstablished == true
         val hit = if (roomCapture) {
             HitRanking.bestOnFloor(hits, floor.height)
         } else {
@@ -448,7 +490,14 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         // last corner in room mode.
         val anchor = when (currentScene.captureMode) {
             CaptureMode.DISTANCE -> currentScene.pendingAnchor
-            CaptureMode.ROOM -> if (currentScene.roomClosed) null else currentScene.roomCorners.lastOrNull()
+            // Wall mode has no half-finished edge: corners arrive complete, a pair of
+            // walls at a time. A rubber band from the last one to the reticle would
+            // suggest a wall is being drawn towards wherever the phone happens to point.
+            CaptureMode.ROOM -> if (currentScene.roomClosed || wallMode) {
+                null
+            } else {
+                currentScene.roomCorners.lastOrNull()
+            }
         }
 
         // Plumb needs no surface at all, and that is the point: a room height is measured
@@ -475,8 +524,18 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         val movingEnd = constrained?.position ?: aim?.position.takeIf { anchor != null }
 
         collectBurstSample(aim, tracking.quality)
+        takeWallIfAsked(aimedWall, currentScene, tracking.quality)
 
-        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, aim?.position, floor?.height)
+        drawScene(
+            session = session,
+            scene = currentScene,
+            cameraPosition = cameraPosition,
+            anchor = anchor,
+            previewEnd = movingEnd,
+            rawTarget = aim?.position,
+            floorHeight = floor?.height,
+            aimedWallId = aimedWall?.plane?.hashCode()?.toLong(),
+        )
 
         val preview = if (anchor != null && movingEnd != null) {
             MeasurementPreview(
@@ -496,7 +555,36 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             floor = floor,
             offFloor = offFloor,
             ceilingHeight = ceilingHeight,
+            aimedWall = aimedWall?.let {
+                AimedWallState(
+                    id = it.face.id,
+                    extent = quantise(it.face.extent, RANGE_STEP),
+                    range = quantise(it.range, RANGE_STEP),
+                    alreadyTaken = it.face.id in currentScene.takenWallIds,
+                )
+            },
         )
+    }
+
+    /**
+     * Hands over the aimed wall, or says why it cannot.
+     *
+     * Rejections are emitted rather than swallowed: a shutter that does nothing is the
+     * single most common reason people conclude an AR app is broken, and "point at a wall
+     * and hold still" is a sentence that gets the user unstuck.
+     */
+    private fun takeWallIfAsked(aimed: AimedWall?, scene: ArScene, quality: TrackingQuality) {
+        if (!wallRequested.compareAndSet(true, false)) return
+
+        val outcome = when {
+            quality == TrackingQuality.NONE || quality == TrackingQuality.POOR ->
+                WallCaptureOutcome.Rejected(WallRejection.TRACKING)
+
+            aimed == null -> WallCaptureOutcome.Rejected(WallRejection.NO_WALL)
+            aimed.face.id in scene.takenWallIds -> WallCaptureOutcome.Rejected(WallRejection.SAME_WALL)
+            else -> WallCaptureOutcome.Accepted(aimed.face)
+        }
+        _walls.tryEmit(outcome)
     }
 
     /**
@@ -713,12 +801,15 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         previewEnd: Vec3?,
         rawTarget: Vec3?,
         floorHeight: Double?,
+        aimedWallId: Long?,
     ) {
         if (scene.showPlanes) {
             planeRenderer.draw(
                 session.getAllTrackables(Plane::class.java),
                 viewProjection,
                 emphasisHeight = floorHeight,
+                takenWallIds = scene.takenWallIds,
+                aimedWallId = aimedWallId,
             )
         }
 
@@ -869,6 +960,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         floor: FloorState? = null,
         offFloor: Boolean = false,
         ceilingHeight: Double? = null,
+        aimedWall: AimedWallState? = null,
     ) {
         val quantisedTarget = target?.copy(range = quantise(target.range, RANGE_STEP))
         val quantisedPreview = preview?.copy(
@@ -893,6 +985,7 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
                 ),
                 offFloor = offFloor,
                 ceilingHeight = ceilingHeight?.let { quantise(it, RANGE_STEP) },
+                aimedWall = aimedWall,
             )
         }
     }

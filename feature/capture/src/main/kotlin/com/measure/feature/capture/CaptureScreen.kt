@@ -100,7 +100,13 @@ fun CaptureScreen(
         MeasurementLabels(state, viewModel)
 
         Reticle(
-            ready = state.canCapture,
+            // In wall mode "ready" means a wall is under the reticle, which is a
+            // different question from whether a point could be sampled here.
+            ready = if (viewModel.isWallMode && viewModel.captureMode == CaptureMode.ROOM) {
+                state.canTakeWall
+            } else {
+                state.canCapture
+            },
             hasTarget = state.target != null,
             samplingProgress = state.sampling?.fraction,
             // Only once a measurement is under way. Before that there is no trajectory to
@@ -115,8 +121,10 @@ fun CaptureScreen(
             if (viewModel.captureMode == CaptureMode.ROOM) {
                 RoomMinimap(
                     corners = viewModel.planOutline(),
+                    // Wall mode has no moving point to preview: the corners appear
+                    // complete, two walls at a time, and there is nothing in between.
                     preview = state.target?.position?.toFloorPlane()
-                        .takeIf { !viewModel.isRoomClosed },
+                        .takeIf { !viewModel.isRoomClosed && !viewModel.isWallMode },
                     closed = viewModel.isRoomClosed,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -271,6 +279,8 @@ private fun BottomBar(
         // is already constrained, by the floor.
         if (!room) ModeSelector(viewModel.mode, viewModel::selectMode)
 
+        if (room) CornerMethodSelector(viewModel.cornerMethod, viewModel::selectCornerMethod)
+
         CaptureModeSelector(viewModel.captureMode, viewModel::selectCaptureMode)
 
         Row(
@@ -281,21 +291,29 @@ private fun BottomBar(
             PillButton(
                 label = "Undo",
                 enabled = if (room) {
-                    viewModel.roomCorners.isNotEmpty() || viewModel.isRoomClosed
+                    viewModel.canUndoRoom
                 } else {
                     viewModel.pending != null || viewModel.segments.isNotEmpty()
                 },
                 onClick = viewModel::undo,
             )
             CaptureButton(
-                enabled = if (room) state.canCaptureCorner && !viewModel.isRoomClosed else state.canCapture,
+                enabled = when {
+                    !room -> state.canCapture
+                    viewModel.isRoomClosed -> false
+                    // A wall needs no floor and no reticle hit, only a fitted wall. That
+                    // is the whole reason this mode exists, so it must not inherit the
+                    // corner shutter's gating.
+                    viewModel.isWallMode -> state.canTakeWall
+                    else -> state.canCaptureCorner
+                },
                 sampling = state.sampling != null,
-                onClick = viewModel::capture,
+                onClick = { if (room && viewModel.isWallMode) viewModel.captureWall() else viewModel.capture() },
             )
             if (room) {
                 PillButton(
                     label = if (viewModel.isRoomClosed) "New room" else "Close",
-                    enabled = viewModel.isRoomClosed || viewModel.roomCorners.size >= 3,
+                    enabled = viewModel.isRoomClosed || viewModel.canCloseRoom,
                     onClick = {
                         if (viewModel.isRoomClosed) viewModel.restartRoom() else viewModel.closeRoom()
                     },
@@ -346,14 +364,25 @@ private fun RoomReadout(
                 fontSize = 12.sp,
             )
             Text(
-                text = if (solution.isReliable) {
-                    "Closed to ${viewModel.percent(solution.closure.relativeError)} of perimeter"
-                } else {
-                    "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
+                text = when {
+                    // Wall-face capture shuts the loop by construction — the last wall
+                    // meets the first — so there is no misclosure, and quoting 0.0%
+                    // would be reporting a check that was never carried out.
+                    !solution.closure.wasAdjusted -> "Closed geometrically — drift not measured"
+                    solution.isReliable ->
+                        "Closed to ${viewModel.percent(solution.closure.relativeError)} of perimeter"
+
+                    else ->
+                        "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
                 },
                 color = if (solution.isReliable) MeasureColours.OnScrimMuted else MeasureColours.Warning,
                 fontSize = 12.sp,
             )
+            return@Column
+        }
+
+        if (viewModel.isWallMode) {
+            WallGuidance(state, viewModel)
             return@Column
         }
 
@@ -387,6 +416,51 @@ private fun RoomReadout(
             fontSize = 12.sp,
         )
     }
+}
+
+/**
+ * Wall-face guidance — docs/ACCURACY.md M10.
+ *
+ * The count is of *walls*, not corners, because walls are what the user is being asked
+ * to do something about. The corners are a consequence, and saying "3 corners" while the
+ * user has pointed at four walls would invite them to look for a corner they never took.
+ */
+@Composable
+private fun WallGuidance(state: ArUiState, viewModel: CaptureViewModel) {
+    val walls = viewModel.capturedWalls.size
+    val aimed = state.aimedWall
+
+    Text(
+        text = when {
+            walls == 0 && aimed == null -> "Point at a wall"
+            aimed?.alreadyTaken == true -> "Already taken"
+            aimed != null -> "Wall ready"
+            else -> "$walls ${if (walls == 1) "wall" else "walls"}"
+        },
+        color = when {
+            aimed?.alreadyTaken == true -> MeasureColours.Warning
+            aimed != null -> MeasureColours.Ready
+            else -> MeasureColours.OnScrim
+        },
+        fontSize = 20.sp,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        text = when {
+            // The wall's fitted size is the useful number: ARCore needs to have found
+            // enough of the wall for its line to mean anything, and the user can fix a
+            // small fit by sweeping the phone along the wall.
+            aimed?.alreadyTaken == true -> "Turn to the next wall"
+            aimed != null -> "${viewModel.formatLength(aimed.extent)} of wall found · " +
+                "${viewModel.formatLength(aimed.range)} away"
+
+            walls == 0 -> "Sweep along it until it lights up, then tap"
+            walls < 3 -> "$walls taken · keep going round"
+            else -> "Take the last wall, then tap Close"
+        },
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
 }
 
 /** The headline number. The reason the user opened the app. */

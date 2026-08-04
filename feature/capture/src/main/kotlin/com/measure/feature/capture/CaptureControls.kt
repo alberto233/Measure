@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.measure.ar.CaptureMode
+import com.measure.ar.CornerMethod
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.designsystem.MeasureColours
 
@@ -82,6 +83,43 @@ internal fun CaptureModeSelector(
                     .clickable { onSelect(mode) }
                     .padding(horizontal = 18.dp, vertical = 8.dp),
                 color = if (active) Color(0xFF14181C) else MeasureColours.OnScrimMuted,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+/**
+ * Tap corners, or take walls — docs/ACCURACY.md M10.
+ *
+ * Offered at the top level of room capture rather than buried, because it is the answer
+ * to the commonest reason a capture fails: the corner is behind something. A user who
+ * cannot find this control will conclude the app cannot measure their room.
+ */
+@Composable
+internal fun CornerMethodSelector(
+    selected: CornerMethod,
+    onSelect: (CornerMethod) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(MeasureColours.Scrim)
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        CornerMethod.entries.forEach { method ->
+            val active = method == selected
+            Text(
+                text = method.label,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (active) MeasureColours.Ready else Color.Transparent)
+                    .clickable { onSelect(method) }
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                color = if (active) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
             )
