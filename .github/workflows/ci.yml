@@ -85,16 +85,29 @@ jobs:
       # rolled. Checked here rather than trusted, because the failure is silent at build
       # time and only shows up on a device.
       - name: Check the APK signature has not changed
+        env:
+          EXPECTED: a2e4157b87138855a12254197276fd8dbabf6c8234f73285755606ab31bbe7f8
         run: |
-          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-          ACTUAL=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk             | grep -m1 "Signer #1 certificate SHA-256 digest" | awk '{print $NF}')
-          EXPECTED=a2e4157b87138855a12254197276fd8dbabf6c8234f73285755606ab31bbe7f8
-          echo "signer: $ACTUAL"
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "::error::APK signing key changed — installed builds could not update."
-            echo "expected $EXPECTED"
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found under $SDK/build-tools - cannot verify signing."
             exit 1
           fi
+
+          # Kept whole rather than piped straight into a filter, so a mismatch can be
+          # diagnosed from the log instead of by re-running this by hand.
+          CERTS=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk 2>&1)
+          ACTUAL=$(printf '%s\n' "$CERTS" | awk '/Signer #1 certificate SHA-256 digest/ {print $NF; exit}')
+
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK signing key changed - installed builds could not update."
+            echo "expected: $EXPECTED"
+            echo "actual:   ${ACTUAL:-(could not be read)}"
+            printf '%s\n' "$CERTS"
+            exit 1
+          fi
+          echo "signer verified: $ACTUAL"
 
       - name: Stage the APK
         run: cp app/build/outputs/apk/debug/app-debug.apk measure-dev.apk
