@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 182 tests passing, CI green |
+| `:core:units`, `:core:geometry` | Implemented, 200 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -117,6 +117,30 @@ Two design decisions carry the weight:
   because a finger on a plan is a measurement of nothing, and no correlation discount is
   applied even between two corners of one room. When either end sits on a corner the
   rectilinear solve moved, the panel says that too.
+
+**Field tested once, and it found the flaw in the idea.** Tapping two points accurately
+enough to get a *straight* line is beyond a finger on a phone-sized plan: measuring a bed
+to a wall produced a line a few degrees off perpendicular, which is not a rougher version
+of that distance but a measurement of something else, and it always reads long. Two
+changes follow.
+
+**Dimension strings.** Entering Measure now draws the plan's overall sizes around it, in
+the notation a floor plan uses: an overall span with the runs between corners beneath it,
+on witness lines outside the drawing. Most people open a plan to find out how wide the
+room is, and that should not require a steady finger — the geometry already knows.
+`DimensionChains` builds them along the plan's own dominant direction rather than the
+screen's axes, because which way a room points depends only on which way the user was
+facing when they started capturing. Angles are quadrupled before averaging and quartered
+after, which folds away the four-fold symmetry of a grid; averaging raw angles would put
+a square room's dominant direction at 45 degrees, exactly wrong.
+
+**Straightening.** A free end is now pulled square to the wall the measurement started
+from, or to the plan's grid, when it is within 12 degrees of it. This is the same argument
+as `MeasurementMode` on the capture screen and not tidying: the wall's direction is known
+exactly, so the error a finger contributes along the wall can simply be removed. A snap
+that moves the point more than 15 cm says so. Ends that landed on a corner or a wall are
+never straightened — those were aimed at something, and only the "somewhere over here" end
+carries finger error worth removing.
 
 The UX was built rather than retrofitted, since three of the last four rounds of field
 faults were interaction faults rather than maths ones. Concretely: measuring is a mode

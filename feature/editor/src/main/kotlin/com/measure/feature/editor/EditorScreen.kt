@@ -77,6 +77,11 @@ fun EditorScreen(
             dragging = viewModel.dragging,
             measuring = viewModel.mode == EditorMode.MEASURE,
             pendingEnd = viewModel.pendingEnd,
+            dimensionChains = if (viewModel.mode == EditorMode.MEASURE) {
+                viewModel.dimensionChains()
+            } else {
+                emptyList()
+            },
             formatLength = viewModel::formatLength,
             onSelect = viewModel::select,
             onMeasureTap = viewModel::tapWhileMeasuring,
@@ -219,11 +224,22 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = pending?.let { "From ${it.description}" }
-                    ?: "Corners and walls pull the point onto them",
+                text = when {
+                    pending != null -> "From ${pending.description}"
+                    // The dimensions are the answer for most people, so the banner points
+                    // at them first rather than at the tool they may not need.
+                    else -> "Overall sizes are shown around the plan · tap for anything else"
+                },
                 color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Ready,
                 fontSize = 12.sp,
             )
+            viewModel.lastStraightening?.let { straightened ->
+                Text(
+                    text = "Last point pulled $straightened",
+                    color = MeasureColours.Ready,
+                    fontSize = 11.sp,
+                )
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (pending != null) Pill("Redo point", onClick = viewModel::clearPendingEnd)

@@ -19,7 +19,12 @@ import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolver
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.DimensionChain
+import com.measure.core.geometry.plan.DimensionChains
 import com.measure.core.geometry.plan.PlanAnchor
+import com.measure.core.geometry.plan.PlanConstraints
+import com.measure.core.geometry.plan.PreferredDirection
+import com.measure.core.geometry.plan.SnapKind
 import com.measure.core.geometry.plan.PlanMeasurement
 import com.measure.core.geometry.plan.PlanSnapper
 import com.measure.core.geometry.plan.ResolvedPoint
@@ -276,6 +281,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (next == mode) return
         mode = next
         pendingEnd = null
+        lastStraightening = null
         selection = Selection.None
     }
 
@@ -287,6 +293,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     /** Drops the half-placed end without leaving the mode, for a mis-tap. */
     fun clearPendingEnd() {
         pendingEnd = null
+        lastStraightening = null
     }
 
     /**
@@ -297,13 +304,20 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun tapWhileMeasuring(point: Vec2, reach: Double) {
         val rooms = project.value?.snapRooms.orEmpty()
-        val placed = PlanSnapper.snap(rooms, point, reach)
 
         val first = pendingEnd
         if (first == null) {
-            pendingEnd = placed
+            pendingEnd = PlanSnapper.snap(rooms, point, reach)
             return
         }
+
+        // Snap first, straighten second. A tap that landed on a corner or a wall was
+        // aimed at that thing and should stay on it; only a free point — the "somewhere
+        // over here" end, which is where the finger error actually lives — gets pulled
+        // square. Straightening a corner off its corner would be the tool overruling an
+        // instruction rather than removing noise.
+        val snapped = PlanSnapper.snap(rooms, point, reach)
+        val placed = if (snapped.kind == SnapKind.FREE) straighten(first, snapped) else snapped
 
         val candidate = PlanMeasurement(first, placed)
         if (candidate.isDegenerate) {
@@ -320,6 +334,67 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             selection = Selection.PlanMeasurementSelection(id)
         }
     }
+
+    /**
+     * Pulls a free end square to the wall the measurement started from.
+     *
+     * "How far is the bed from the wall" means the perpendicular distance, and a line a
+     * few degrees off perpendicular is not a worse drawing of it — it is a measurement of
+     * something else, and it always reads long. The wall's direction is known exactly, so
+     * the error a finger contributes along the wall can simply be removed.
+     *
+     * The plan's own grid is offered as a fallback, so a measurement between two free
+     * points still comes out straight rather than very slightly crooked.
+     */
+    private fun straighten(from: ResolvedPoint, to: ResolvedPoint): ResolvedPoint {
+        val preferred = buildList {
+            wallDirectionOf(from)?.let {
+                add(PreferredDirection(it.perpendicular(), "square to ${from.description}"))
+                add(PreferredDirection(it, "along ${from.description}"))
+            }
+            val grid = dominantDirection()
+            add(PreferredDirection(grid.perpendicular(), "square to the plan"))
+            add(PreferredDirection(grid, "along the plan"))
+        }
+
+        val result = PlanConstraints.straighten(from.position, to.position, preferred)
+        if (result.description == null) return to
+
+        // Said out loud when it moved the point a long way, because that means the user
+        // was pointing at something this constraint does not describe.
+        if (result.isNotable) {
+            message = "Moved ${formatLength(result.correction)} to keep it ${result.description}"
+        }
+        lastStraightening = result.description
+        return to.copy(anchor = PlanAnchor.Free(result.position), position = result.position)
+    }
+
+    /** What the last placed end was straightened onto, for the banner to report. */
+    var lastStraightening by mutableStateOf<String?>(null)
+        private set
+
+    private fun wallDirectionOf(point: ResolvedPoint): Vec2? {
+        val anchor = point.anchor as? PlanAnchor.Wall ?: return null
+        val room = project.value?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
+        val outline = room.outline
+        if (outline.size < 3 || anchor.index !in outline.indices) return null
+        val from = outline[anchor.index]
+        val to = outline[(anchor.index + 1) % outline.size]
+        return (to - from).takeIf { it.length > Vec2.EPSILON }?.normalised()
+    }
+
+    private fun dominantDirection(): Vec2 =
+        DimensionChains.dominantDirection(project.value?.rooms.orEmpty().map { it.outline })
+
+    /**
+     * The dimension strings for the whole plan — how wide, how deep, and where it steps.
+     *
+     * Computed rather than stored, and shown only while measuring: this is what most
+     * people opened the plan to find out, and making them tap two points accurately for
+     * it was asking for a steady finger to answer a question the geometry already knows.
+     */
+    fun dimensionChains(): List<DimensionChain> =
+        DimensionChains.chains(project.value?.rooms.orEmpty().map { it.outline })
 
     fun planMeasurementById(id: Long): SavedPlanMeasurement? =
         project.value?.planMeasurements?.firstOrNull { it.id == id }

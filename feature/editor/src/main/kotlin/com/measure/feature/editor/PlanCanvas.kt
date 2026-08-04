@@ -28,6 +28,7 @@ import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.Segments
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.DimensionChain
 import com.measure.core.geometry.plan.ResolvedPoint
 import com.measure.core.geometry.plan.SnapKind
 import kotlin.math.atan2
@@ -58,7 +59,13 @@ data class PlanCamera(
 
     companion object {
         /** Fits [outlines] into [size] with a margin, for the initial view. */
-        fun fitting(outlines: List<Vec2>, size: IntSize, marginPx: Int = 96): PlanCamera {
+        /**
+         * @param marginPx enough clear space for the dimension strings, whose overall
+         *   line stands 92 px off the plan with a label above it. Fitting tighter than
+         *   that puts the overall dimension off the edge of the screen the moment
+         *   measuring is switched on, and the fit deliberately happens only once.
+         */
+        fun fitting(outlines: List<Vec2>, size: IntSize, marginPx: Int = 132): PlanCamera {
             if (outlines.isEmpty() || size.width == 0 || size.height == 0) return PlanCamera()
 
             val minX = outlines.minOf { it.x }
@@ -107,6 +114,8 @@ internal fun PlanCanvas(
     /** Non-null while measuring: the mode, and the first end if one is down. */
     measuring: Boolean,
     pendingEnd: ResolvedPoint?,
+    /** Drawn only while measuring, which is when they are what was asked for. */
+    dimensionChains: List<DimensionChain>,
     formatLength: (Double) -> String,
     onSelect: (Selection) -> Unit,
     onMeasureTap: (point: Vec2, reach: Double) -> Unit,
@@ -296,6 +305,13 @@ internal fun PlanCanvas(
             drawEndMark(to, measurement.to.kind, colour, selected)
         }
 
+        // Dimension strings, drawn outside the plan in the way a drawing does it: the
+        // overall span with the runs between corners beneath, on witness lines clear of
+        // the geometry. Outside rather than over, so the plan stays readable.
+        dimensionChains.forEach { chain ->
+            drawDimensionChain(chain, camera, size)
+        }
+
         // The half-placed end, while measuring. Big, and marked with what it caught, so a
         // mis-tap is visible before the second tap builds a number on top of it.
         pendingEnd?.let { end ->
@@ -310,7 +326,8 @@ internal fun PlanCanvas(
     PlanLabels(
         wallLabels(rooms, camera, size, dragging, selection, formatLength) +
             measurementLabels(measurements, camera, size, selection, formatLength) +
-            planMeasurementLabels(planMeasurements, camera, size, selection, formatLength),
+            planMeasurementLabels(planMeasurements, camera, size, selection, formatLength) +
+            dimensionLabels(dimensionChains, camera, size, formatLength),
     )
 }
 
@@ -390,6 +407,68 @@ private fun DrawScope.drawOpening(
 
         // An archway is a hole with nothing in it, and that is exactly how it is drawn.
         OpeningKind.PASSAGE -> Unit
+    }
+}
+
+/**
+ * One dimension string: a line of ticks outside the plan, with witness lines back to it.
+ *
+ * Everything here is in pixels rather than metres on purpose. A dimension string is
+ * annotation, not geometry — it should stand the same distance clear of the drawing and
+ * carry the same tick size however far the plan is zoomed, exactly as it would on paper.
+ */
+private fun DrawScope.drawDimensionChain(chain: DimensionChain, camera: PlanCamera, size: IntSize) {
+    if (chain.ticks.size < 2) return
+
+    // Plan +y is "away" and screen +y is down, so the normal flips on the way to pixels.
+    val outward = Offset(-chain.normal.x.toFloat(), chain.normal.y.toFloat())
+    val runLine = outward * DIMENSION_RUN_OFFSET_PX
+    val overallLine = outward * DIMENSION_OVERALL_OFFSET_PX
+
+    val ends = chain.ticks.map { camera.toScreen(chain.pointAt(it), size) }
+
+    // Witness lines: from the plan edge out past the furthest dimension line, so each
+    // tick is visibly the corner it came from and not an unexplained mark.
+    ends.forEach { anchor ->
+        drawLine(
+            color = MeasureColours.OnScrimMuted.copy(alpha = 0.45f),
+            start = anchor + outward * DIMENSION_WITNESS_GAP_PX,
+            end = anchor + overallLine + outward * DIMENSION_WITNESS_OVERRUN_PX,
+            strokeWidth = 1.5f,
+        )
+    }
+
+    fun tick(at: Offset, along: Offset) {
+        // The 45-degree slash of a drawing, rather than an arrowhead: it stays legible at
+        // any size and does not fill in when two ticks are close together.
+        val slash = Offset(along.x + outward.x, along.y + outward.y) * DIMENSION_TICK_PX
+        drawLine(MeasureColours.OnScrim, at - slash, at + slash, strokeWidth = 2f)
+    }
+
+    val direction = (ends.last() - ends.first()).let {
+        val length = hypot(it.x, it.y)
+        if (length < 1f) Offset(1f, 0f) else Offset(it.x / length, it.y / length)
+    }
+
+    // The runs between corners.
+    drawLine(
+        color = MeasureColours.OnScrim,
+        start = ends.first() + runLine,
+        end = ends.last() + runLine,
+        strokeWidth = 1.5f,
+    )
+    ends.forEach { tick(it + runLine, direction) }
+
+    // And the overall, further out. Only when it says something the runs do not.
+    if (chain.segments.size > 1) {
+        drawLine(
+            color = MeasureColours.OnScrim,
+            start = ends.first() + overallLine,
+            end = ends.last() + overallLine,
+            strokeWidth = 1.5f,
+        )
+        tick(ends.first() + overallLine, direction)
+        tick(ends.last() + overallLine, direction)
     }
 }
 
@@ -544,3 +623,13 @@ private const val JAMB_HALF_PX = 5f
 
 /** Half the separation between the two lines of a window's frame. */
 private const val GLAZING_HALF_PX = 2.5f
+
+/** How far a dimension line stands off the plan, and its overall line beyond that. */
+private const val DIMENSION_RUN_OFFSET_PX = 46f
+private const val DIMENSION_OVERALL_OFFSET_PX = 92f
+
+/** A witness line starts just clear of the corner and overruns the last dimension line. */
+private const val DIMENSION_WITNESS_GAP_PX = 6f
+private const val DIMENSION_WITNESS_OVERRUN_PX = 10f
+
+private const val DIMENSION_TICK_PX = 5f

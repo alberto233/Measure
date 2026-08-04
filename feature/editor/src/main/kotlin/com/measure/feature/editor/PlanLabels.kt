@@ -18,6 +18,8 @@ import com.measure.core.data.SavedMeasurement
 import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.DimensionChain
 
 /** One piece of text pinned to a point on the plan, in pixels. */
 internal data class PlanLabel(
@@ -199,6 +201,56 @@ internal fun planMeasurementLabels(
 
 /** Clear of the line itself, which the label would otherwise sit exactly on top of. */
 private const val PLAN_MEASUREMENT_LABEL_LIFT_PX = 16f
+
+/**
+ * The numbers on a dimension string: each run, and the overall beneath them.
+ *
+ * Placed in pixels rather than metres, like the string itself, so they hold their distance
+ * from the drawing at every zoom. A run whose label would be wider than the run is skipped
+ * — the tick marks still show the break, and a number lying across its neighbours is worse
+ * than a number missing.
+ */
+internal fun dimensionLabels(
+    chains: List<DimensionChain>,
+    camera: PlanCamera,
+    size: IntSize,
+    formatLength: (Double) -> String,
+): List<PlanLabel> = buildList {
+    if (size == IntSize.Zero) return@buildList
+
+    chains.forEach { chain ->
+        if (chain.ticks.size < 2) return@forEach
+        val outwardX = -chain.normal.x.toFloat()
+        val outwardY = chain.normal.y.toFloat()
+
+        fun place(along: Double, offset: Float): Pair<Float, Float> {
+            val anchor = camera.toScreen(chain.pointAt(along), size)
+            return anchor.x + outwardX * offset to anchor.y + outwardY * offset
+        }
+
+        chain.segments.forEach { segment ->
+            val widthPx = segment.length / camera.metresPerPixel
+            if (widthPx < MINIMUM_DIMENSION_LABEL_PX) return@forEach
+            val (x, y) = place(segment.midpoint, DIMENSION_RUN_LABEL_OFFSET_PX)
+            add(PlanLabel(formatLength(segment.length), x, y, MeasureColours.OnScrim))
+        }
+
+        if (chain.segments.size > 1) {
+            val (x, y) = place(
+                (chain.ticks.first() + chain.ticks.last()) / 2.0,
+                DIMENSION_OVERALL_LABEL_OFFSET_PX,
+            )
+            add(PlanLabel(formatLength(chain.overall), x, y, MeasureColours.OnScrim, bold = true))
+        }
+    }
+}
+
+/** Matched to the dimension lines in PlanCanvas, which these sit on. */
+private const val DIMENSION_RUN_LABEL_OFFSET_PX = 46f
+private const val DIMENSION_OVERALL_LABEL_OFFSET_PX = 92f
+
+/** Narrower than this and the label is wider than the run it belongs to. */
+private const val MINIMUM_DIMENSION_LABEL_PX = 44.0
 
 /** Walls shorter than this get no label; it would be wider than the wall. */
 private const val MINIMUM_LABELLED_METRES = 0.25
