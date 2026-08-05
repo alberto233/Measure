@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 223 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 226 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -19,7 +19,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M7's PNG and PDF, then M13 finding a plan — see §8 |
+| Next | M13 finding a plan, then M8 multi-room — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -190,9 +190,26 @@ Three decisions worth keeping:
 The `FileProvider` is scoped to one cache directory. Rooted any wider it would hand every
 share target a readable path into private storage, database included.
 
-**Not yet done in M7:** PNG and PDF, which need the plan rendered through Android's canvas
-rather than emitted as text, and are therefore the two that cannot be tested the way these
-were.
+**PDF and PNG are now there too**, rendered through Android's canvas by a single
+`PlanDrawing` used by both — one implementation, because a plan drawn twice by two pieces
+of code will eventually be drawn two different ways and the version checked against a tape
+will be the wrong one. The PDF is a real A4 page in points, turning landscape when the plan
+is wider than it is tall; a page that is not a paper size prints scaled by an unknown
+amount, which for a floor plan is worse than useless. Both are drawn light: an export ends
+up printed or on a laptop, and the app's dark palette would come out of a printer as a page
+of toner.
+
+**Field tested once.** SVG failed to share on the A36 — not a rendering fault but a MIME
+one. `image/svg+xml` is correct and registered, and nothing on a typical handset claims it,
+so the chooser had nothing to offer and the export read as broken. DXF was worse: it was
+being sent as `application/dxf`, which is not a registered type at all (the real one is
+`image/vnd.dxf`). Both are fixed, and the share now falls back to
+`application/octet-stream` when nothing resolves the exact type — a file manager or a mail
+client will always take that.
+
+`PlanGeometry` was also lifted out of `SvgExporter`, where "where does this door sit on
+this wall" had started life as a private helper and then had to be reached by the canvas
+renderer too.
 
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to

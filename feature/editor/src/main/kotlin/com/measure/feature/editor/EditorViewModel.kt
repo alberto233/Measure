@@ -345,6 +345,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun focusOn(next: MeasureFocus) {
         if (drawing) return
+        // A measurement waiting to be kept holds the view until it is answered. Tapping
+        // the plan is the natural way to dismiss a card, and dismissing this one would
+        // leave a saved distance the user never agreed to and can no longer see. Said
+        // rather than silently ignored, so the tap is not simply dead.
+        if (unconfirmed != null) {
+            message = "Keep or discard this measurement first"
+            return
+        }
         focus = next
     }
 
@@ -382,6 +390,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         focus = MeasureFocus.None
         viewModelScope.launch { repository.deletePlanMeasurement(id) }
     }
+
+    /** True when a tap on the plan will be refused because something needs answering. */
+    val isHoldingConfirmation: Boolean get() = unconfirmed != null
 
     /**
      * A tap while drawing: the first places an end, the second completes and saves.
@@ -537,6 +548,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun deletePlanMeasurement(id: Long) {
         viewModelScope.launch { repository.deletePlanMeasurement(id) }
+        // Clearing the *selection* was not enough: the measure view reads `focus`, so the
+        // card went on showing a measurement that no longer existed.
+        if (focus == MeasureFocus.Custom(id)) focus = MeasureFocus.None
+        if (unconfirmed == id) unconfirmed = null
         selection = Selection.None
     }
 

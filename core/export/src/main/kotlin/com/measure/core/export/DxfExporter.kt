@@ -37,12 +37,12 @@ object DxfExporter {
                 closedPolyline(room.outline, LAYER_WALLS)
             }
             room.openings.forEach { opening ->
-                SvgExporter.openingSpan(room, opening)?.let { (from, to) ->
+                PlanGeometry.openingSpan(room, opening)?.let { (from, to) ->
                     line(from.x, from.y, to.x, to.y, LAYER_OPENINGS)
                 }
             }
             if (room.outline.isNotEmpty()) {
-                val centre = SvgExporter.centroidOf(room.outline)
+                val centre = PlanGeometry.labelPoint(room.outline)
                 text(centre.x, centre.y, room.name, LAYER_TEXT)
             }
         }

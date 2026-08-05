@@ -67,11 +67,20 @@ enum class ExportFormat(
     val label: String,
     val description: String,
 ) {
-    SVG("svg", "image/svg+xml", "SVG drawing", "A scalable drawing, for a document or a printer"),
-    DXF("dxf", "application/dxf", "DXF drawing", "Opens in CAD — AutoCAD, LibreCAD, QCAD"),
+    /** First, because it is the one most people mean by "send me the plan". */
+    PDF("pdf", "application/pdf", "PDF", "A page to print, email or attach to a quote"),
+    PNG("png", "image/png", "Image", "A picture, for a message or a document"),
+    SVG("svg", "image/svg+xml", "SVG drawing", "A scalable drawing that stays sharp at any size"),
+
+    // The registered type is image/vnd.dxf. application/dxf is a common invention and
+    // resolves to nothing on a phone, which is how a share ends up with no apps offered.
+    DXF("dxf", "image/vnd.dxf", "DXF drawing", "Opens in CAD — AutoCAD, LibreCAD, QCAD"),
     CSV("csv", "text/csv", "CSV table", "Room sizes as a spreadsheet"),
     JSON("json", "application/json", "Project file", "Everything, in a form this app can read back"),
     ;
+
+    /** Whether the file is text this module writes, or a picture Android has to render. */
+    val isText: Boolean get() = this != PDF && this != PNG
 
     fun fileName(planName: String): String {
         // Anything a filesystem or a share target might choke on becomes an underscore.

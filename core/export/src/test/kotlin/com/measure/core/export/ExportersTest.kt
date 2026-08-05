@@ -246,6 +246,47 @@ class ExportersTest {
     }
 
     @Test
+    fun `every format has a distinct extension and a plausible mime type`() {
+        // Two formats sharing an extension would overwrite each other in the cache, and a
+        // made-up mime type resolves to nothing on a phone — which produces a share sheet
+        // with no apps in it and reads as the export having failed. `application/dxf` was
+        // exactly that: invented, and not the registered `image/vnd.dxf`.
+        val extensions = ExportFormat.entries.map { it.extension }
+        assertEquals(extensions.size, extensions.toSet().size)
+
+        ExportFormat.entries.forEach { format ->
+            assertTrue(format.mimeType.contains('/'), "${format.label} has no mime type")
+            assertFalse(format.mimeType.startsWith("application/dxf"), "use the registered dxf type")
+        }
+    }
+
+    @Test
+    fun `only the picture formats are excluded from text rendering`() {
+        assertFalse(ExportFormat.PDF.isText)
+        assertFalse(ExportFormat.PNG.isText)
+        listOf(ExportFormat.SVG, ExportFormat.DXF, ExportFormat.CSV, ExportFormat.JSON).forEach {
+            assertTrue(it.isText, "${it.label} should be written as text")
+        }
+    }
+
+    @Test
+    fun `the room label goes somewhere inside an L shaped room`() {
+        // The true centroid of an L can fall outside it, which would put the name in the
+        // hallway. Averaging the corners keeps it in the room.
+        val ell = ExportableRoom(
+            name = "L",
+            outline = listOf(
+                Vec2(0.0, 0.0), Vec2(6.0, 0.0), Vec2(6.0, 2.0),
+                Vec2(2.0, 2.0), Vec2(2.0, 6.0), Vec2(0.0, 6.0),
+            ),
+            floorArea = 20.0,
+            perimeter = 20.0,
+        )
+        val label = PlanGeometry.labelPoint(ell.outline)
+        assertTrue(label.x in 0.0..6.0 && label.y in 0.0..6.0)
+    }
+
+    @Test
     fun `a file name never contains a path separator`() {
         assertEquals("Flat-3_4.svg", ExportFormat.SVG.fileName("Flat 3/4"))
         assertEquals("plan.dxf", ExportFormat.DXF.fileName("   "))

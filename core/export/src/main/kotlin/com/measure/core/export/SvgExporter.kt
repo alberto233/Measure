@@ -74,7 +74,7 @@ object SvgExporter {
                 // Openings as a gap drawn back over the wall in white, which is how a
                 // plan shows them and survives being printed in black and white.
                 room.openings.forEach { opening ->
-                    openingSpan(room, opening)?.let { (from, to) ->
+                    PlanGeometry.openingSpan(room, opening)?.let { (from, to) ->
                         append(
                             "    <line x1=\"${mm(x(from))}\" y1=\"${mm(y(from))}\" " +
                                 "x2=\"${mm(x(to))}\" y2=\"${mm(y(to))}\" " +
@@ -89,7 +89,7 @@ object SvgExporter {
                     }
                 }
 
-                val centroid = centroidOf(room.outline)
+                val centroid = PlanGeometry.labelPoint(room.outline)
                 append(
                     "    <text x=\"${mm(x(centroid))}\" y=\"${mm(y(centroid))}\" " +
                         "font-family=\"sans-serif\" font-size=\"${mm(TEXT_HEIGHT_MM)}\" " +
@@ -127,26 +127,6 @@ object SvgExporter {
                 "text-anchor=\"middle\">${escape(plan.name)} has no rooms yet</text>\n",
         )
         append("</svg>\n")
-    }
-
-    internal fun openingSpan(room: ExportableRoom, opening: ExportableOpening): Pair<Vec2, Vec2>? {
-        val outline = room.outline
-        if (outline.size < 3 || opening.wallIndex !in outline.indices) return null
-        val from = outline[opening.wallIndex]
-        val to = outline[(opening.wallIndex + 1) % outline.size]
-        val length = from.distanceTo(to)
-        if (length < Vec2.EPSILON) return null
-
-        val start = (opening.offset / length).coerceIn(0.0, 1.0)
-        val end = ((opening.offset + opening.width) / length).coerceIn(0.0, 1.0)
-        val span = to - from
-        return (from + span * start) to (from + span * end)
-    }
-
-    internal fun centroidOf(outline: List<Vec2>): Vec2 {
-        if (outline.isEmpty()) return Vec2.ZERO
-        val sum = outline.fold(Vec2.ZERO) { total, point -> total + point }
-        return sum / outline.size.toDouble()
     }
 
     /**
