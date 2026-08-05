@@ -48,7 +48,6 @@ sealed interface Selection {
     data class Wall(val roomId: Long, val index: Int) : Selection
     data class Corner(val roomId: Long, val index: Int) : Selection
     data class Measurement(val id: Long) : Selection
-    data class PlanMeasurementSelection(val id: Long) : Selection
     data class Room(val roomId: Long) : Selection
 }
 
@@ -61,6 +60,30 @@ sealed interface Selection {
  * only way into it is a button that stays lit.
  */
 enum class EditorMode { SELECT, MEASURE }
+
+/**
+ * The one thing being read in the measure view.
+ *
+ * One at a time on purpose. A plan carrying every dimension it could is a drawing nobody
+ * reads: the numbers collide, and the one being looked for is buried among twenty that
+ * are not. Lines and ticks are always drawn, because they cost nothing to look past; a
+ * number appears only when asked for.
+ */
+sealed interface MeasureFocus {
+    data object None : MeasureFocus
+
+    /** A run of a dimension string, or the overall span when [segment] is [OVERALL]. */
+    data class Dimension(val chain: Int, val segment: Int) : MeasureFocus {
+        val isOverall: Boolean get() = segment == OVERALL
+
+        companion object {
+            const val OVERALL = -1
+        }
+    }
+
+    /** A distance the user drew. */
+    data class Custom(val id: Long) : MeasureFocus
+}
 
 /**
  * Everything needed to put one room back exactly as it was.
@@ -260,6 +283,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     var mode by mutableStateOf(EditorMode.SELECT)
         private set
 
+    /** What is being read right now. Exactly one thing, or nothing. */
+    var focus by mutableStateOf<MeasureFocus>(MeasureFocus.None)
+        private set
+
+    /** True while points are being placed for a new distance. */
+    var drawing by mutableStateOf(false)
+        private set
+
     /**
      * The first end of a measurement being drawn, waiting for its partner.
      *
@@ -273,6 +304,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         private set
 
     /**
+     * A measurement just drawn and not yet accepted.
+     *
+     * Nothing else can be started while one is sitting here. Drawing a second distance
+     * the moment the first lands is how a plan quietly fills up with lines nobody meant
+     * to keep — and it is the same fault as the door added seven times, which was also a
+     * control that acted without ever asking whether the last one was wanted.
+     */
+    var unconfirmed by mutableStateOf<Long?>(null)
+        private set
+
+    /** What the last placed end was straightened onto, for the banner to report. */
+    var lastStraightening by mutableStateOf<String?>(null)
+        private set
+
+    /**
      * Named `selectMode` rather than `setMode`, which would clash with the property's own
      * generated setter on the JVM. `CaptureViewModel.selectMode` has the same name for the
      * same reason.
@@ -280,29 +326,66 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun selectMode(next: EditorMode) {
         if (next == mode) return
         mode = next
-        pendingEnd = null
-        lastStraightening = null
+        resetMeasuring()
         selection = Selection.None
     }
 
-    fun cancelMeasuring() {
+    private fun resetMeasuring() {
+        focus = MeasureFocus.None
+        drawing = false
         pendingEnd = null
-        mode = EditorMode.SELECT
+        unconfirmed = null
+        lastStraightening = null
     }
 
-    /** Drops the half-placed end without leaving the mode, for a mis-tap. */
+    fun focusOn(next: MeasureFocus) {
+        if (drawing) return
+        focus = next
+    }
+
+    /** Begin placing points. Refused until the last measurement has been accepted. */
+    fun beginDrawing() {
+        if (unconfirmed != null) {
+            message = "Keep or discard the last measurement first"
+            return
+        }
+        drawing = true
+        pendingEnd = null
+        lastStraightening = null
+        focus = MeasureFocus.None
+    }
+
+    fun cancelDrawing() {
+        drawing = false
+        pendingEnd = null
+        lastStraightening = null
+    }
+
+    /** Drops the half-placed end without leaving the tool, for a mis-tap. */
     fun clearPendingEnd() {
         pendingEnd = null
         lastStraightening = null
     }
 
+    fun keepMeasurement() {
+        unconfirmed = null
+    }
+
+    fun discardMeasurement() {
+        val id = unconfirmed ?: return
+        unconfirmed = null
+        focus = MeasureFocus.None
+        viewModelScope.launch { repository.deletePlanMeasurement(id) }
+    }
+
     /**
-     * A tap while measuring: the first places an end, the second completes and saves.
+     * A tap while drawing: the first places an end, the second completes and saves.
      *
-     * Saved immediately, like everything else in this app, and then selected so the value
-     * and its tolerance are on screen without a further tap.
+     * Saved immediately, like everything else here, then held for confirmation so the
+     * user reads the number they just drew before anything else can be drawn.
      */
     fun tapWhileMeasuring(point: Vec2, reach: Double) {
+        if (!drawing) return
         val rooms = project.value?.snapRooms.orEmpty()
 
         val first = pendingEnd
@@ -328,10 +411,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         pendingEnd = null
+        drawing = false
         val projectId = projectId
         viewModelScope.launch {
             val id = repository.savePlanMeasurement(projectId, first.anchor, placed.anchor)
-            selection = Selection.PlanMeasurementSelection(id)
+            unconfirmed = id
+            focus = MeasureFocus.Custom(id)
         }
     }
 
@@ -369,10 +454,6 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         return to.copy(anchor = PlanAnchor.Free(result.position), position = result.position)
     }
 
-    /** What the last placed end was straightened onto, for the banner to report. */
-    var lastStraightening by mutableStateOf<String?>(null)
-        private set
-
     private fun wallDirectionOf(point: ResolvedPoint): Vec2? {
         val anchor = point.anchor as? PlanAnchor.Wall ?: return null
         val room = project.value?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
@@ -395,6 +476,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun dimensionChains(): List<DimensionChain> =
         DimensionChains.chains(project.value?.rooms.orEmpty().map { it.outline })
+
+    /** The length the focused dimension is reporting, if one is focused. */
+    fun focusedDimensionLength(): Double? {
+        val target = focus as? MeasureFocus.Dimension ?: return null
+        val chain = dimensionChains().getOrNull(target.chain) ?: return null
+        return if (target.isOverall) chain.overall else chain.segments.getOrNull(target.segment)?.length
+    }
 
     fun planMeasurementById(id: Long): SavedPlanMeasurement? =
         project.value?.planMeasurements?.firstOrNull { it.id == id }

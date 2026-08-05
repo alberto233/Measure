@@ -165,7 +165,7 @@ internal fun measurementLabels(
 }
 
 /**
- * Distances drawn on the plan.
+ * The one distance being read, if it is a drawn one.
  *
  * Marked with a tilde. These are consequences of the plan rather than observations of the
  * room, and the difference has to be visible on the drawing itself and not only in a
@@ -176,81 +176,80 @@ internal fun planMeasurementLabels(
     planMeasurements: List<SavedPlanMeasurement>,
     camera: PlanCamera,
     size: IntSize,
-    selection: Selection,
+    measuring: Boolean,
+    focus: MeasureFocus,
     formatLength: (Double) -> String,
 ): List<PlanLabel> = buildList {
-    if (size == IntSize.Zero) return@buildList
+    if (size == IntSize.Zero || !measuring) return@buildList
+    val active = focus as? MeasureFocus.Custom ?: return@buildList
 
-    planMeasurements.forEach { saved ->
-        val measurement = saved.measurement ?: return@forEach
-        val midpoint = (measurement.from.position + measurement.to.position) * 0.5
-        val screen = camera.toScreen(midpoint, size)
-        val selected = selection == Selection.PlanMeasurementSelection(saved.id)
+    val saved = planMeasurements.firstOrNull { it.id == active.id } ?: return@buildList
+    val measurement = saved.measurement ?: return@buildList
+    val screen = camera.toScreen((measurement.from.position + measurement.to.position) * 0.5, size)
 
-        add(
-            PlanLabel(
-                text = "~ ${formatLength(measurement.length)}",
-                x = screen.x,
-                y = screen.y - PLAN_MEASUREMENT_LABEL_LIFT_PX,
-                colour = if (selected) MeasureColours.Sampling else MeasureColours.Warning,
-                bold = selected,
-            ),
-        )
-    }
+    add(
+        PlanLabel(
+            text = "~ ${formatLength(measurement.length)}",
+            x = screen.x,
+            y = screen.y - PLAN_MEASUREMENT_LABEL_LIFT_PX,
+            colour = MeasureColours.Sampling,
+            bold = true,
+        ),
+    )
 }
 
 /** Clear of the line itself, which the label would otherwise sit exactly on top of. */
 private const val PLAN_MEASUREMENT_LABEL_LIFT_PX = 16f
 
 /**
- * The numbers on a dimension string: each run, and the overall beneath them.
+ * The number on the one dimension run being read.
  *
- * Placed in pixels rather than metres, like the string itself, so they hold their distance
- * from the drawing at every zoom. A run whose label would be wider than the run is skipped
- * — the tick marks still show the break, and a number lying across its neighbours is worse
- * than a number missing.
+ * Nothing is labelled until it is asked for. A plan carrying every dimension it could is
+ * a drawing nobody reads — the numbers collide with each other and with the geometry, and
+ * the one being looked for is buried among a dozen that are not. The lines and ticks stay
+ * drawn, because they cost nothing to look past and they are what there is to aim at.
  */
 internal fun dimensionLabels(
     chains: List<DimensionChain>,
     camera: PlanCamera,
     size: IntSize,
+    focus: MeasureFocus,
     formatLength: (Double) -> String,
 ): List<PlanLabel> = buildList {
     if (size == IntSize.Zero) return@buildList
+    val target = focus as? MeasureFocus.Dimension ?: return@buildList
+    val chain = chains.getOrNull(target.chain) ?: return@buildList
+    if (chain.ticks.size < 2) return@buildList
 
-    chains.forEach { chain ->
-        if (chain.ticks.size < 2) return@forEach
-        val outwardX = -chain.normal.x.toFloat()
-        val outwardY = chain.normal.y.toFloat()
+    val outwardX = -chain.normal.x.toFloat()
+    val outwardY = chain.normal.y.toFloat()
 
-        fun place(along: Double, offset: Float): Pair<Float, Float> {
-            val anchor = camera.toScreen(chain.pointAt(along), size)
-            return anchor.x + outwardX * offset to anchor.y + outwardY * offset
-        }
-
-        chain.segments.forEach { segment ->
-            val widthPx = segment.length / camera.metresPerPixel
-            if (widthPx < MINIMUM_DIMENSION_LABEL_PX) return@forEach
-            val (x, y) = place(segment.midpoint, DIMENSION_RUN_LABEL_OFFSET_PX)
-            add(PlanLabel(formatLength(segment.length), x, y, MeasureColours.OnScrim))
-        }
-
-        if (chain.segments.size > 1) {
-            val (x, y) = place(
-                (chain.ticks.first() + chain.ticks.last()) / 2.0,
-                DIMENSION_OVERALL_LABEL_OFFSET_PX,
-            )
-            add(PlanLabel(formatLength(chain.overall), x, y, MeasureColours.OnScrim, bold = true))
-        }
+    val (along, length, offset) = if (target.isOverall) {
+        Triple(
+            (chain.ticks.first() + chain.ticks.last()) / 2.0,
+            chain.overall,
+            DIMENSION_OVERALL_LABEL_OFFSET_PX,
+        )
+    } else {
+        val segment = chain.segments.getOrNull(target.segment) ?: return@buildList
+        Triple(segment.midpoint, segment.length, DIMENSION_RUN_LABEL_OFFSET_PX)
     }
+
+    val anchor = camera.toScreen(chain.pointAt(along), size)
+    add(
+        PlanLabel(
+            text = formatLength(length),
+            x = anchor.x + outwardX * offset,
+            y = anchor.y + outwardY * offset,
+            colour = MeasureColours.Sampling,
+            bold = true,
+        ),
+    )
 }
 
 /** Matched to the dimension lines in PlanCanvas, which these sit on. */
 private const val DIMENSION_RUN_LABEL_OFFSET_PX = 46f
 private const val DIMENSION_OVERALL_LABEL_OFFSET_PX = 92f
-
-/** Narrower than this and the label is wider than the run it belongs to. */
-private const val MINIMUM_DIMENSION_LABEL_PX = 44.0
 
 /** Walls shorter than this get no label; it would be wider than the wall. */
 private const val MINIMUM_LABELLED_METRES = 0.25

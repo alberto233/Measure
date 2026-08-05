@@ -113,11 +113,14 @@ internal fun PlanCanvas(
     dragging: EditorViewModel.DragState?,
     /** Non-null while measuring: the mode, and the first end if one is down. */
     measuring: Boolean,
+    drawing: Boolean,
+    focus: MeasureFocus,
     pendingEnd: ResolvedPoint?,
     /** Drawn only while measuring, which is when they are what was asked for. */
     dimensionChains: List<DimensionChain>,
     formatLength: (Double) -> String,
     onSelect: (Selection) -> Unit,
+    onFocus: (MeasureFocus) -> Unit,
     onMeasureTap: (point: Vec2, reach: Double) -> Unit,
     onBeginDrag: (roomId: Long, index: Int, position: Vec2) -> Unit,
     onDrag: (Vec2) -> Unit,
@@ -144,6 +147,10 @@ internal fun PlanCanvas(
 
     val touchSlopMetres = { camera.metresPerPixel * TOUCH_SLOP_PX }
 
+    // How far a guide has to run to cross the whole plan, in metres. Computed from the
+    // rooms alone so a stray measurement cannot stretch it across the screen.
+    val planBounds = rooms.flatMap { it.outline }
+
     Canvas(
         modifier
             .onSizeChanged { size = it }
@@ -159,13 +166,26 @@ internal fun PlanCanvas(
                     )
                 }
             }
-            .pointerInput(rooms, camera, measuring) {
+            .pointerInput(rooms, camera, measuring, drawing) {
                 detectTapGestures { offset ->
-                    val plan = camera.toPlan(offset, size)
-                    if (measuring) {
-                        onMeasureTap(plan, touchSlopMetres())
-                    } else {
-                        onSelect(hitTest(rooms, measurements, planMeasurements, plan, touchSlopMetres()))
+                    when {
+                        // Placing points is a deliberate sub-mode, so a tap here can only
+                        // mean one thing and never has to be guessed at.
+                        measuring && drawing ->
+                            onMeasureTap(camera.toPlan(offset, size), touchSlopMetres())
+
+                        // Otherwise a tap in the measure view asks to *read* something.
+                        // Dimension runs are tested first because they lie outside the
+                        // plan, where nothing else is.
+                        measuring -> onFocus(
+                            hitDimension(dimensionChains, camera, size, offset)
+                                ?: hitPlanMeasurement(planMeasurements, camera, size, offset)
+                                ?: MeasureFocus.None,
+                        )
+
+                        else -> onSelect(
+                            hitTest(rooms, measurements, camera.toPlan(offset, size), touchSlopMetres()),
+                        )
                     }
                 }
             }
@@ -288,28 +308,40 @@ internal fun PlanCanvas(
 
         // Distances drawn on the plan, over the rooms because they are usually measured
         // *to* a wall and would otherwise be hidden by it.
-        planMeasurements.forEach { saved ->
-            val measurement = saved.measurement ?: return@forEach
-            val selected = selection == Selection.PlanMeasurementSelection(saved.id)
-            val from = camera.toScreen(measurement.from.position, size)
-            val to = camera.toScreen(measurement.to.position, size)
-            val colour = if (selected) MeasureColours.Sampling else MeasureColours.Warning
+        // Only in the measure view. On the plan itself these are annotations competing
+        // with the drawing; here they are the subject.
+        if (measuring) {
+            planMeasurements.forEach { saved ->
+                val measurement = saved.measurement ?: return@forEach
+                val active = focus == MeasureFocus.Custom(saved.id)
+                val from = camera.toScreen(measurement.from.position, size)
+                val to = camera.toScreen(measurement.to.position, size)
+                val colour = if (active) MeasureColours.Sampling else MeasureColours.Warning
 
-            drawLine(
-                color = colour,
-                start = from,
-                end = to,
-                strokeWidth = if (selected) 5f else 3f,
-            )
-            drawEndMark(from, measurement.from.kind, colour, selected)
-            drawEndMark(to, measurement.to.kind, colour, selected)
+                drawLine(
+                    color = colour.copy(alpha = if (active) 1f else 0.55f),
+                    start = from,
+                    end = to,
+                    strokeWidth = if (active) 5f else 3f,
+                )
+                drawEndMark(from, measurement.from.kind, colour, active)
+                drawEndMark(to, measurement.to.kind, colour, active)
+            }
         }
 
         // Dimension strings, drawn outside the plan in the way a drawing does it: the
         // overall span with the runs between corners beneath, on witness lines clear of
         // the geometry. Outside rather than over, so the plan stays readable.
-        dimensionChains.forEach { chain ->
-            drawDimensionChain(chain, camera, size)
+        dimensionChains.forEachIndexed { index, chain ->
+            drawDimensionChain(chain, camera, size, focus.runIn(index))
+        }
+        // The guide: the focused run projected back across the plan, so it is obvious
+        // which stretch of building the number belongs to. This is what an architect does
+        // with a straightedge when checking a dimension against the drawing.
+        (focus as? MeasureFocus.Dimension)?.let { target ->
+            dimensionChains.getOrNull(target.chain)?.let { chain ->
+                drawDimensionGuide(chain, target, camera, size, planBounds)
+            }
         }
 
         // The half-placed end, while measuring. Big, and marked with what it caught, so a
@@ -326,8 +358,8 @@ internal fun PlanCanvas(
     PlanLabels(
         wallLabels(rooms, camera, size, dragging, selection, formatLength) +
             measurementLabels(measurements, camera, size, selection, formatLength) +
-            planMeasurementLabels(planMeasurements, camera, size, selection, formatLength) +
-            dimensionLabels(dimensionChains, camera, size, formatLength),
+            planMeasurementLabels(planMeasurements, camera, size, measuring, focus, formatLength) +
+            dimensionLabels(dimensionChains, camera, size, focus, formatLength),
     )
 }
 
@@ -417,7 +449,13 @@ private fun DrawScope.drawOpening(
  * annotation, not geometry — it should stand the same distance clear of the drawing and
  * carry the same tick size however far the plan is zoomed, exactly as it would on paper.
  */
-private fun DrawScope.drawDimensionChain(chain: DimensionChain, camera: PlanCamera, size: IntSize) {
+private fun DrawScope.drawDimensionChain(
+    chain: DimensionChain,
+    camera: PlanCamera,
+    size: IntSize,
+    /** The run of this chain being read, if any: null, a segment index, or OVERALL. */
+    activeRun: Int?,
+) {
     if (chain.ticks.size < 2) return
 
     // Plan +y is "away" and screen +y is down, so the normal flips on the way to pixels.
@@ -450,26 +488,142 @@ private fun DrawScope.drawDimensionChain(chain: DimensionChain, camera: PlanCame
         if (length < 1f) Offset(1f, 0f) else Offset(it.x / length, it.y / length)
     }
 
-    // The runs between corners.
-    drawLine(
-        color = MeasureColours.OnScrim,
-        start = ends.first() + runLine,
-        end = ends.last() + runLine,
-        strokeWidth = 1.5f,
-    )
+    // The runs between corners, each drawn separately so the one being read can be picked
+    // out. Unread runs are quiet: the lines are there to be aimed at, not to be studied.
+    chain.segments.forEachIndexed { index, _ ->
+        val active = activeRun == index
+        drawLine(
+            color = if (active) MeasureColours.Sampling else MeasureColours.OnScrimMuted,
+            start = ends[index] + runLine,
+            end = ends[index + 1] + runLine,
+            strokeWidth = if (active) 3f else 1.5f,
+        )
+    }
     ends.forEach { tick(it + runLine, direction) }
 
     // And the overall, further out. Only when it says something the runs do not.
     if (chain.segments.size > 1) {
+        val active = activeRun == MeasureFocus.Dimension.OVERALL
         drawLine(
-            color = MeasureColours.OnScrim,
+            color = if (active) MeasureColours.Sampling else MeasureColours.OnScrimMuted,
             start = ends.first() + overallLine,
             end = ends.last() + overallLine,
-            strokeWidth = 1.5f,
+            strokeWidth = if (active) 3f else 1.5f,
         )
         tick(ends.first() + overallLine, direction)
         tick(ends.last() + overallLine, direction)
     }
+}
+
+/**
+ * Projects the run being read back across the plan.
+ *
+ * A dimension sitting in the margin says how long something is without saying *which*
+ * something. Two dashed lines at the run's ends, carried across the drawing, answer that
+ * without a word — and they are the only thing on screen besides the number, which is the
+ * point of showing one at a time.
+ */
+private fun DrawScope.drawDimensionGuide(
+    chain: DimensionChain,
+    target: MeasureFocus.Dimension,
+    camera: PlanCamera,
+    size: IntSize,
+    planPoints: List<Vec2>,
+) {
+    if (planPoints.isEmpty()) return
+
+    val (fromTick, toTick) = if (target.isOverall) {
+        chain.ticks.first() to chain.ticks.last()
+    } else {
+        val segment = chain.segments.getOrNull(target.segment) ?: return
+        segment.from to segment.to
+    }
+
+    // How far the plan reaches across the guide's direction, so the line spans it exactly
+    // rather than being given an arbitrary length that is wrong at some zoom.
+    val depths = planPoints.map { it dot chain.normal }
+    val near = depths.min()
+    val far = depths.max()
+
+    listOf(fromTick, toTick).forEach { along ->
+        val start = camera.toScreen(chain.direction * along + chain.normal * near, size)
+        val end = camera.toScreen(chain.direction * along + chain.normal * far, size)
+        drawLine(
+            color = MeasureColours.Sampling.copy(alpha = 0.55f),
+            start = start,
+            end = end,
+            strokeWidth = 2f,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)),
+        )
+    }
+}
+
+/** Which run of chain [index] is being read, if this focus is on that chain at all. */
+internal fun MeasureFocus.runIn(index: Int): Int? =
+    (this as? MeasureFocus.Dimension)?.takeIf { it.chain == index }?.segment
+
+/**
+ * Which dimension run a tap landed on, tested in pixels.
+ *
+ * Pixels rather than metres because a dimension string is annotation: it stands the same
+ * distance off the drawing however far the plan is zoomed, so where it *is* is a screen
+ * question and asking it in metres would make the target move with the zoom.
+ */
+private fun hitDimension(
+    chains: List<DimensionChain>,
+    camera: PlanCamera,
+    size: IntSize,
+    tap: Offset,
+): MeasureFocus.Dimension? {
+    chains.forEachIndexed { chainIndex, chain ->
+        if (chain.ticks.size < 2) return@forEachIndexed
+        val outward = Offset(-chain.normal.x.toFloat(), chain.normal.y.toFloat())
+        val ends = chain.ticks.map { camera.toScreen(chain.pointAt(it), size) }
+
+        chain.segments.indices.forEach { index ->
+            val from = ends[index] + outward * DIMENSION_RUN_OFFSET_PX
+            val to = ends[index + 1] + outward * DIMENSION_RUN_OFFSET_PX
+            if (distanceToSegmentPx(from, to, tap) <= DIMENSION_TOUCH_SLOP_PX) {
+                return MeasureFocus.Dimension(chainIndex, index)
+            }
+        }
+
+        if (chain.segments.size > 1) {
+            val from = ends.first() + outward * DIMENSION_OVERALL_OFFSET_PX
+            val to = ends.last() + outward * DIMENSION_OVERALL_OFFSET_PX
+            if (distanceToSegmentPx(from, to, tap) <= DIMENSION_TOUCH_SLOP_PX) {
+                return MeasureFocus.Dimension(chainIndex, MeasureFocus.Dimension.OVERALL)
+            }
+        }
+    }
+    return null
+}
+
+private fun hitPlanMeasurement(
+    planMeasurements: List<SavedPlanMeasurement>,
+    camera: PlanCamera,
+    size: IntSize,
+    tap: Offset,
+): MeasureFocus.Custom? {
+    planMeasurements.forEach { saved ->
+        val measurement = saved.measurement ?: return@forEach
+        val from = camera.toScreen(measurement.from.position, size)
+        val to = camera.toScreen(measurement.to.position, size)
+        if (distanceToSegmentPx(from, to, tap) <= DIMENSION_TOUCH_SLOP_PX) {
+            return MeasureFocus.Custom(saved.id)
+        }
+    }
+    return null
+}
+
+private fun distanceToSegmentPx(from: Offset, to: Offset, point: Offset): Float {
+    val span = to - from
+    val lengthSquared = span.x * span.x + span.y * span.y
+    if (lengthSquared < 1e-6f) return hypot(point.x - from.x, point.y - from.y)
+    val t = (((point - from).x * span.x + (point - from).y * span.y) / lengthSquared)
+        .coerceIn(0f, 1f)
+    val nearest = from + span * t
+    return hypot(point.x - nearest.x, point.y - nearest.y)
 }
 
 /**
@@ -543,7 +697,6 @@ private fun Selection.roomId(): Long? = when (this) {
     is Selection.Wall -> roomId
     is Selection.Corner -> roomId
     is Selection.Measurement -> null
-    is Selection.PlanMeasurementSelection -> null
     is Selection.Room -> roomId
     Selection.None -> null
 }
@@ -558,23 +711,9 @@ private fun Selection.roomId(): Long? = when (this) {
 private fun hitTest(
     rooms: List<SavedRoom>,
     measurements: List<SavedMeasurement>,
-    planMeasurements: List<SavedPlanMeasurement>,
     point: Vec2,
     reach: Double,
 ): Selection {
-    // Plan measurements are checked before room geometry, unlike everything else, because
-    // they lie *on* the walls and corners they were drawn to. Any other order would make a
-    // measurement to a corner impossible to select afterwards.
-    planMeasurements.forEach { saved ->
-        val measurement = saved.measurement ?: return@forEach
-        val distance = Segments.distanceToSegment(
-            measurement.from.position,
-            measurement.to.position,
-            point,
-        )
-        if (distance <= reach) return Selection.PlanMeasurementSelection(saved.id)
-    }
-
     findCorner(rooms, point, reach)?.let { (roomId, index) -> return Selection.Corner(roomId, index) }
 
     rooms.forEach { room ->
@@ -633,3 +772,6 @@ private const val DIMENSION_WITNESS_GAP_PX = 6f
 private const val DIMENSION_WITNESS_OVERRUN_PX = 10f
 
 private const val DIMENSION_TICK_PX = 5f
+
+/** A dimension line is thin; the target around it is not. */
+private const val DIMENSION_TOUCH_SLOP_PX = 26f

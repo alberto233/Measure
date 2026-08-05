@@ -118,7 +118,17 @@ Two design decisions carry the weight:
   applied even between two corners of one room. When either end sits on a corner the
   rectilinear solve moved, the panel says that too.
 
-**Field tested once, and it found the flaw in the idea.** Tapping two points accurately
+**Field tested twice.** The second session reshaped the view around one principle: show
+one number at a time, and only when asked. Dimension lines and ticks are always drawn
+because they cost nothing to look past and are what there is to aim at; no number appears
+until a run is tapped, and tapping one projects dashed guides back across the plan so it
+is obvious which stretch of building it covers. Distances the user draws are visible only
+in this view, not on the plan, and drawing a new one is a deliberate `+ Distance` step
+that is refused until the previous one has been kept or discarded — the same fault as the
+door added seven times, which was also a control that acted without asking whether the
+last one was wanted.
+
+**Field tested once before that, and it found the flaw in the original idea.** Tapping two points accurately
 enough to get a *straight* line is beyond a finger on a phone-sized plan: measuring a bed
 to a wall produced a line a few degrees off perpendicular, which is not a rougher version
 of that distance but a measurement of something else, and it always reads long. Two

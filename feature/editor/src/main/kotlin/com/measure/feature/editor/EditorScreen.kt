@@ -76,6 +76,8 @@ fun EditorScreen(
             selection = viewModel.selection,
             dragging = viewModel.dragging,
             measuring = viewModel.mode == EditorMode.MEASURE,
+            drawing = viewModel.drawing,
+            focus = viewModel.focus,
             pendingEnd = viewModel.pendingEnd,
             dimensionChains = if (viewModel.mode == EditorMode.MEASURE) {
                 viewModel.dimensionChains()
@@ -84,6 +86,7 @@ fun EditorScreen(
             },
             formatLength = viewModel::formatLength,
             onSelect = viewModel::select,
+            onFocus = viewModel::focusOn,
             onMeasureTap = viewModel::tapWhileMeasuring,
             onBeginDrag = viewModel::beginDrag,
             onDrag = viewModel::updateDrag,
@@ -118,7 +121,12 @@ fun EditorScreen(
 
             // The panel is the only thing that must clear the keyboard: the plan behind it
             // should stay where it is rather than being squashed into a letterbox.
-            SelectionPanel(viewModel, Modifier.align(Alignment.BottomCenter).imePadding())
+            val panelModifier = Modifier.align(Alignment.BottomCenter).imePadding()
+            if (viewModel.mode == EditorMode.MEASURE) {
+                MeasurePanel(viewModel, panelModifier)
+            } else {
+                SelectionPanel(viewModel, panelModifier)
+            }
 
             viewModel.message?.let { text ->
                 LaunchedEffect(text) {
@@ -195,16 +203,17 @@ private fun TopBar(
 }
 
 /**
- * The state of a measurement being drawn, stated in words while it is being drawn.
+ * What the measure view is doing, and the one control that changes it.
  *
- * On a touch screen there is no hover, so a tap is the first moment anything can be said
- * about where a point landed — and the second tap commits a number built on the first.
- * This is where the user finds out that "corner" meant corner 2 of Room 1, in time to
- * move it.
+ * Reading and drawing are separate states with separate affordances, so a tap on the plan
+ * never has to be guessed at: while reading it selects something to read, while drawing it
+ * places a point, and the banner says which. The alternative — one tap meaning two things
+ * depending on invisible state — is the shape of every interaction fault this app has hit.
  */
 @Composable
 private fun MeasuringBanner(viewModel: EditorViewModel) {
     val pending = viewModel.pendingEnd
+    val drawing = viewModel.drawing
 
     Row(
         Modifier
@@ -218,7 +227,11 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                text = if (pending == null) "Tap the first point" else "Tap the second point",
+                text = when {
+                    drawing && pending == null -> "Tap the first point"
+                    drawing -> "Tap the second point"
+                    else -> "Tap a dimension to read it"
+                },
                 color = MeasureColours.OnScrim,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -226,24 +239,34 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
             Text(
                 text = when {
                     pending != null -> "From ${pending.description}"
-                    // The dimensions are the answer for most people, so the banner points
-                    // at them first rather than at the tool they may not need.
-                    else -> "Overall sizes are shown around the plan · tap for anything else"
+                    drawing -> "Corners and walls pull the point onto them"
+                    else -> "Sizes are marked around the plan"
                 },
                 color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Ready,
                 fontSize = 12.sp,
             )
             viewModel.lastStraightening?.let { straightened ->
-                Text(
-                    text = "Last point pulled $straightened",
-                    color = MeasureColours.Ready,
-                    fontSize = 11.sp,
-                )
+                Text("Pulled $straightened", color = MeasureColours.Ready, fontSize = 11.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (pending != null) Pill("Redo point", onClick = viewModel::clearPendingEnd)
-            Pill("Done", onClick = viewModel::cancelMeasuring)
+            when {
+                pending != null -> {
+                    Pill("Redo point", onClick = viewModel::clearPendingEnd)
+                    Pill("Cancel", onClick = viewModel::cancelDrawing)
+                }
+
+                drawing -> Pill("Cancel", onClick = viewModel::cancelDrawing)
+
+                // Refused rather than hidden while a measurement is unconfirmed, so the
+                // reason is visible instead of the control merely being absent.
+                else -> Pill(
+                    label = "+ Distance",
+                    enabled = viewModel.unconfirmed == null,
+                    highlighted = true,
+                    onClick = viewModel::beginDrawing,
+                )
+            }
         }
     }
 }
@@ -295,7 +318,7 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
                 MeasurementList(viewModel, measurements)
                 Text(
                     text = "Pinch to zoom · tap a wall to set its true length · " +
-                        "long-press a corner to move it · Measure for a distance across the plan",
+                        "long-press a corner to move it · Measure for sizes and distances",
                     color = MeasureColours.OnScrimMuted,
                     fontSize = 13.sp,
                 )
@@ -304,7 +327,6 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
             is Selection.Corner -> CornerPanel(viewModel, selection)
             is Selection.Wall -> WallPanel(viewModel, selection)
             is Selection.Measurement -> MeasurementPanel(viewModel, selection)
-            is Selection.PlanMeasurementSelection -> PlanMeasurementPanel(viewModel, selection)
             is Selection.Room -> RoomPanel(viewModel, selection)
         }
     }
@@ -461,67 +483,106 @@ private fun MeasurementList(
 }
 
 /**
- * A distance read off the plan — docs/PRODUCT_PLAN.md M12.
+ * The measure view's panel: whatever one thing is being read, or nothing.
  *
- * Everything here exists to stop this number being mistaken for a measured one. It says
- * where each end is attached, so "1.24 m" is visibly a distance between a corner and a
- * point somebody put there by finger rather than two surveyed positions. It carries its
- * own tolerance, which is dominated by the free end when there is one. And it says when
- * the geometry underneath it was squared up by the solver, because a span across a
- * rectilinear-snapped room reflects the model as much as the room.
+ * Deliberately not the editing panel. This view exists to answer a question, and mixing
+ * in controls that reshape the room would invite an edit while the user is reading — the
+ * two are different jobs and the screen says which one it is doing.
  */
 @Composable
-private fun PlanMeasurementPanel(viewModel: EditorViewModel, selection: Selection.PlanMeasurementSelection) {
-    val saved = viewModel.planMeasurementById(selection.id) ?: return
+private fun MeasurePanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MeasureColours.Panel)
+            .heightIn(max = PANEL_MAX_HEIGHT)
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        when (val focus = viewModel.focus) {
+            MeasureFocus.None -> Text(
+                text = "Tap any dimension line for its size · " +
+                    "+ Distance measures between two points you choose",
+                color = MeasureColours.OnScrimMuted,
+                fontSize = 13.sp,
+            )
+
+            is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
+            is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+        }
+    }
+}
+
+@Composable
+private fun DimensionReadout(viewModel: EditorViewModel, focus: MeasureFocus.Dimension) {
+    val length = viewModel.focusedDimensionLength() ?: return
+
+    Text(
+        text = viewModel.formatLength(length),
+        color = MeasureColours.OnScrim,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        text = if (focus.isOverall) "Overall, across the whole plan" else "Between the marked corners",
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
+    Text(
+        text = "The dashed lines show which part of the plan this covers.",
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
+}
+
+/**
+ * A distance the user drew, and — while it is new — whether they want to keep it.
+ *
+ * Nothing else can be drawn until this is answered. Letting a second measurement start
+ * the instant the first lands is how a plan quietly fills with lines nobody meant to
+ * keep, which is the same fault as the door that got added seven times.
+ */
+@Composable
+private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocus.Custom) {
+    val saved = viewModel.planMeasurementById(focus.id) ?: return
     val measurement = saved.measurement
+    val unconfirmed = viewModel.unconfirmed == focus.id
 
     if (measurement == null) {
         Text(
-            text = "This measurement was attached to geometry that has gone",
+            text = "This distance was attached to geometry that has gone",
             color = MeasureColours.Warning,
             fontSize = 14.sp,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
-            Pill("Done", onClick = viewModel::clearSelection)
         }
         return
     }
 
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column {
-            Text(
-                text = com.measure.core.units.LengthFormatter.formatWithUncertainty(
-                    com.measure.core.units.Length(measurement.length),
-                    com.measure.core.units.Length(measurement.sigma),
-                    viewModel.unitSystem(),
-                ),
-                color = MeasureColours.OnScrim,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "Off the plan, not measured in the room",
-                color = MeasureColours.Warning,
-                fontSize = 12.sp,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
-            Pill("Done", onClick = viewModel::clearSelection)
-        }
-    }
-
+    Text(
+        text = com.measure.core.units.LengthFormatter.formatWithUncertainty(
+            com.measure.core.units.Length(measurement.length),
+            com.measure.core.units.Length(measurement.sigma),
+            viewModel.unitSystem(),
+        ),
+        color = MeasureColours.OnScrim,
+        fontSize = 24.sp,
+        fontWeight = FontWeight.Bold,
+    )
+    Text(
+        text = "Off the plan, not measured in the room",
+        color = MeasureColours.Warning,
+        fontSize = 12.sp,
+    )
     Text(
         text = "${measurement.from.description} → ${measurement.to.description}",
         color = MeasureColours.OnScrimMuted,
         fontSize = 12.sp,
     )
-
     if (measurement.isModelled) {
         Text(
             text = "One end sits on a corner the solver squared up, so part of this " +
@@ -529,6 +590,15 @@ private fun PlanMeasurementPanel(viewModel: EditorViewModel, selection: Selectio
             color = MeasureColours.OnScrimMuted,
             fontSize = 12.sp,
         )
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (unconfirmed) {
+            Pill("Keep", highlighted = true, onClick = viewModel::keepMeasurement)
+            Pill("Discard", onClick = viewModel::discardMeasurement)
+        } else {
+            Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
+        }
     }
 }
 
