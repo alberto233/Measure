@@ -12,6 +12,20 @@
         android:name="android.hardware.camera.ar"
         android:required="false" />
 
+    <!--
+      Without this, PackageManager.resolveActivity returns null on Android 11 and later
+      whatever is installed, because an app cannot see packages it has not declared an
+      interest in. The share code asks whether anything handles a format's exact type
+      before falling back to a generic one, and that question is meaningless if the
+      answer is always no.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MeasureApp"
         android:allowBackup="true"

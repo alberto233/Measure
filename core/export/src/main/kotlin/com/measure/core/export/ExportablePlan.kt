@@ -1,6 +1,8 @@
 package com.measure.core.export
 
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.plan.DimensionChain
+import com.measure.core.geometry.plan.DimensionChains
 
 /**
  * A plan reduced to what an export needs, and nothing else.
@@ -18,11 +20,26 @@ data class ExportablePlan(
     val rooms: List<ExportableRoom>,
     /** Distances taken in the room with the camera. */
     val measurements: List<ExportableMeasurement> = emptyList(),
+    /** Distances drawn on the plan afterwards. */
+    val distances: List<ExportableDistance> = emptyList(),
     val unitSuffix: String = "m",
 ) {
-    val isEmpty: Boolean get() = rooms.isEmpty() && measurements.isEmpty()
+    val isEmpty: Boolean get() = rooms.isEmpty() && measurements.isEmpty() && distances.isEmpty()
 
-    val allPoints: List<Vec2> get() = rooms.flatMap { it.outline }
+    val allPoints: List<Vec2>
+        get() = rooms.flatMap { it.outline } + distances.flatMap { listOf(it.from, it.to) }
+
+    /**
+     * The dimension strings for the drawing.
+     *
+     * Every run is drawn on an export, unlike in the app, where one is shown at a time and
+     * the rest are bare lines. The difference is deliberate: on screen a number can be
+     * asked for, and a plan carrying all of them at once is unreadable on a phone. On
+     * paper there is nobody to ask, so a drawing that does not carry its dimensions is a
+     * picture of a room rather than a description of one.
+     */
+    val dimensions: List<DimensionChain>
+        get() = DimensionChains.chains(rooms.filter { it.outline.size >= 3 }.map { it.outline })
 
     val totalFloorArea: Double get() = rooms.sumOf { it.floorArea }
 }
@@ -60,6 +77,21 @@ data class ExportableMeasurement(
     val mode: String,
 )
 
+/**
+ * A distance drawn on the plan rather than measured in the room.
+ *
+ * Exported, and marked as derived wherever it appears. It is genuinely useful — it is
+ * usually the "will it fit" answer somebody wanted the drawing for — but it is a
+ * consequence of the plan and not an observation of the room, and a printed drawing is
+ * exactly where that distinction stops being visible unless it is written down.
+ */
+data class ExportableDistance(
+    val from: Vec2,
+    val to: Vec2,
+    val length: Double,
+    val description: String,
+)
+
 /** The formats a plan can leave the app as. */
 enum class ExportFormat(
     val extension: String,
@@ -69,7 +101,10 @@ enum class ExportFormat(
 ) {
     /** First, because it is the one most people mean by "send me the plan". */
     PDF("pdf", "application/pdf", "PDF", "A page to print, email or attach to a quote"),
-    PNG("png", "image/png", "Image", "A picture, for a message or a document"),
+    // Named by its format like the rest. "Image" read as a different kind of thing
+    // beside four formats that name themselves, which is a reason to hesitate over a
+    // choice that should be obvious.
+    PNG("png", "image/png", "PNG image", "A picture, for a message or a document"),
     SVG("svg", "image/svg+xml", "SVG drawing", "A scalable drawing that stays sharp at any size"),
 
     // The registered type is image/vnd.dxf. application/dxf is a common invention and

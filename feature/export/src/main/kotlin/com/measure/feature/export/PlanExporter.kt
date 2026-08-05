@@ -12,6 +12,7 @@ import com.measure.core.data.SavedRoom
 import com.measure.core.export.CsvExporter
 import com.measure.core.export.DxfExporter
 import com.measure.core.export.ExportFormat
+import com.measure.core.export.ExportableDistance
 import com.measure.core.export.ExportableMeasurement
 import com.measure.core.export.ExportableOpening
 import com.measure.core.export.ExportablePlan
@@ -176,6 +177,18 @@ internal fun ProjectDetail.toExportable() = ExportablePlan(
             length = it.length.metres,
             sigma = it.sigma.metres,
             mode = it.mode.label,
+        )
+    },
+    // Distances drawn on the plan were being left out of every export entirely, which
+    // made the files quietly less than what the user had on screen.
+    distances = planMeasurements.mapNotNull { saved ->
+        val measurement = saved.measurement ?: return@mapNotNull null
+        ExportableDistance(
+            from = measurement.from.position,
+            to = measurement.to.position,
+            length = measurement.length,
+            description = saved.label
+                ?: "${measurement.from.description} to ${measurement.to.description}",
         )
     },
 )

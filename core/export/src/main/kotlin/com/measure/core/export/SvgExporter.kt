@@ -21,8 +21,13 @@ object SvgExporter {
     /** Millimetres on the page per metre in the room, at 1:50. */
     private const val MILLIMETRES_PER_METRE = 1000.0
 
-    /** A margin wide enough for the dimension text that sits outside the plan. */
-    private const val MARGIN_MM = 24.0
+    /** A margin wide enough for the dimension strings that sit outside the plan. */
+    private const val MARGIN_MM = 34.0
+
+    /** How far the dimension lines stand off the drawing, in millimetres on the page. */
+    private const val RUN_OFFSET_MM = 9.0
+    private const val OVERALL_OFFSET_MM = 18.0
+    private const val TICK_MM = 1.4
 
     /** Line weights in millimetres, which is how a drawing specifies them. */
     private const val WALL_WEIGHT_MM = 0.6
@@ -101,6 +106,76 @@ object SvgExporter {
                         "text-anchor=\"middle\">${number(room.floorArea)} m²</text>\n",
                 )
                 append("  </g>\n")
+            }
+
+            // Dimension strings. A drawing that does not carry its dimensions is a
+            // picture of a room rather than a description of one, and on paper there is
+            // nobody to tap for the number.
+            plan.dimensions.forEach { chain ->
+                if (chain.ticks.size < 2) return@forEach
+                val outward = -chain.normal
+
+                fun at(along: Double, offset: Double): Pair<Double, Double> {
+                    val point = chain.pointAt(along) + outward * (offset / scale)
+                    return x(point) to y(point)
+                }
+
+                chain.ticks.forEach { tick ->
+                    val (x1, y1) = at(tick, 1.5)
+                    val (x2, y2) = at(tick, OVERALL_OFFSET_MM + 3.0)
+                    append(
+                        "  <line x1=\"${mm(x1)}\" y1=\"${mm(y1)}\" x2=\"${mm(x2)}\" y2=\"${mm(y2)}\" " +
+                            "stroke=\"#999999\" stroke-width=\"${mm(0.15)}\"/>\n",
+                    )
+                    val (tx, ty) = at(tick, RUN_OFFSET_MM)
+                    append(
+                        "  <line x1=\"${mm(tx - TICK_MM)}\" y1=\"${mm(ty - TICK_MM)}\" " +
+                            "x2=\"${mm(tx + TICK_MM)}\" y2=\"${mm(ty + TICK_MM)}\" " +
+                            "stroke=\"#000000\" stroke-width=\"${mm(0.3)}\"/>\n",
+                    )
+                }
+
+                val (runFromX, runFromY) = at(chain.ticks.first(), RUN_OFFSET_MM)
+                val (runToX, runToY) = at(chain.ticks.last(), RUN_OFFSET_MM)
+                append(
+                    "  <line x1=\"${mm(runFromX)}\" y1=\"${mm(runFromY)}\" " +
+                        "x2=\"${mm(runToX)}\" y2=\"${mm(runToY)}\" " +
+                        "stroke=\"#000000\" stroke-width=\"${mm(0.2)}\"/>\n",
+                )
+
+                chain.segments.forEach { segment ->
+                    val (lx, ly) = at(segment.midpoint, RUN_OFFSET_MM + 3.0)
+                    append(
+                        "  <text x=\"${mm(lx)}\" y=\"${mm(ly)}\" font-family=\"sans-serif\" " +
+                            "font-size=\"${mm(TEXT_HEIGHT_MM * 0.7)}\" text-anchor=\"middle\">" +
+                            "${number(segment.length)} m</text>\n",
+                    )
+                }
+
+                if (chain.segments.size > 1) {
+                    val (ox, oy) = at((chain.ticks.first() + chain.ticks.last()) / 2.0, OVERALL_OFFSET_MM + 3.0)
+                    append(
+                        "  <text x=\"${mm(ox)}\" y=\"${mm(oy)}\" font-family=\"sans-serif\" " +
+                            "font-size=\"${mm(TEXT_HEIGHT_MM * 0.8)}\" text-anchor=\"middle\" " +
+                            "font-weight=\"bold\">${number(chain.overall)} m</text>\n",
+                    )
+                }
+            }
+
+            // Distances drawn on the plan, marked so they cannot be mistaken for a wall.
+            plan.distances.forEach { distance ->
+                append(
+                    "  <line x1=\"${mm(x(distance.from))}\" y1=\"${mm(y(distance.from))}\" " +
+                        "x2=\"${mm(x(distance.to))}\" y2=\"${mm(y(distance.to))}\" " +
+                        "stroke=\"#b06000\" stroke-width=\"${mm(0.3)}\" stroke-dasharray=\"2,1.5\"/>\n",
+                )
+                val midX = (x(distance.from) + x(distance.to)) / 2.0
+                val midY = (y(distance.from) + y(distance.to)) / 2.0
+                append(
+                    "  <text x=\"${mm(midX)}\" y=\"${mm(midY - 1.5)}\" font-family=\"sans-serif\" " +
+                        "font-size=\"${mm(TEXT_HEIGHT_MM * 0.7)}\" text-anchor=\"middle\" " +
+                        "fill=\"#b06000\">~ ${number(distance.length)} m</text>\n",
+                )
             }
 
             // The scale, stated. Without it this is a picture rather than a drawing.

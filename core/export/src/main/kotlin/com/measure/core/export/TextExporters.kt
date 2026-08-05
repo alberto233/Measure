@@ -41,6 +41,15 @@ object CsvExporter {
                 append("${field(it.label)},${number(it.length)},${number(it.sigma)},${field(it.mode)}\n")
             }
         }
+
+        // Kept in their own table and labelled as taken off the plan, because a
+        // spreadsheet strips every visual cue that told the user which was which.
+        if (plan.distances.isNotEmpty()) {
+            append("\nDistance off the plan,Length (m)\n")
+            plan.distances.forEach {
+                append("${field(it.description)},${number(it.length)}\n")
+            }
+        }
     }
 
     /**
@@ -114,6 +123,19 @@ object JsonExporter {
             append("\"tolerance\": ${number(measurement.sigma)}, ")
             append("\"mode\": ${string(measurement.mode)}}")
             append(if (index == plan.measurements.lastIndex) "\n" else ",\n")
+        }
+        append("  ],\n")
+        // Separate from "measurements" on purpose. One kind was observed in the room and
+        // the other derived from the drawing, and a reader that could not tell them apart
+        // would be free to treat them as equally good.
+        append("  \"distancesOffThePlan\": [\n")
+        plan.distances.forEachIndexed { index, distance ->
+            append("    {")
+            append("\"description\": ${string(distance.description)}, ")
+            append("\"length\": ${number(distance.length)}, ")
+            append("\"from\": [${number(distance.from.x)}, ${number(distance.from.y)}], ")
+            append("\"to\": [${number(distance.to.x)}, ${number(distance.to.y)}]}")
+            append(if (index == plan.distances.lastIndex) "\n" else ",\n")
         }
         append("  ]\n")
         append("}\n")

@@ -29,8 +29,12 @@ internal object PlanDrawing {
     private val FILL = Color.rgb(242, 242, 242)
     private val MUTED = Color.rgb(110, 110, 110)
 
-    /** A margin in pixels, for the title block and so nothing touches the edge. */
-    private const val MARGIN_FRACTION = 0.08f
+    /** A margin, for the dimension strings, the title block and a little clear air. */
+    private const val MARGIN_FRACTION = 0.13f
+
+    /** How far the dimension lines stand off the drawing, as a share of the margin. */
+    private const val RUN_OFFSET = 0.32f
+    private const val OVERALL_OFFSET = 0.66f
 
     fun draw(canvas: Canvas, plan: ExportablePlan, width: Float, height: Float, unitLabel: String) {
         canvas.drawColor(BACKGROUND)
@@ -138,6 +142,115 @@ internal object PlanDrawing {
             val centre = PlanGeometry.labelPoint(room.outline)
             canvas.drawText(room.name, x(centre), y(centre), label)
             canvas.drawText(areaOf(room, unitLabel), x(centre), y(centre) + bodyText * 1.1f, sublabel)
+            room.ceilingHeight?.let {
+                canvas.drawText(
+                    "${number(it)} m high",
+                    x(centre),
+                    y(centre) + bodyText * 2.0f,
+                    sublabel,
+                )
+            }
+        }
+
+        // Dimension strings. Every run, unlike in the app where one is shown at a time:
+        // on paper there is nobody to tap for the number, so a drawing that does not
+        // carry its dimensions is a picture of a room rather than a description of one.
+        val dimensionLine = Paint().apply {
+            color = WALL
+            style = Paint.Style.STROKE
+            strokeWidth = lineWeight * 0.5f
+            isAntiAlias = true
+        }
+        val witness = Paint().apply {
+            color = MUTED
+            style = Paint.Style.STROKE
+            strokeWidth = lineWeight * 0.3f
+            isAntiAlias = true
+        }
+        val dimensionText = Paint().apply {
+            color = WALL
+            textSize = bodyText * 0.72f
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        plan.dimensions.forEach { chain ->
+            if (chain.ticks.size < 2) return@forEach
+
+            fun at(along: Double, offset: Float): Pair<Float, Float> {
+                val base = chain.pointAt(along)
+                // The normal points into the plan, so the offset goes the other way; the
+                // canvas flip means only the y component changes sign on the way out.
+                val px = x(base) - chain.normal.x.toFloat() * offset
+                val py = y(base) + chain.normal.y.toFloat() * offset
+                return px to py
+            }
+
+            chain.ticks.forEach { tick ->
+                val (x1, y1) = at(tick, margin * 0.06f)
+                val (x2, y2) = at(tick, margin * (OVERALL_OFFSET + 0.1f))
+                canvas.drawLine(x1, y1, x2, y2, witness)
+            }
+
+            val (runFromX, runFromY) = at(chain.ticks.first(), margin * RUN_OFFSET)
+            val (runToX, runToY) = at(chain.ticks.last(), margin * RUN_OFFSET)
+            canvas.drawLine(runFromX, runFromY, runToX, runToY, dimensionLine)
+
+            chain.segments.forEach { segment ->
+                val (lx, ly) = at(segment.midpoint, margin * RUN_OFFSET - bodyText * 0.4f)
+                canvas.drawText("${number(segment.length)} m", lx, ly, dimensionText)
+            }
+
+            if (chain.segments.size > 1) {
+                val (fromX, fromY) = at(chain.ticks.first(), margin * OVERALL_OFFSET)
+                val (toX, toY) = at(chain.ticks.last(), margin * OVERALL_OFFSET)
+                canvas.drawLine(fromX, fromY, toX, toY, dimensionLine)
+
+                val middle = (chain.ticks.first() + chain.ticks.last()) / 2.0
+                val (ox, oy) = at(middle, margin * OVERALL_OFFSET - bodyText * 0.4f)
+                canvas.drawText(
+                    "${number(chain.overall)} m",
+                    ox,
+                    oy,
+                    Paint(dimensionText).apply { isFakeBoldText = true },
+                )
+            }
+        }
+
+        // Distances drawn on the plan, dashed and marked, so they are never mistaken for
+        // a wall or for something measured in the room.
+        if (plan.distances.isNotEmpty()) {
+            val derived = Paint().apply {
+                color = Color.rgb(176, 96, 0)
+                style = Paint.Style.STROKE
+                strokeWidth = lineWeight * 0.8f
+                pathEffect = android.graphics.DashPathEffect(
+                    floatArrayOf(lineWeight * 4f, lineWeight * 3f),
+                    0f,
+                )
+                isAntiAlias = true
+            }
+            val derivedText = Paint().apply {
+                color = Color.rgb(176, 96, 0)
+                textSize = bodyText * 0.72f
+                textAlign = Paint.Align.CENTER
+                isAntiAlias = true
+            }
+            plan.distances.forEach { distance ->
+                canvas.drawLine(
+                    x(distance.from),
+                    y(distance.from),
+                    x(distance.to),
+                    y(distance.to),
+                    derived,
+                )
+                canvas.drawText(
+                    "~ ${number(distance.length)} m",
+                    (x(distance.from) + x(distance.to)) / 2f,
+                    (y(distance.from) + y(distance.to)) / 2f - bodyText * 0.4f,
+                    derivedText,
+                )
+            }
         }
 
         // The title block. A drawing with no name on it is a drawing nobody can file.

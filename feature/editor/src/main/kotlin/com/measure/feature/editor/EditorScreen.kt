@@ -168,7 +168,14 @@ fun EditorScreen(
                         .clip(RoundedCornerShape(12.dp))
                         .background(MeasureColours.Scrim)
                         .padding(horizontal = 16.dp, vertical = 10.dp),
-                    color = MeasureColours.Warning,
+                    // Amber for a refusal, teal for something that worked. Confirming a
+                    // success in the colour used for problems teaches people to read
+                    // every message as a problem, and then to stop reading them.
+                    color = if (viewModel.messageIsWarning) {
+                        MeasureColours.Warning
+                    } else {
+                        MeasureColours.Ready
+                    },
                     fontSize = 14.sp,
                 )
             }

@@ -26,6 +26,9 @@ class ExportersTest {
         name = "Plan 1",
         rooms = listOf(room),
         measurements = listOf(ExportableMeasurement("Ceiling height", 2.44, 0.03, "Plumb")),
+        distances = listOf(
+            ExportableDistance(Vec2(1.0, 0.0), Vec2(1.0, 2.5), 2.5, "wall 1 to the bed"),
+        ),
     )
 
     // --- SVG ---------------------------------------------------------------------------
@@ -284,6 +287,47 @@ class ExportersTest {
         )
         val label = PlanGeometry.labelPoint(ell.outline)
         assertTrue(label.x in 0.0..6.0 && label.y in 0.0..6.0)
+    }
+
+    @Test
+    fun `an exported drawing carries its dimensions`() {
+        // A drawing that does not is a picture of a room rather than a description of
+        // one, and on paper there is nobody to tap for the number.
+        val chains = plan.dimensions
+        assertEquals(2, chains.size)
+        assertEquals(5.0, chains[0].overall, 1e-6)
+
+        val svg = SvgExporter.export(plan)
+        assertTrue(svg.contains(">5 m<"), "the overall width should be written on the drawing")
+        assertTrue(svg.contains(">4 m<"), "and the depth")
+    }
+
+    @Test
+    fun `a distance drawn on the plan reaches every format, marked as derived`() {
+        // It was reaching none of them, which quietly made every file less than what the
+        // user had on screen.
+        assertTrue(SvgExporter.export(plan).contains("~ 2.5 m"))
+        assertTrue(CsvExporter.export(plan).contains("Distance off the plan"))
+        assertTrue(CsvExporter.export(plan).contains("wall 1 to the bed"))
+
+        val json = JsonExporter.export(plan)
+        assertTrue(json.contains("\"distancesOffThePlan\""))
+        assertTrue(json.contains("\"length\": 2.5000"))
+        // Kept apart from the observed measurements, so a reader cannot treat the two as
+        // equally good.
+        assertTrue(json.indexOf("\"measurements\"") < json.indexOf("\"distancesOffThePlan\""))
+        assertEquals(count(json, "{"), count(json, "}"))
+        assertEquals(count(json, "["), count(json, "]"))
+    }
+
+    @Test
+    fun `a distance widens the drawing so it is not cropped out of it`() {
+        // The bounds have to include the distances or one drawn beyond a wall would be
+        // clipped off the edge of the page.
+        val outside = plan.copy(
+            distances = listOf(ExportableDistance(Vec2(0.0, 0.0), Vec2(9.0, 0.0), 9.0, "out")),
+        )
+        assertTrue(outside.allPoints.any { it.x > 5.0 })
     }
 
     @Test
