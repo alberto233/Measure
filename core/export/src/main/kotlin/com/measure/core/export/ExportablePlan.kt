@@ -43,16 +43,22 @@ data class ExportablePlan(
         get() = rooms.flatMap { it.outline } + distances.flatMap { listOf(it.from, it.to) }
 
     /**
-     * The dimension strings for the drawing.
+     * The dimension strings for the drawing, **one set per room**.
      *
      * Every run is drawn on an export, unlike in the app, where one is shown at a time and
      * the rest are bare lines. The difference is deliberate: on screen a number can be
      * asked for, and a plan carrying all of them at once is unreadable on a phone. On
      * paper there is nobody to ask, so a drawing that does not carry its dimensions is a
      * picture of a room rather than a description of one.
+     *
+     * Per room for the same two reasons as on screen — a plan-wide string buries the run
+     * anyone is looking for, and a run spanning two rooms is a distance the app was never
+     * entitled to state. The export matters more, not less: nobody can tap a printed
+     * drawing to ask where a number came from.
      */
     val dimensions: List<DimensionChain>
-        get() = DimensionChains.chains(rooms.filter { it.outline.size >= 3 }.map { it.outline })
+        get() = rooms.filter { it.outline.size >= 3 }
+            .flatMap { DimensionChains.chains(listOf(it.outline)) }
 
     val totalFloorArea: Double get() = rooms.sumOf { it.floorArea }
 

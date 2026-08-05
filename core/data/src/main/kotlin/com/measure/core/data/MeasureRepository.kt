@@ -561,6 +561,47 @@ class MeasureRepository(
         projects.touch(projectId, now())
     }
 
+    /**
+     * Turns a room on the spot, about the centre of what it occupies.
+     *
+     * The other half of arranging a plan by hand, and the half that was missing: a room
+     * arrives at whatever angle the phone was facing when its capture began, and sliding
+     * it around can never correct that. Without this the plan is a puzzle whose pieces do
+     * not turn.
+     *
+     * Like [moveRoom] this is a plain transform with no re-solve, so no wall length can
+     * change while the drawing is being arranged. It is also safe against a *later*
+     * re-solve, which is less obvious and worth stating: `AngleSnapper` estimates each
+     * room's rectilinear frame from that room's own walls rather than from the world axes,
+     * so a rotated room snaps to its new orientation instead of being spun back.
+     */
+    suspend fun rotateRoom(roomId: Long, projectId: Long, radians: Double) {
+        val corners = rooms.cornersFor(roomId)
+        if (corners.size < 3) return
+
+        val pivot = RoomPlacement.centre(corners.map { Vec2(it.x, it.y) })
+        rooms.updateCorners(
+            corners.map { corner ->
+                val solved = RoomPlacement.rotateAbout(Vec2(corner.x, corner.y), radians, pivot)
+                // The observations turn with the solution, about the same pivot. They are
+                // what a re-solve starts from, so leaving them behind would snap the room
+                // back to its capture orientation the first time a wall was locked.
+                val measured = RoomPlacement.rotateAbout(
+                    Vec2(corner.measuredX, corner.measuredY),
+                    radians,
+                    pivot,
+                )
+                corner.copy(
+                    x = solved.x,
+                    y = solved.y,
+                    measuredX = measured.x,
+                    measuredY = measured.y,
+                )
+            },
+        )
+        projects.touch(projectId, now())
+    }
+
     suspend fun deleteMeasurement(measurementId: Long) = measurements.deleteById(measurementId)
 
     // --- distances drawn on the plan ---------------------------------------------------

@@ -24,6 +24,7 @@ import com.measure.core.geometry.plan.DimensionChains
 import com.measure.core.geometry.plan.PlanAnchor
 import com.measure.core.geometry.plan.PlanConstraints
 import com.measure.core.geometry.plan.PreferredDirection
+import com.measure.core.geometry.plan.RoomPlacement
 import com.measure.core.geometry.plan.SnapKind
 import com.measure.core.geometry.plan.PlanMeasurement
 import com.measure.core.geometry.plan.PlanSnapper
@@ -41,6 +42,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** What the editor has selected, which decides what the bottom panel offers. */
 sealed interface Selection {
@@ -290,6 +293,57 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun cancelRoomMove() {
         movingRoom = null
+    }
+
+    /**
+     * Turns a room by a fixed step, for picking which way round it goes.
+     *
+     * Buttons rather than a two-finger twist. The plan already pinches to zoom, and a
+     * gesture that sometimes scales the view and sometimes rotates a room is the same
+     * ambiguity as a tap that sometimes selects and sometimes places a point — which is
+     * the fault this editor has produced more than any other.
+     */
+    fun turnRoom(roomId: Long, degrees: Double) {
+        val room = roomById(roomId) ?: return
+        remember(room)
+        val projectId = projectId
+        viewModelScope.launch {
+            repository.rotateRoom(roomId, projectId, Math.toRadians(degrees))
+            confirm("${room.name} turned ${degrees.roundToInt()}°")
+        }
+    }
+
+    /**
+     * Lines a room's walls up with the grid the rest of the plan is built on.
+     *
+     * One tap for the part of arranging that is mechanical. What is left after it is which
+     * of the four quarter turns is wanted, which is a question about where the door and the
+     * window are and only the user can answer — hence the two turn buttons beside it.
+     */
+    fun squareRoomToPlan(roomId: Long) {
+        val room = roomById(roomId) ?: return
+        val others = project.value?.rooms.orEmpty().filter { it.id != roomId }
+
+        // The grid of everything else, or the world axes when this is the only room and
+        // there is no plan for it to agree with yet.
+        val reference = if (others.isEmpty()) {
+            Vec2(1.0, 0.0)
+        } else {
+            DimensionChains.dominantDirection(others.map { it.outline })
+        }
+
+        val angle = RoomPlacement.squaringAngle(room.outline, reference)
+        if (abs(angle) < MINIMUM_TURN_RADIANS) {
+            confirm("${room.name} is already square to the plan")
+            return
+        }
+
+        remember(room)
+        val projectId = projectId
+        viewModelScope.launch {
+            repository.rotateRoom(roomId, projectId, angle)
+            confirm("${room.name} squared — turned ${Math.toDegrees(angle).roundToInt()}°")
+        }
     }
 
     // --- locked lengths -------------------------------------------------------------
@@ -609,14 +663,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         DimensionChains.dominantDirection(project.value?.rooms.orEmpty().map { it.outline })
 
     /**
-     * The dimension strings for the whole plan — how wide, how deep, and where it steps.
+     * The dimension strings, **one set per room** — how wide, how deep, where it steps.
      *
      * Computed rather than stored, and shown only while measuring: this is what most
      * people opened the plan to find out, and making them tap two points accurately for
      * it was asking for a steady finger to answer a question the geometry already knows.
+     *
+     * Per room rather than per plan, which is not how an architect's drawing does it. Two
+     * reasons, and the second is the one that settles it:
+     *
+     * 1. A plan-wide chain puts every room's corners on one line of ticks, so a flat of
+     *    four rooms produces a string of a dozen runs and the number wanted is buried
+     *    among eleven that are not. That notation assumes a reader who is used to it.
+     * 2. A chain spanning two rooms **measures between them** — and until captures are
+     *    registered against each other, that distance is a layout somebody arranged, not
+     *    something anybody measured. Drawing it in the most authoritative notation on the
+     *    page would undo exactly what recording the capture frame was for.
+     *
+     * The plan-wide overall can come back when it is earned, which means when two rooms
+     * share a wall the app knows about rather than one it drew them next to.
      */
     fun dimensionChains(): List<DimensionChain> =
-        DimensionChains.chains(project.value?.rooms.orEmpty().map { it.outline })
+        project.value?.rooms.orEmpty().flatMap { DimensionChains.chains(listOf(it.outline)) }
 
     /** The length the focused dimension is reporting, if one is focused. */
     fun focusedDimensionLength(): Double? {
@@ -857,5 +925,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
          * cost an undo slot and a confirmation for a change nobody can see.
          */
         const val MINIMUM_MOVE_METRES = 0.01
+
+        /** Below a tenth of a degree a room is already square; saying so beats a no-op. */
+        val MINIMUM_TURN_RADIANS = Math.toRadians(0.1)
     }
 }

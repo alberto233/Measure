@@ -458,13 +458,20 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         fontSize = 12.sp,
     )
 
-    // Said here as well as in the note above the plan, because a gesture nobody is told
-    // about is a feature nobody has. This is the panel for the thing it acts on.
+    // Placing a room takes both of these. Moving alone leaves a plan whose pieces slide
+    // but never turn, and a room arrives at whatever angle the phone was facing when its
+    // capture began — so the turn controls are not a refinement of the move, they are the
+    // other half of it.
     Text(
         text = "Long-press this room and drag to move it",
         color = MeasureColours.OnScrimMuted,
         fontSize = 12.sp,
     )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill("Square to plan", onClick = { viewModel.squareRoomToPlan(room.id) })
+        Pill("⟲ 90°", onClick = { viewModel.turnRoom(room.id, 90.0) })
+        Pill("⟳ 90°", onClick = { viewModel.turnRoom(room.id, -90.0) })
+    }
 
     // The bounding box, because "will it fit" is asked about a rectangle far more often
     // than about a floor area. Deliberately not a "largest clear span", which has no

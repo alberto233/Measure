@@ -186,6 +186,18 @@ interface RoomDao {
     @Query("UPDATE corners SET x = x + :dx, y = y + :dy, measuredX = measuredX + :dx, measuredY = measuredY + :dy WHERE roomId = :roomId")
     suspend fun translateCorners(roomId: Long, dx: Double, dy: Double)
 
+    /**
+     * Writes corners back after a transform SQLite cannot express.
+     *
+     * Rotation needs sines and cosines, so unlike [translateCorners] it is computed in
+     * Kotlin and the rows are updated rather than nudged in place. `@Update` rather than
+     * delete-and-reinsert so the corner ids survive — anything holding one, an undo
+     * snapshot or a measurement anchor, would otherwise be pointing at a row that no
+     * longer exists.
+     */
+    @Update
+    suspend fun updateCorners(corners: List<CornerEntity>)
+
     @Query(
         """
         SELECT r.name FROM rooms r

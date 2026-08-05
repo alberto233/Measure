@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 239 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 247 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -281,10 +281,44 @@ where the second room is. So the app stops pretending it does, in four places:
   `arrangementMeasured` in the JSON. An export is where every hint the screen gave is
   lost, and the file outlives the conversation that produced it.
 
-One consequence is deliberately left alone: a dimension string spanning two rooms from
-different captures reports the drawing's extent, which is not a measured distance until
-the user has arranged the rooms. Suppressing it would be wrong the other way round the
-moment they have, and the app cannot know when they are done. The note covers it.
+### Two things the first version of this got wrong
+
+Both came straight back from the field test, and both are worth recording because the
+reasoning that produced them was plausible.
+
+**Placement was translation-only, so rooms could not be turned.** "The app must not invent
+a rotation" is correct and does not imply "no rotation exists" — the *user* setting one is
+exactly as legitimate as the user setting a position, and a room arrives at whatever angle
+the phone was facing when its capture began. Translation alone therefore left a plan whose
+pieces slide but never turn: a puzzle with unturnable pieces, in the user's words. The room
+panel now has **Square to plan** (line this room's walls up with the grid the rest of the
+plan is built on — `RoomPlacement.squaringAngle`, folded into ±45° because a grid has
+four-fold symmetry) and **⟲/⟳ 90°** for choosing which quarter turn is wanted, which is a
+question about doors and daylight that geometry cannot answer.
+
+Buttons, not a two-finger twist: the plan already pinches to zoom, and a gesture that
+sometimes scales the view and sometimes rotates a room is the same ambiguity as a tap that
+sometimes selects and sometimes places a point.
+
+Rotation is safe against a later re-solve, which is not obvious. `AngleSnapper` estimates
+each room's rectilinear frame from *that room's own walls* rather than from the world axes,
+so a rotated room snaps to its new orientation instead of being spun back to where it was
+captured. Corners are rewritten by `@Update` rather than delete-and-reinsert so their ids
+survive anything holding one.
+
+**Dimension strings were plan-wide, so they measured between rooms.** A shared chain is how
+an architect's drawing does it, and it assumes a reader who is used to reading one. With
+four rooms it produces a string of a dozen runs in which the one being looked for is buried,
+and the user's point was that people annotate for furniture rather than for construction.
+
+The argument that settled it is the other one: a run spanning two rooms **states a distance
+between them**, and until captures are registered that distance is a layout somebody
+arranged. Drawing it in the most authoritative notation on the page would undo exactly what
+recording the capture frame was for. Chains are now built per room, on screen and in every
+export. A single-room plan is unchanged, which is the common case.
+
+The plan-wide overall can come back when it is earned — when two rooms share a wall the app
+knows about, rather than one it drew them next to.
 
 **What is validated on the A36:** M1 point-to-point (matched a tape), M3 room capture
 (0.4% misclosure on a closed loop), M4 persistence (plans survive, thumbnails correct),
@@ -570,9 +604,13 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+- **The plan-wide overall dimension is gone, deliberately**, along with plan-wide chains.
+  It is the number people want for "how wide is the flat", and it comes back the moment
+  the app knows a shared wall rather than inferring one from where it drew two rooms.
+  Until then the custom measure tool gives an anchored, honest version of the same thing.
 - **Rooms from separate captures are placed, not measured.** See the section above. The
-  app now says so everywhere and gives the user a way to arrange them, which is the honest
-  answer rather than the good one. The good one is registering a new capture against an
+  app now says so everywhere and gives the user a way to arrange them — move *and* turn —
+  which is the honest answer rather than the good one. The good one is registering a new capture against an
   existing plan — walking through a doorway the app already knows about and matching the
   two — which is real work and belongs to M8 rather than to a bug fix. Two things are
   worth writing down before anyone starts: rooms captured in one visit without leaving the

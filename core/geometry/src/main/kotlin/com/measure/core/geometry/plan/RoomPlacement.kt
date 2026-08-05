@@ -1,6 +1,8 @@
 package com.measure.core.geometry.plan
 
 import com.measure.core.geometry.Vec2
+import kotlin.math.PI
+import kotlin.math.round
 
 /**
  * Where to put a room that was measured in a different world frame.
@@ -53,5 +55,50 @@ object RoomPlacement {
             x = right + GAP_METRES - incoming.minOf { it.x },
             y = near - incoming.minOf { it.y },
         )
+    }
+
+    /**
+     * Where a room turns about, which is the centre of what it occupies.
+     *
+     * The bounding box rather than the centroid, so a room appears to spin on the spot
+     * instead of swinging around a point that depends on its shape. An L-shaped room's
+     * centroid can sit well off centre — and in the worst case outside the room — which
+     * would send it wandering across the plan every time it was rotated.
+     */
+    fun centre(outline: List<Vec2>): Vec2 {
+        if (outline.isEmpty()) return Vec2.ZERO
+        return Vec2(
+            x = (outline.minOf { it.x } + outline.maxOf { it.x }) / 2.0,
+            y = (outline.minOf { it.y } + outline.maxOf { it.y }) / 2.0,
+        )
+    }
+
+    fun rotateAbout(point: Vec2, radians: Double, pivot: Vec2): Vec2 =
+        pivot + (point - pivot).rotated(radians)
+
+    /**
+     * The smallest turn that lines this room's walls up with [reference].
+     *
+     * The counterpart to the row of unplaced rooms: a room arrives at whatever angle the
+     * user was facing when they started capturing, and translation alone can never fix
+     * that — it leaves a plan whose pieces cannot be turned. This is one tap of the
+     * arranging that follows, and for a rectilinear room it is almost all of it.
+     *
+     * Both directions describe a **grid**, and a grid has four-fold symmetry: turning a
+     * room 90° lines it up just as well as leaving it. So the answer is folded into
+     * ±45°, which is the smallest turn that does the job. Choosing which of the four
+     * quarter turns is wanted is a question about doors and daylight that the geometry
+     * cannot answer, and is left to the user and two buttons.
+     *
+     * Returns zero when the room has no direction worth speaking of.
+     */
+    fun squaringAngle(outline: List<Vec2>, reference: Vec2): Double {
+        if (outline.size < 3 || reference.length < Vec2.EPSILON) return 0.0
+        val own = DimensionChains.dominantDirection(listOf(outline))
+        if (own.length < Vec2.EPSILON) return 0.0
+
+        val quarter = PI / 2
+        val delta = reference.bearing - own.bearing
+        return delta - quarter * round(delta / quarter)
     }
 }

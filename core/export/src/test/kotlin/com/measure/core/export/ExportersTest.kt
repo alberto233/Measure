@@ -330,6 +330,33 @@ class ExportersTest {
         assertTrue(outside.allPoints.any { it.x > 5.0 })
     }
 
+    // --- dimension strings ---------------------------------------------------------------
+
+    @Test
+    fun `each room carries its own dimensions, not a chain shared with its neighbours`() {
+        val second = room.copy(
+            name = "Bedroom",
+            outline = listOf(Vec2(9.0, 0.0), Vec2(12.0, 0.0), Vec2(12.0, 4.0), Vec2(9.0, 4.0)),
+        )
+        val twoRooms = plan.copy(rooms = listOf(room, second))
+
+        // Two chains per room — one along, one across — rather than two for the plan.
+        assertEquals(4, twoRooms.dimensions.size)
+
+        // And no run may span the gap between them. A chain whose overall reached from the
+        // kitchen's near wall to the bedroom's far one would be stating a distance nobody
+        // measured, in the most authoritative notation on the drawing.
+        val widest = twoRooms.dimensions.maxOf { it.overall }
+        assertTrue(widest <= 5.0 + 1e-9, "a dimension spans both rooms: $widest m")
+    }
+
+    @Test
+    fun `a single room dimensions exactly as it did before`() {
+        // The per-room change must be invisible for the common case, which is one room.
+        assertEquals(2, plan.dimensions.size)
+        assertEquals(5.0, plan.dimensions.maxOf { it.overall }, 1e-9)
+    }
+
     // --- what the drawing is not entitled to claim --------------------------------------
 
     @Test
