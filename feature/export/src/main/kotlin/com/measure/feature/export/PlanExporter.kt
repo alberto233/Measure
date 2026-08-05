@@ -191,6 +191,8 @@ internal fun ProjectDetail.toExportable() = ExportablePlan(
                 ?: "${measurement.from.description} to ${measurement.to.description}",
         )
     },
+    // The file has to carry this or it makes a claim the screen was careful not to.
+    arrangementMeasured = !hasUnrelatedCaptures,
 )
 
 internal fun SavedRoom.toExportable() = ExportableRoom(

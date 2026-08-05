@@ -23,6 +23,19 @@ data class ExportablePlan(
     /** Distances drawn on the plan afterwards. */
     val distances: List<ExportableDistance> = emptyList(),
     val unitSuffix: String = "m",
+    /**
+     * Whether how the rooms sit relative to each other was measured.
+     *
+     * False once a plan holds rooms from more than one AR session: each session gives the
+     * phone a new origin, so the app sets later rooms down beside the earlier ones and the
+     * arrangement is a layout somebody made rather than a survey.
+     *
+     * It has to travel into the file. An export is where every hint the screen gave is
+     * lost — the note above the plan, the room the user dragged into place — and the file
+     * outlives the conversation that produced it. Someone scaling a corridor off a printed
+     * drawing has no way to know the drawing was never entitled to show one.
+     */
+    val arrangementMeasured: Boolean = true,
 ) {
     val isEmpty: Boolean get() = rooms.isEmpty() && measurements.isEmpty() && distances.isEmpty()
 
@@ -42,6 +55,19 @@ data class ExportablePlan(
         get() = DimensionChains.chains(rooms.filter { it.outline.size >= 3 }.map { it.outline })
 
     val totalFloorArea: Double get() = rooms.sumOf { it.floorArea }
+
+    /**
+     * The one sentence every format says when [arrangementMeasured] is false, or null.
+     *
+     * Written once here rather than per exporter so the six files cannot end up making six
+     * differently worded promises — and so the wording can be argued about in one place.
+     */
+    val arrangementCaveat: String?
+        get() = if (arrangementMeasured) {
+            null
+        } else {
+            "Rooms placed by hand — each room is measured, the space between them is not"
+        }
 }
 
 data class ExportableRoom(

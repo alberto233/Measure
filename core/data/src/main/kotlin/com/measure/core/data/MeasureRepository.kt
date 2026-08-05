@@ -12,6 +12,7 @@ import com.measure.core.geometry.capture.MeasuredSegment
 import com.measure.core.geometry.plan.PlanAnchor
 import com.measure.core.geometry.plan.PlanMeasurement
 import com.measure.core.geometry.plan.PlanSnapper
+import com.measure.core.geometry.plan.RoomPlacement
 import com.measure.core.geometry.plan.SnapKind
 import com.measure.core.geometry.plan.SnapRoom
 import com.measure.core.geometry.capture.MeasurementMode
@@ -66,6 +67,11 @@ data class SavedRoom(
     val ceilingHeight: Double?,
     /** Doors and windows, grouped by the wall index they sit in. */
     val openings: Map<Int, List<SavedOpening>>,
+    /**
+     * The AR world frame this room was measured in, or empty if it was captured before the
+     * app recorded one. Only ever compared, never interpreted.
+     */
+    val captureSession: String = "",
     /**
      * Corners the rectilinear solve moved.
      *
@@ -159,6 +165,21 @@ data class ProjectDetail(
 ) {
     /** The rooms in the form [PlanSnapper] wants, so callers do not each build it. */
     val snapRooms: List<SnapRoom> get() = rooms.map(SavedRoom::toSnapRoom)
+
+    /**
+     * Whether this plan holds rooms measured in more than one AR session.
+     *
+     * When it does, **how the rooms sit relative to each other was never measured** — each
+     * session gave its own origin, so the app set the later rooms down beside the earlier
+     * ones and the arrangement is a layout, not a survey. Inside any one room every number
+     * is as good as it ever was.
+     *
+     * The screen has to say this. A floor plan's whole claim is that it describes a
+     * building, and a user who does not know which parts of that claim were measured has
+     * no way to tell a real 4.2 m gap between two rooms from an arbitrary one.
+     */
+    val hasUnrelatedCaptures: Boolean
+        get() = rooms.map { it.captureSession }.distinct().size > 1
 }
 
 internal fun SavedRoom.toSnapRoom() = SnapRoom(
@@ -322,6 +343,13 @@ class MeasureRepository(
      * what the user was shown and agreed to. The per-corner sigmas travel with it so a
      * future re-solve — after an edit, or a locked wall length — can weight the corners
      * exactly as the first solve did.
+     *
+     * @param captureSession which AR world frame these coordinates are in. When it differs
+     *   from every room already in the project, the room is **moved clear of them** before
+     *   being stored: its coordinates and theirs came from different ARCore sessions and
+     *   have no common origin, so leaving them as they are would draw an overlap or a gap
+     *   that nobody measured. See [RoomPlacement]. Empty means unknown, and nothing moves,
+     *   because a guess is only worth making from evidence.
      */
     suspend fun saveRoom(
         projectId: Long,
@@ -330,16 +358,20 @@ class MeasureRepository(
         measured: List<Vec2>,
         sigmas: List<Double>,
         ceilingHeight: Double? = null,
+        captureSession: String = "",
     ): Long {
         @Suppress("NAME_SHADOWING") val ceilingHeight = ceilingHeight?.takeIf { it > 0.0 }
         val level = levels.firstFor(projectId)
             ?: LevelEntity(id = levels.insert(LevelEntity(projectId = projectId, name = "Ground floor", elevation = 0.0)), projectId = projectId, name = "Ground floor", elevation = 0.0)
+
+        val offset = placementOffset(projectId, captureSession, solution.polygon.vertices)
 
         val roomId = rooms.insert(
             RoomEntity(
                 levelId = level.id,
                 name = name,
                 ceilingHeight = ceilingHeight,
+                captureSession = captureSession,
                 area = solution.area.squareMetres,
                 perimeter = solution.perimeter.metres,
                 misclosure = solution.closure.relativeError,
@@ -353,10 +385,13 @@ class MeasureRepository(
                 CornerEntity(
                     roomId = roomId,
                     index = index,
-                    x = vertex.x,
-                    y = vertex.y,
-                    measuredX = measured.getOrElse(index) { vertex }.x,
-                    measuredY = measured.getOrElse(index) { vertex }.y,
+                    x = vertex.x + offset.x,
+                    y = vertex.y + offset.y,
+                    // The observations move with the solution, and must: a re-solve starts
+                    // from them, so leaving them behind would teleport the room back to
+                    // its capture coordinates the first time a wall was locked.
+                    measuredX = measured.getOrElse(index) { vertex }.x + offset.x,
+                    measuredY = measured.getOrElse(index) { vertex }.y + offset.y,
                     sigma = sigmas.getOrElse(index) { DEFAULT_SIGMA },
                     // A corner counts as snapped when either wall meeting there was
                     // pulled to an axis, since it is the corner that moved to make that
@@ -368,6 +403,27 @@ class MeasureRepository(
 
         projects.touch(projectId, now())
         return roomId
+    }
+
+    /**
+     * How far this room has to move to be honest about not knowing where it is.
+     *
+     * Zero unless the project already holds rooms from a *different* world frame. Zero also
+     * when the frame is unknown at either end, because "these might be the same session"
+     * is not grounds for shoving a room across the plan.
+     */
+    private suspend fun placementOffset(
+        projectId: Long,
+        captureSession: String,
+        vertices: List<Vec2>,
+    ): Vec2 {
+        if (captureSession.isEmpty()) return Vec2.ZERO
+        val existing = rooms.roomsIn(projectId)
+        if (existing.isEmpty()) return Vec2.ZERO
+        if (existing.any { it.captureSession == captureSession }) return Vec2.ZERO
+
+        val occupied = rooms.cornersIn(projectId).map { Vec2(it.x, it.y) }
+        return RoomPlacement.offsetFor(occupied, vertices)
     }
 
     suspend fun saveMeasurement(projectId: Long, segment: MeasuredSegment, label: String? = null): Long {
@@ -487,6 +543,24 @@ class MeasureRepository(
 
     suspend fun renameRoom(roomId: Long, name: String) = rooms.rename(roomId, name)
 
+    /**
+     * Slides a whole room across the plan, without changing its shape.
+     *
+     * The counterpart to [RoomPlacement]: the app sets a room down clear of the others
+     * because it does not know where it goes, and this is how the person who does know
+     * says so. A plain translation of every corner, so the room the user measured is the
+     * room they still have — no re-solve, no snapping, nothing that could quietly alter a
+     * wall length while they were arranging the drawing.
+     *
+     * Observations move with the solution. They are what a later re-solve starts from, so
+     * leaving them behind would spring the room back the first time a wall was locked.
+     */
+    suspend fun moveRoom(roomId: Long, projectId: Long, dx: Double, dy: Double) {
+        if (dx == 0.0 && dy == 0.0) return
+        rooms.translateCorners(roomId, dx, dy)
+        projects.touch(projectId, now())
+    }
+
     suspend fun deleteMeasurement(measurementId: Long) = measurements.deleteById(measurementId)
 
     // --- distances drawn on the plan ---------------------------------------------------
@@ -561,6 +635,7 @@ internal fun RoomEntity.toSavedRoom(
         misclosure = misclosure,
         isReliable = isReliable,
         ceilingHeight = ceilingHeight,
+        captureSession = captureSession,
     )
 }
 

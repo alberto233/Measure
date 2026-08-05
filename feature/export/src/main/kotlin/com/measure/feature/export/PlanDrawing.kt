@@ -267,6 +267,17 @@ internal object PlanDrawing {
             height - margin * 0.45f,
             footer,
         )
+        // And what the drawing is not entitled to claim, when that applies. Coloured like
+        // the derived distances, because it says the same kind of thing: this part came
+        // off the drawing rather than out of the room.
+        plan.arrangementCaveat?.let { caveat ->
+            canvas.drawText(
+                caveat,
+                margin,
+                height - margin * 1.35f,
+                Paint(footer).apply { color = Color.rgb(176, 96, 0) },
+            )
+        }
     }
 
     private fun areaOf(room: ExportableRoom, unitLabel: String) = "${number(room.floorArea)} $unitLabel"

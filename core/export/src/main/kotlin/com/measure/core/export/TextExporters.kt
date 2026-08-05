@@ -35,6 +35,10 @@ object CsvExporter {
             append("${field("Total")},${number(plan.totalFloorArea)},,,,,\n")
         }
 
+        // A spreadsheet has no drawing to qualify, but it does carry room-by-room numbers
+        // someone may add up as if the rooms were surveyed together.
+        plan.arrangementCaveat?.let { append("\n${field("Note")},${field(it)}\n") }
+
         if (plan.measurements.isNotEmpty()) {
             append("\nMeasurement,Length (m),Tolerance (m),Mode\n")
             plan.measurements.forEach {
@@ -86,6 +90,10 @@ object JsonExporter {
         append("  \"application\": \"Measure\",\n")
         append("  \"units\": \"metres\",\n")
         append("  \"name\": ${string(plan.name)},\n")
+        // Machine-readable, because this is the format something else reads back, and the
+        // thing it most needs to know about the coordinates is whether they mean anything
+        // between one room and the next.
+        append("  \"arrangementMeasured\": ${plan.arrangementMeasured},\n")
         append("  \"rooms\": [\n")
         plan.rooms.forEachIndexed { index, room ->
             append("    {\n")

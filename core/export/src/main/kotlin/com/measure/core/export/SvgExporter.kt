@@ -185,6 +185,15 @@ object SvgExporter {
                     "${escape(plan.name)} · 1:${number(scaleDenominator)} at A-size · " +
                     "measured with Measure</text>\n",
             )
+
+            // And what the drawing is not entitled to claim, when that applies.
+            plan.arrangementCaveat?.let { caveat ->
+                append(
+                    "  <text x=\"${mm(MARGIN_MM)}\" y=\"${mm(height - MARGIN_MM / 3 - TEXT_HEIGHT_MM * 1.3)}\" " +
+                        "font-family=\"sans-serif\" font-size=\"${mm(TEXT_HEIGHT_MM * 0.7)}\" " +
+                        "fill=\"#b06000\">${escape(caveat)}</text>\n",
+                )
+            }
             append("</svg>\n")
         }
     }

@@ -164,6 +164,30 @@ interface RoomDao {
 
     @Query(
         """
+        SELECT r.* FROM rooms r
+          JOIN levels l ON r.levelId = l.id
+         WHERE l.projectId = :projectId
+         ORDER BY r.createdAt
+        """,
+    )
+    suspend fun roomsIn(projectId: Long): List<RoomEntity>
+
+    @Query(
+        """
+        SELECT c.* FROM corners c
+          JOIN rooms r ON c.roomId = r.id
+          JOIN levels l ON r.levelId = l.id
+         WHERE l.projectId = :projectId
+        """,
+    )
+    suspend fun cornersIn(projectId: Long): List<CornerEntity>
+
+    /** Shifts a whole room, for assembling a plan by hand. */
+    @Query("UPDATE corners SET x = x + :dx, y = y + :dy, measuredX = measuredX + :dx, measuredY = measuredY + :dy WHERE roomId = :roomId")
+    suspend fun translateCorners(roomId: Long, dx: Double, dy: Double)
+
+    @Query(
+        """
         SELECT r.name FROM rooms r
           JOIN levels l ON r.levelId = l.id
          WHERE l.projectId = :projectId

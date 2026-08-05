@@ -414,6 +414,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 measured = measured,
                 sigmas = sigmas,
                 ceilingHeight = detectedCeilingHeight,
+                // Which ARCore frame these corners are in. Rooms captured without leaving
+                // this screen share it and are positioned correctly relative to each
+                // other; a later visit starts a new session with a new origin, and the
+                // repository has to know that before it draws them on one plan.
+                captureSession = controller.worldFrame,
             )
         }
         notice = describe(solution)

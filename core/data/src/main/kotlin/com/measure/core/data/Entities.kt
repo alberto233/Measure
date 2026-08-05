@@ -77,6 +77,18 @@ data class RoomEntity(
     val levelId: Long,
     val name: String,
     val ceilingHeight: Double? = null,
+    /**
+     * Which AR session captured this room.
+     *
+     * Load-bearing, not bookkeeping. A room's corners are in the world frame of the
+     * ARCore session that captured it, and every session starts a new frame wherever the
+     * phone happened to be. Two rooms from the same session are positioned correctly
+     * relative to each other and nothing else can be assumed — so the app has to know
+     * which rooms those are before it draws them on one plan.
+     *
+     * Empty for rooms saved before this was recorded.
+     */
+    val captureSession: String = "",
     /** Placement within the project frame; identity until multi-room assembly (M8). */
     val originX: Double = 0.0,
     val originY: Double = 0.0,

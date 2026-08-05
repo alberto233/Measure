@@ -50,6 +50,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -95,6 +96,27 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
     private var session: Session? = null
     private var sessionConfig: Config? = null
     private var installRequested = false
+
+    /**
+     * Identifies the world frame the current session measures in.
+     *
+     * ARCore puts the origin wherever the phone was when the session started and points
+     * the axes wherever it was pointing, so **every new session is a different coordinate
+     * system**. Two rooms captured without leaving this screen share a frame and their
+     * positions relative to each other are real; two captured in separate visits do not,
+     * and any relative position between them would be an accident of where the user was
+     * standing when they pressed the button.
+     *
+     * Nothing here can fix that — the phone genuinely does not know where the second room
+     * is — but anything storing a captured room has to be able to tell the two cases
+     * apart, and this is what tells it. Empty until a session exists.
+     *
+     * Volatile because the GL thread creates it under [sessionLock] and callers read it
+     * from the main thread without one.
+     */
+    @Volatile
+    var worldFrame: String = ""
+        private set
 
     private val background = BackgroundRenderer()
     private val planeRenderer = PlaneRenderer()
@@ -195,6 +217,9 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
             created.configure(config)
             session = created
             sessionConfig = config
+            // A new session is a new origin, so it is a new frame — regenerated here and
+            // nowhere else, because this is the only place a session comes into being.
+            worldFrame = UUID.randomUUID().toString()
             _state.update { it.copy(depthEnabled = depthSupported, torchSupported = torchSupported) }
             return true
         } catch (error: UnavailableUserDeclinedInstallationException) {

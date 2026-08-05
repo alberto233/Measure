@@ -111,6 +111,7 @@ internal fun PlanCanvas(
     planMeasurements: List<SavedPlanMeasurement>,
     selection: Selection,
     dragging: EditorViewModel.DragState?,
+    movingRoom: EditorViewModel.RoomMove?,
     /** Non-null while measuring: the mode, and the first end if one is down. */
     measuring: Boolean,
     drawing: Boolean,
@@ -125,6 +126,9 @@ internal fun PlanCanvas(
     onBeginDrag: (roomId: Long, index: Int, position: Vec2) -> Unit,
     onDrag: (Vec2) -> Unit,
     onEndDrag: () -> Unit,
+    onBeginRoomMove: (roomId: Long, at: Vec2) -> Unit,
+    onRoomMove: (Vec2) -> Unit,
+    onEndRoomMove: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var size by remember { mutableStateOf(IntSize.Zero) }
@@ -189,17 +193,37 @@ internal fun PlanCanvas(
                     }
                 }
             }
-            .pointerInput(rooms, camera) {
+            .pointerInput(rooms, camera, measuring) {
+                // A long press on a corner reshapes the room; a long press on the body of
+                // one slides the whole thing. Corner first, because every corner is also
+                // inside its room and the other order would make corners unreachable.
+                //
+                // Only outside the measure view: there a long press has no meaning, and a
+                // plan that rearranges itself while someone is reading a dimension off it
+                // is the plan moving without being asked.
+                var target: Long? = null
                 detectDragGesturesAfterLongPress(
                     onDragStart = { offset ->
+                        // Cleared first, so a press that catches nothing cannot inherit
+                        // the previous gesture's answer.
+                        target = null
                         val plan = camera.toPlan(offset, size)
-                        findCorner(rooms, plan, touchSlopMetres())?.let { (roomId, index) ->
-                            onBeginDrag(roomId, index, plan)
+                        val corner = if (measuring) null else findCorner(rooms, plan, touchSlopMetres())
+                        when {
+                            corner != null -> onBeginDrag(corner.first, corner.second, plan)
+                            measuring -> Unit
+                            else -> findRoom(rooms, plan)?.let {
+                                target = it
+                                onBeginRoomMove(it, plan)
+                            }
                         }
                     },
-                    onDrag = { change, _ -> onDrag(camera.toPlan(change.position, size)) },
-                    onDragEnd = onEndDrag,
-                    onDragCancel = onEndDrag,
+                    onDrag = { change, _ ->
+                        val plan = camera.toPlan(change.position, size)
+                        if (target == null) onDrag(plan) else onRoomMove(plan)
+                    },
+                    onDragEnd = { if (target == null) onEndDrag() else onEndRoomMove() },
+                    onDragCancel = { if (target == null) onEndDrag() else onEndRoomMove() },
                 )
             },
     ) {
@@ -233,7 +257,11 @@ internal fun PlanCanvas(
         }
 
         rooms.forEach { room ->
-            val outline = room.outline.toMutableList()
+            // Live under the finger for both gestures, so the room being moved is the one
+            // being looked at rather than a ghost that catches up when the finger lifts.
+            val shift = movingRoom?.takeIf { it.roomId == room.id }?.offset
+            val outline = (if (shift == null) room.outline else room.outline.map { it + shift })
+                .toMutableList()
             if (dragging?.roomId == room.id && dragging.index in outline.indices) {
                 outline[dragging.index] = dragging.position
             }
@@ -741,6 +769,15 @@ private fun findCorner(rooms: List<SavedRoom>, point: Vec2, reach: Double): Pair
     rooms.forEach { room ->
         val polygon = room.polygonOrNull() ?: return@forEach
         Segments.nearestVertex(polygon, point, reach)?.let { return room.id to it }
+    }
+    return null
+}
+
+/** Which room a point fell inside, for a long press that means "pick this one up". */
+private fun findRoom(rooms: List<SavedRoom>, point: Vec2): Long? {
+    rooms.forEach { room ->
+        val polygon = room.polygonOrNull() ?: return@forEach
+        if (Segments.contains(polygon, point)) return room.id
     }
     return null
 }

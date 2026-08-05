@@ -160,6 +160,21 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     data class DragState(val roomId: Long, val index: Int, val position: Vec2)
 
     /**
+     * A whole room being slid across the plan.
+     *
+     * Separate from [dragging] because it is a different act: that one reshapes a room by
+     * asserting where a corner really is, this one only decides where a room sits. Sharing
+     * one state would mean one code path having to remember which of the two it was in,
+     * which is the shape of bug this editor keeps producing.
+     */
+    var movingRoom by mutableStateOf<RoomMove?>(null)
+        private set
+
+    data class RoomMove(val roomId: Long, val from: Vec2, val to: Vec2) {
+        val offset: Vec2 get() = to - from
+    }
+
+    /**
      * One step of undo per edit.
      *
      * A dragged corner is a freehand judgement, and the usual outcome of a freehand
@@ -231,6 +246,50 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         sigmas[drag.index] = DRAGGED_CORNER_SIGMA
 
         resolve(room, moved, sigmas)
+    }
+
+    // --- moving a whole room ------------------------------------------------------------
+
+    /**
+     * Long-press inside a room and drag to move it — docs/DEVELOPMENT.md §8.
+     *
+     * Needed because the app cannot know where a room measured in a separate visit goes.
+     * ARCore hands out a new origin every session, so rooms captured on different trips
+     * arrive in unrelated coordinate systems; they get set down in a row, and this is how
+     * the user — who was there — puts them where they belong.
+     *
+     * Deliberately not helped along with snapping to neighbouring walls. That would make
+     * the app's guess look like a measurement again, in a new place, and the whole reason
+     * this control exists is that a placement should be traceable to whoever made it.
+     */
+    fun beginRoomMove(roomId: Long, at: Vec2) {
+        movingRoom = RoomMove(roomId, at, at)
+        selection = Selection.Room(roomId)
+    }
+
+    fun updateRoomMove(at: Vec2) {
+        movingRoom = movingRoom?.copy(to = at)
+    }
+
+    fun endRoomMove() {
+        val move = movingRoom ?: return
+        movingRoom = null
+
+        val offset = move.offset
+        if (offset.length < MINIMUM_MOVE_METRES) return
+
+        val room = roomById(move.roomId) ?: return
+        remember(room)
+
+        val projectId = projectId
+        viewModelScope.launch {
+            repository.moveRoom(move.roomId, projectId, offset.x, offset.y)
+            confirm("${room.name} moved — placement is yours, not measured")
+        }
+    }
+
+    fun cancelRoomMove() {
+        movingRoom = null
     }
 
     // --- locked lengths -------------------------------------------------------------
@@ -792,5 +851,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
          * wins the argument.
          */
         const val DRAGGED_CORNER_SIGMA = 0.003
+
+        /**
+         * Below this, a room move was a long-press that wobbled. Writing it anyway would
+         * cost an undo slot and a confirmation for a change nobody can see.
+         */
+        const val MINIMUM_MOVE_METRES = 0.01
     }
 }

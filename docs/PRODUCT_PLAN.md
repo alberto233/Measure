@@ -119,7 +119,7 @@ promising dates.
 | **M5** | 2D plan editor | 3 wks | Compose Canvas plan, pan/zoom, drag corners, type an exact wall length and re-solve, room labels |
 | **M6** | Openings and heights | 1.5 wks | Doors and windows on walls, ceiling height detection, wall area, volume |
 | **M7** | Export | 2 wks | PNG, PDF, SVG, DXF, CSV, JSON project file |
-| **M8** | Multi-room | 2 wks | Capture rooms separately, assemble, snap shared walls |
+| **M8** | Multi-room | 2 wks | Register a new capture against an existing plan, snap shared walls. *Partly landed early as a correctness fix: rooms from separate captures no longer overlap, are placed clear of each other, can be dragged into position, and every screen and file says the arrangement was not measured. What remains is making it measured.* |
 | **M9** | 3D view | 1.5 wks | Extruded walls, orbit camera |
 | **M10** | Beta polish | 2 wks | Onboarding, accuracy tutorial, device calibration, localisation, crash reporting, store listing |
 
@@ -209,6 +209,23 @@ noisy input, we find out in week three rather than month four.
   implement it until later.
 - **Folders or tags for M14.** One-to-many or many-to-many. M13 exists partly to answer
   this before a schema commits to either.
-- **Object footprints.** Furniture in the plan would make "how far is the bed from the
-  wall" answerable directly, and would carry into the 3D view. It is also a new capture
-  flow, a new entity and a new set of accuracy claims, so it is not folded into M12.
+- **Furniture — parked for 1.1, deliberately.** Two versions of the same idea: rectangles
+  with typed sizes placed on the plan, and the same blocks superimposed in the live camera
+  view. Neither is in the MVP.
+
+  The *question* is core — §3 lists "will this fit" and "plan a layout" — but the AR
+  version is the expensive answer and the one this app is worst placed to give. It fights
+  §5's first commitment: a preview succeeds by looking convincing, and how convincing it
+  looks is dominated by how still ARCore holds a virtual object while the user walks round
+  it, which is exactly what this project has repeatedly found it cannot lean on. Without
+  depth occlusion a block also reads as a sticker floating over the room, and depth is what
+  failed at wall detection. It is a crowded category besides — IKEA Place, Amazon, Wayfair,
+  all with real catalogues — and a grey box competes badly with a rendered sofa.
+
+  When it is picked up, the order should be **plan objects first, AR second**. Footprints
+  on the plan answer whether a thing fits against a wall and through a door, with the
+  clearance measured rather than eyeballed; they persist, they export, and they make "how
+  far is the bed from the wall" answerable at all. Once that data exists, showing it in the
+  camera is a rendering job on top of objects that are already there rather than a new
+  capture flow — perhaps a fifth of the cost, and judgeable on hardware with the 2D version
+  as the fallback if it looks unconvincing.

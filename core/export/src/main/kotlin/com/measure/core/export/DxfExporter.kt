@@ -23,9 +23,13 @@ object DxfExporter {
     private const val LAYER_WALLS = "WALLS"
     private const val LAYER_OPENINGS = "OPENINGS"
     private const val LAYER_TEXT = "ROOM_NAMES"
+    private const val LAYER_NOTES = "NOTES"
 
     /** Text height in metres, so a room name reads sensibly at a domestic scale. */
     private const val TEXT_HEIGHT = 0.25
+
+    /** How far below the drawing a note sits, in metres, so it is clear of the geometry. */
+    private const val NOTE_DROP = 1.0
 
     fun export(plan: ExportablePlan): String = buildString {
         header(plan)
@@ -45,6 +49,17 @@ object DxfExporter {
                 val centre = PlanGeometry.labelPoint(room.outline)
                 text(centre.x, centre.y, room.name, LAYER_TEXT)
             }
+        }
+
+        // What the drawing is not entitled to claim, as a note on the drawing rather than
+        // a comment. This is the export most likely to be measured off in earnest, so it
+        // is the one where an unstated caveat does the most damage — and DXF has no
+        // comment syntax a reader would show anyone.
+        plan.arrangementCaveat?.let { caveat ->
+            val points = plan.allPoints
+            val left = points.minOfOrNull { it.x } ?: 0.0
+            val bottom = points.minOfOrNull { it.y } ?: 0.0
+            text(left, bottom - NOTE_DROP, caveat, LAYER_NOTES)
         }
 
         append("  0\nENDSEC\n")
@@ -69,13 +84,17 @@ object DxfExporter {
 
     private fun StringBuilder.tables() {
         append("  0\nSECTION\n  2\nTABLES\n")
-        append("  0\nTABLE\n  2\nLAYER\n 70\n     3\n")
+        append("  0\nTABLE\n  2\nLAYER\n 70\n     4\n")
         listOf(
             // Colour 7 is "whatever the background is not", which is the only sane choice
             // for a drawing that may be opened on white or on black.
             LAYER_WALLS to 7,
             LAYER_OPENINGS to 5,
             LAYER_TEXT to 3,
+            // On its own layer so it can be turned off deliberately rather than by
+            // deleting it, and 1 is red — a note about what a drawing does not say should
+            // not be quiet.
+            LAYER_NOTES to 1,
         ).forEach { (name, colour) ->
             append("  0\nLAYER\n  2\n$name\n 70\n     0\n 62\n${colour.toString().padStart(6)}\n  6\nCONTINUOUS\n")
         }

@@ -81,6 +81,7 @@ fun EditorScreen(
             planMeasurements = project?.planMeasurements.orEmpty(),
             selection = viewModel.selection,
             dragging = viewModel.dragging,
+            movingRoom = viewModel.movingRoom,
             measuring = viewModel.mode == EditorMode.MEASURE,
             drawing = viewModel.drawing,
             focus = viewModel.focus,
@@ -97,6 +98,9 @@ fun EditorScreen(
             onBeginDrag = viewModel::beginDrag,
             onDrag = viewModel::updateDrag,
             onEndDrag = viewModel::endDrag,
+            onBeginRoomMove = viewModel::beginRoomMove,
+            onRoomMove = viewModel::updateRoomMove,
+            onEndRoomMove = viewModel::endRoomMove,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -122,6 +126,8 @@ fun EditorScreen(
                 )
                 if (viewModel.mode == EditorMode.MEASURE) {
                     MeasuringBanner(viewModel)
+                } else if (project?.hasUnrelatedCaptures == true) {
+                    UnrelatedCapturesNote()
                 }
             }
 
@@ -245,6 +251,43 @@ private fun TopBar(
             Pill("Send", enabled = canExport, onClick = onExport)
             Pill("Undo", enabled = canUndo, onClick = onUndo)
         }
+    }
+}
+
+/**
+ * Says that the rooms' arrangement was never measured.
+ *
+ * Shown whenever a plan holds rooms from more than one AR session. Each session gave the
+ * phone a fresh origin, so the app has no measurement of how one room sits relative to
+ * another and simply set the later ones down alongside the earlier ones.
+ *
+ * Stated rather than left to be discovered, because a floor plan looks equally authoritative
+ * either way. Every number *inside* each room is as good as it ever was; the distance
+ * between two of them is a layout the user is free to arrange, and they can only know which
+ * is which if the screen tells them.
+ */
+@Composable
+private fun UnrelatedCapturesNote() {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MeasureColours.Panel)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = "Rooms from separate captures",
+            color = MeasureColours.Warning,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Each room is measured, but how they sit together is not — " +
+                "long-press a room and drag to place it.",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 12.sp,
+        )
     }
 }
 
@@ -411,6 +454,14 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
 
     Text(
         text = "${viewModel.formatArea(room)} floor · ${viewModel.formatLength(room.perimeter.metres)} perimeter",
+        color = MeasureColours.OnScrimMuted,
+        fontSize = 12.sp,
+    )
+
+    // Said here as well as in the note above the plan, because a gesture nobody is told
+    // about is a feature nobody has. This is the panel for the thing it acts on.
+    Text(
+        text = "Long-press this room and drag to move it",
         color = MeasureColours.OnScrimMuted,
         fontSize = 12.sp,
     )

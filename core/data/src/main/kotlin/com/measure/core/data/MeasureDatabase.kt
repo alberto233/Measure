@@ -27,7 +27,7 @@ import androidx.sqlite.execSQL
         MeasurementEntity::class,
         PlanMeasurementEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -150,6 +150,20 @@ abstract class MeasureDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Records which AR session captured each room.
+         *
+         * Existing rooms get an empty session, which reads as "unknown" — the app must
+         * not claim two old rooms were captured together when it has no way to tell.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "ALTER TABLE `rooms` ADD COLUMN `captureSession` TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
         @Volatile
         private var instance: MeasureDatabase? = null
 
@@ -163,7 +177,7 @@ abstract class MeasureDatabase : RoomDatabase() {
                 // Cascading deletes are declared on the entities and are load-bearing:
                 // Room does not switch foreign keys on for you.
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build()
     }
 }

@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 229 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 239 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -19,7 +19,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M13 finding a plan, then M8 multi-room — see §8 |
+| Next | M13 finding a plan — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -236,6 +236,55 @@ renderer too.
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to
 tell them apart.
+
+## Rooms captured on separate visits were drawn as if they had been surveyed together
+
+Found by reading the code rather than by a field test, which is the only reason it is not
+still there. It was silent, it was wrong, and it would have been wrong in the way that
+looks most like being right.
+
+`CaptureActivity` creates a `CaptureViewModel` per launch, which creates a
+`MeasureArController`, which creates an ARCore `Session`. **A new session puts the world
+origin wherever the phone happens to be and the axes wherever it happens to be pointing.**
+So a room captured on Tuesday and a room captured on Wednesday are described in two
+unrelated coordinate systems, and nothing between the capture and the plan re-centred
+them. The editor drew both at their stored coordinates and produced a floor plan showing
+the two rooms overlapping, or nine metres apart, depending on where the user was standing
+when they opened the app. Every number *inside* each room was right. The relationship
+between them was invented, and drawn with exactly the same confidence as the measured
+parts.
+
+Capturing two rooms without leaving the capture screen — "New room" — was always correct,
+because that is one session. It is the second *visit* that breaks, which is precisely the
+"capture a multi-room flat" case in `docs/PRODUCT_PLAN.md` §3.
+
+There is no fix that recovers the true relationship: the phone genuinely does not know
+where the second room is. So the app stops pretending it does, in four places:
+
+- **`RoomEntity.captureSession`** records which ARCore world frame a room's corners are
+  in (`MeasureArController.worldFrame`, regenerated in `createSession` and nowhere else).
+  Schema version 6.
+- **`RoomPlacement`** sets a room from a new frame down clear of everything already on the
+  plan, in a row with a metre of air. Translation only, never rotation — the room's own
+  geometry is real and must survive untouched, and a guessed rotation would be a second
+  invented number stacked on the first. Nobody reads a room floating a metre off the
+  others as a survey; an overlap, they would.
+- **Long-press a room and drag** moves it (`RoomDao.translateCorners`, through
+  `EditorViewModel.beginRoomMove`). Deliberately without snapping to neighbouring walls:
+  the whole point is that a placement should be traceable to whoever made it, and helping
+  the user snap rooms flush would make the app's guess look like a measurement again.
+  Observations move with the solved corners, or the room would spring back to its capture
+  coordinates the first time a wall was locked.
+- **It is stated.** A note above the plan, and one sentence — `ExportablePlan.arrangementCaveat`,
+  written once so six formats cannot make six different promises — carried into the SVG,
+  the PDF, the PNG, the DXF (on its own `NOTES` layer) and the CSV, with a boolean
+  `arrangementMeasured` in the JSON. An export is where every hint the screen gave is
+  lost, and the file outlives the conversation that produced it.
+
+One consequence is deliberately left alone: a dimension string spanning two rooms from
+different captures reports the drawing's extent, which is not a measured distance until
+the user has arranged the rooms. Suppressing it would be wrong the other way round the
+moment they have, and the app cannot know when they are done. The note covers it.
 
 **What is validated on the A36:** M1 point-to-point (matched a tape), M3 room capture
 (0.4% misclosure on a closed loop), M4 persistence (plans survive, thumbnails correct),
@@ -514,13 +563,24 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations are written but never run against real data.** The schema is at version 5
-  with four hand-written migrations (walls table; measured corner positions; openings;
-  plan measurements). All four are straightforward and Room validates them against the exported schemas at
+- **Migrations are written but never run against real data.** The schema is at version 6
+  with five hand-written migrations (walls table; measured corner positions; openings;
+  plan measurements; capture session). All five are straightforward and Room validates them against the exported schemas at
   compile time,
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+- **Rooms from separate captures are placed, not measured.** See the section above. The
+  app now says so everywhere and gives the user a way to arrange them, which is the honest
+  answer rather than the good one. The good one is registering a new capture against an
+  existing plan — walking through a doorway the app already knows about and matching the
+  two — which is real work and belongs to M8 rather than to a bug fix. Two things are
+  worth writing down before anyone starts: rooms captured in one visit without leaving the
+  capture screen already share a frame and need none of this, and the placement must stay
+  translation-only until there is a measurement to justify a rotation.
+- **Rooms captured before version 6 have no frame recorded**, so the app cannot tell
+  whether two of them were captured together. It assumes not, and leaves them exactly
+  where they are — the alternative would be shuffling an existing plan on a guess.
 - **Sharing an SVG fails on the A36, and the cause is not yet known.** Every other format
   shares. `image/svg+xml` is the correct registered type and almost nothing on a handset
   claims it, so the share falls back to `application/octet-stream` — and it still fails,

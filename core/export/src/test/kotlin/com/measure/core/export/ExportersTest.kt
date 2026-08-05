@@ -330,6 +330,59 @@ class ExportersTest {
         assertTrue(outside.allPoints.any { it.x > 5.0 })
     }
 
+    // --- what the drawing is not entitled to claim --------------------------------------
+
+    @Test
+    fun `a measured plan carries no caveat, and says nothing about arrangement`() {
+        assertEquals(null, plan.arrangementCaveat)
+        assertFalse(SvgExporter.export(plan).contains("placed by hand"))
+        assertFalse(DxfExporter.export(plan).contains("placed by hand"))
+        assertFalse(CsvExporter.export(plan).contains("placed by hand"))
+        assertTrue(JsonExporter.export(plan).contains("\"arrangementMeasured\": true"))
+    }
+
+    @Test
+    fun `every format says so when the rooms were only placed`() {
+        // The point of this test is that it is a loop. A caveat that reaches four formats
+        // out of five is worse than none: whoever gets the fifth file has no reason to
+        // suspect the others said anything more.
+        val unmeasured = plan.copy(arrangementMeasured = false)
+        val caveat = unmeasured.arrangementCaveat
+        assertTrue(caveat != null && caveat.isNotBlank())
+
+        listOf(
+            "SVG" to SvgExporter.export(unmeasured),
+            "DXF" to DxfExporter.export(unmeasured),
+            "CSV" to CsvExporter.export(unmeasured),
+        ).forEach { (format, text) ->
+            assertTrue(text.contains(caveat!!), "the $format says nothing about the layout")
+        }
+        assertTrue(JsonExporter.export(unmeasured).contains("\"arrangementMeasured\": false"))
+    }
+
+    @Test
+    fun `the dxf note stays valid dxf`() {
+        val dxf = DxfExporter.export(plan.copy(arrangementMeasured = false))
+
+        // A note sitting on a layer the table never declared is how a reader rejects a
+        // whole file, so the layer count and the layer entries have to move together.
+        assertTrue(dxf.contains("\nNOTES\n"), "the note needs its own layer")
+        assertEquals(count(dxf, "  0\nLAYER\n"), 4)
+        assertTrue(dxf.trimEnd().endsWith("EOF"))
+        // Group 1 holds the string; a newline in it would end the group and corrupt
+        // everything after it.
+        assertFalse(dxf.contains("  1\n\n"))
+    }
+
+    @Test
+    fun `the csv note cannot shift the columns of the tables around it`() {
+        val csv = CsvExporter.export(plan.copy(arrangementMeasured = false))
+        // The note is prose and contains an em dash and commas. Quoted, it is one field;
+        // unquoted it would silently push every measurement below it out of alignment.
+        val noteLine = csv.lines().first { it.startsWith("\"Note\"") }
+        assertEquals(2, noteLine.split("\",\"").size)
+    }
+
     @Test
     fun `a file name never contains a path separator`() {
         assertEquals("Flat-3_4.svg", ExportFormat.SVG.fileName("Flat 3/4"))
