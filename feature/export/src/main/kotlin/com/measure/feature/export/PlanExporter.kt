@@ -170,6 +170,7 @@ object PlanExporter {
  */
 internal fun ProjectDetail.toExportable() = ExportablePlan(
     name = name,
+    reference = reference,
     rooms = rooms.map(SavedRoom::toExportable),
     measurements = measurements.map {
         ExportableMeasurement(

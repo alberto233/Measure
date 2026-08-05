@@ -2,6 +2,7 @@ package com.measure.app
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +21,15 @@ class ProjectsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // The same fix EditorActivity needed, applied before this screen could reproduce
+        // the fault rather than after. With edge-to-edge on, letting the window resize for
+        // the keyboard means the inset is counted twice — once by the resize and again by
+        // `safeDrawingPadding` — and the content ends up squashed into the top of the
+        // screen. This screen gained its first text field with search, so it was one step
+        // away from the same bug. Nothing here needs to move for the keyboard: the search
+        // field is at the top and stays visible.
+        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
 
         setContent {
             ProjectsScreen(

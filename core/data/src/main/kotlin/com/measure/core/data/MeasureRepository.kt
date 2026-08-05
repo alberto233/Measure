@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.combine
 data class ProjectSummary(
     val id: Long,
     val name: String,
+    /** The user's own label for this plan — a client, an address. Empty when unset. */
+    val reference: String,
     val updatedAt: Long,
     val unitSystem: UnitSystem,
     val roomCount: Int,
@@ -158,6 +160,8 @@ data class SavedPlanMeasurement(
 data class ProjectDetail(
     val id: Long,
     val name: String,
+    /** The user's own label for this plan. Travels into the exports' title block. */
+    val reference: String = "",
     val unitSystem: UnitSystem,
     val rooms: List<SavedRoom>,
     val measurements: List<SavedMeasurement>,
@@ -229,6 +233,7 @@ class MeasureRepository(
                 ProjectSummary(
                     id = row.id,
                     name = row.name,
+                    reference = row.reference,
                     updatedAt = row.updatedAt,
                     unitSystem = row.unitSystem.toUnitSystem(),
                     roomCount = row.roomCount,
@@ -278,6 +283,7 @@ class MeasureRepository(
             ProjectDetail(
                 id = project.id,
                 name = project.name,
+                reference = project.reference,
                 unitSystem = project.unitSystem.toUnitSystem(),
                 rooms = roomRows.map {
                     it.toSavedRoom(
@@ -326,6 +332,10 @@ class MeasureRepository(
         ProjectNaming.nextRoomName(rooms.namesIn(projectId))
 
     suspend fun renameProject(projectId: Long, name: String) = projects.rename(projectId, name, now())
+
+    /** Sets the free-text label a plan can be found by. Blank clears it. */
+    suspend fun setReference(projectId: Long, reference: String) =
+        projects.setReference(projectId, reference.trim(), now())
 
     suspend fun deleteProject(projectId: Long) = projects.delete(projectId)
 

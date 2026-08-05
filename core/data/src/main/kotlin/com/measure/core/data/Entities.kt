@@ -26,6 +26,19 @@ data class ProjectEntity(
     val updatedAt: Long,
     /** Stored as the enum name, so a new unit system does not renumber the old ones. */
     val unitSystem: String,
+    /**
+     * Whatever the user needs to recognise this plan by — a client, an address, a flat
+     * number — docs/PRODUCT_PLAN.md M13.
+     *
+     * One free-text field rather than a `client` column and an `address` column and a
+     * `notes` column. Which of those someone needs is not knowable in advance: an estate
+     * agent wants the address, a fitter wants the customer, and a person measuring their
+     * own home wants "the old flat". Three columns would force everyone into a shape
+     * chosen for somebody else, and two of them would sit empty for every user.
+     *
+     * Searched alongside the name. Empty until someone fills it in, which most will not.
+     */
+    val reference: String = "",
 )
 
 /**

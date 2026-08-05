@@ -66,6 +66,23 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug --console=plain 2>&1 | tee /tmp/build.log
 
+      # :core:data holds pure logic worth testing — project naming, plan-view collapse,
+      # search and sort — but it is an Android library, so its tests need the SDK and
+      # cannot run in the JVM job above. They were therefore never run anywhere at all.
+      # Run here, where the SDK is, rather than left as tests nobody executes.
+      - name: Test the data layer
+        run: ./gradlew :core:data:testDebugUnitTest --stacktrace
+
+      - name: Upload data test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-test-reports
+          path: |
+            core/data/build/reports/tests/
+            core/data/build/test-results/
+          retention-days: 7
+
       # Kotlin prints diagnostics before the failure marker, and a long Gradle stack
       # trace then buries them. Anyone reading only the end of the log — including
       # tooling that can fetch just the tail — would never see the actual error, so

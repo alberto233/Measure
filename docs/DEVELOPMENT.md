@@ -14,12 +14,12 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
-| `:feature:projects` | The home screen: saved plans with drawn thumbnails |
+| `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M13 finding a plan — see §8 |
+| Next | M14 grouping, or M8 registration — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -590,6 +590,43 @@ and Android cannot install an APK from inside a zip.
 Builds are debug-signed, which is fine for sideloading but cannot go to the Play Store.
 A release signing config is an M10 concern.
 
+## M13: finding a plan
+
+Nothing on the home screen distinguished "Plan 3" from "Plan 7". Schema v7 adds
+`ProjectEntity.reference` — **one** free-text field rather than a `client` column, an
+`address` column and a `notes` column, because which of those someone needs is not
+knowable in advance and two of the three would sit empty for every user.
+
+`ProjectCatalogue` holds the searching and ordering, pure and tested, because a search that
+quietly fails to match is indistinguishable from a plan that is not there, and the user's
+conclusion is that the app lost their work. Three things in it are deliberate:
+
+- **Every word must match, in any order, across both fields.** "ash 3" finds "Plan 3" at
+  "14 Ash Road" — a string that appears in neither field, so substring matching would find
+  nothing while the user watched a plan they could see fail to be found.
+- **Search folds accents.** This app is built and tested in Spanish, where somebody will
+  type "Ático" into the reference and later search for "atico".
+- **Name ordering counts.** `Plan 1, Plan 10, Plan 2` is correct alphabetically and looks
+  like a bug to everyone who sees it — and since the app names plans "Plan N" itself, that
+  is the ordering most users would get.
+
+The controls appear only past five plans. Below that, finding one is not a problem, and two
+rows of furniture above a readable list is the cost of solving it anyway.
+
+"No plans match" is a different empty state from "nothing measured yet", and says the plans
+are still there. Telling somebody who has measured thirty rooms that they have measured
+nothing is the worst thing a list screen can imply.
+
+`ProjectsActivity` also got `SOFT_INPUT_ADJUST_NOTHING`. It had the same
+`enableEdgeToEdge` + `safeDrawingPadding` pairing that threw the editor's panel to the top,
+and search gave it its first text field — so it was one step from reproducing a fault
+already fixed once. Applied before it could happen rather than after.
+
+**`:core:data`'s tests now run.** They are JVM tests in an Android library, so they need the
+SDK and could not run in the JVM job — which meant `ProjectNamingTest` and
+`SavedMeasurementTest` had been in the tree for weeks without CI ever executing them. They
+run in the Android job now, where the SDK is.
+
 ## 8. Open decisions
 
 - **App name.** `Measure` is a working title and too generic for the Play Store.
@@ -597,9 +634,9 @@ A release signing config is an M10 concern.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations are written but never run against real data.** The schema is at version 6
-  with five hand-written migrations (walls table; measured corner positions; openings;
-  plan measurements; capture session). All five are straightforward and Room validates them against the exported schemas at
+- **Migrations are written but never run against real data.** The schema is at version 7
+  with six hand-written migrations (walls table; measured corner positions; openings;
+  plan measurements; capture session; project reference). All six are straightforward and Room validates them against the exported schemas at
   compile time,
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which

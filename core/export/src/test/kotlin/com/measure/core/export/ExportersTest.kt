@@ -411,6 +411,17 @@ class ExportersTest {
     }
 
     @Test
+    fun `the reference goes on the drawing, so a sent plan says whose it is`() {
+        val labelled = plan.copy(reference = "14 Ash Road")
+
+        assertEquals("Plan 1 · 14 Ash Road", labelled.title)
+        assertTrue(SvgExporter.export(labelled).contains("14 Ash Road"))
+        assertTrue(JsonExporter.export(labelled).contains("\"reference\": \"14 Ash Road\""))
+        // And a plan without one is unchanged rather than gaining a stray separator.
+        assertEquals("Plan 1", plan.title)
+    }
+
+    @Test
     fun `a file name never contains a path separator`() {
         assertEquals("Flat-3_4.svg", ExportFormat.SVG.fileName("Flat 3/4"))
         assertEquals("plan.dxf", ExportFormat.DXF.fileName("   "))

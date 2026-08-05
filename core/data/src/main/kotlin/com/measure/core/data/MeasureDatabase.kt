@@ -27,7 +27,7 @@ import androidx.sqlite.execSQL
         MeasurementEntity::class,
         PlanMeasurementEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -164,6 +164,20 @@ abstract class MeasureDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Adds the free-text reference a plan can be found by.
+         *
+         * Empty for every existing plan, which is exactly right: the app has no idea whose
+         * house "Plan 3" is, and inventing one would be worse than leaving it blank.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "ALTER TABLE `projects` ADD COLUMN `reference` TEXT NOT NULL DEFAULT ''",
+                )
+            }
+        }
+
         @Volatile
         private var instance: MeasureDatabase? = null
 
@@ -177,7 +191,14 @@ abstract class MeasureDatabase : RoomDatabase() {
                 // Cascading deletes are declared on the entities and are load-bearing:
                 // Room does not switch foreign keys on for you.
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7,
+                )
                 .build()
     }
 }

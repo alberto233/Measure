@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 data class ProjectSummaryRow(
     val id: Long,
     val name: String,
+    val reference: String,
     val updatedAt: Long,
     val unitSystem: String,
     val roomCount: Int,
@@ -48,7 +49,7 @@ interface ProjectDao {
 
     @Query(
         """
-        SELECT p.id, p.name, p.updatedAt, p.unitSystem,
+        SELECT p.id, p.name, p.reference, p.updatedAt, p.unitSystem,
                (SELECT COUNT(*) FROM rooms r
                   JOIN levels l ON r.levelId = l.id
                  WHERE l.projectId = p.id) AS roomCount,
@@ -113,6 +114,9 @@ interface ProjectDao {
 
     @Query("UPDATE projects SET name = :name, updatedAt = :now WHERE id = :id")
     suspend fun rename(id: Long, name: String, now: Long)
+
+    @Query("UPDATE projects SET reference = :reference, updatedAt = :now WHERE id = :id")
+    suspend fun setReference(id: Long, reference: String, now: Long)
 
     @Query("UPDATE projects SET updatedAt = :now WHERE id = :id")
     suspend fun touch(id: Long, now: Long)

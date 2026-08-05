@@ -18,6 +18,16 @@ import com.measure.core.geometry.plan.DimensionChains
 data class ExportablePlan(
     val name: String,
     val rooms: List<ExportableRoom>,
+    /**
+     * The user's own label — a client, an address — or empty.
+     *
+     * On the drawing because that is where it earns its keep: "Plan 3" identifies a file
+     * on a phone, and "14 Ash Road" identifies a drawing in somebody else's inbox.
+     *
+     * Declared after [rooms] rather than beside [name] so that constructing a plan
+     * positionally still means what it used to.
+     */
+    val reference: String = "",
     /** Distances taken in the room with the camera. */
     val measurements: List<ExportableMeasurement> = emptyList(),
     /** Distances drawn on the plan afterwards. */
@@ -61,6 +71,9 @@ data class ExportablePlan(
             .flatMap { DimensionChains.chains(listOf(it.outline)) }
 
     val totalFloorArea: Double get() = rooms.sumOf { it.floorArea }
+
+    /** The name, with the reference after it when there is one. For a title block. */
+    val title: String get() = if (reference.isBlank()) name else "$name · $reference"
 
     /**
      * The one sentence every format says when [arrangementMeasured] is false, or null.

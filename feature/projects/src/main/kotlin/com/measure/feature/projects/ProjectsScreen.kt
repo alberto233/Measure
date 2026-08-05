@@ -33,10 +33,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.measure.core.data.ProjectSort
 import com.measure.core.data.ProjectSummary
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.PlanStyle
@@ -64,9 +66,14 @@ fun ProjectsScreen(
     modifier: Modifier = Modifier,
     viewModel: ProjectsViewModel = viewModel(),
 ) {
-    val projects by viewModel.projects.collectAsStateWithLifecycle()
-    var renaming by remember { mutableStateOf<ProjectSummary?>(null) }
+    val all by viewModel.projects.collectAsStateWithLifecycle()
+    val projects = viewModel.visible(all)
+    var editing by remember { mutableStateOf<ProjectSummary?>(null) }
     var deleting by remember { mutableStateOf<ProjectSummary?>(null) }
+
+    // Only worth showing once there are enough plans to have trouble finding one. Below
+    // that the controls are two rows of furniture above a list you can already read.
+    val searchable = (all?.size ?: 0) >= SEARCH_THRESHOLD
 
     Box(
         modifier
@@ -81,14 +88,28 @@ fun ProjectsScreen(
         ) {
             item { Header(onDeviceCheck) }
 
+            if (searchable) {
+                item {
+                    FindBar(
+                        query = viewModel.query,
+                        onQuery = viewModel::search,
+                        sort = viewModel.sort,
+                        onSort = viewModel::selectSort,
+                    )
+                }
+            }
+
             when {
                 projects == null -> Unit // Loading: say nothing rather than say "empty".
-                projects!!.isEmpty() -> item { EmptyState() }
-                else -> items(projects!!, key = { it.id }) { project ->
+                // Two different nothings, and conflating them would be a small lie: one
+                // means "you have measured nothing", the other "nothing here says that".
+                all!!.isEmpty() -> item { EmptyState() }
+                projects.isEmpty() -> item { NoMatches(viewModel.query) }
+                else -> items(projects, key = { it.id }) { project ->
                     ProjectCard(
                         project = project,
                         onOpen = { onOpenProject(project.id) },
-                        onRename = { renaming = project },
+                        onEdit = { editing = project },
                         onDelete = { deleting = project },
                     )
                 }
@@ -101,13 +122,15 @@ fun ProjectsScreen(
         )
     }
 
-    renaming?.let { project ->
-        RenameDialog(
-            initial = project.name,
-            onDismiss = { renaming = null },
-            onConfirm = {
-                viewModel.rename(project.id, it)
-                renaming = null
+    editing?.let { project ->
+        DetailsDialog(
+            initialName = project.name,
+            initialReference = project.reference,
+            onDismiss = { editing = null },
+            onConfirm = { name, reference ->
+                viewModel.rename(project.id, name)
+                viewModel.setReference(project.id, reference)
+                editing = null
             },
         )
     }
@@ -155,6 +178,119 @@ private fun Header(onDeviceCheck: () -> Unit) {
     }
 }
 
+/**
+ * Search, and how the list is ordered — docs/PRODUCT_PLAN.md M13.
+ *
+ * Both on one row of the screen rather than behind a menu. There are three orders and one
+ * field; hiding four things behind a button to save two rows would mean nobody ever
+ * discovered them, and a search nobody finds is a search that does not exist.
+ */
+@Composable
+private fun FindBar(
+    query: String,
+    onQuery: (String) -> Unit,
+    sort: ProjectSort,
+    onSort: (ProjectSort) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(MeasureColours.Scrim)
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.weight(1f)) {
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    singleLine = true,
+                    textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 15.sp),
+                    cursorBrush = SolidColor(MeasureColours.Ready),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // A placeholder rather than a label above the field: the row is already
+                // recognisably a search box, and the hint says what it searches, which is
+                // the part nobody would guess.
+                if (query.isEmpty()) {
+                    Text(
+                        text = "Search name or reference",
+                        color = MeasureColours.OnScrimMuted.copy(alpha = 0.7f),
+                        fontSize = 15.sp,
+                    )
+                }
+            }
+            if (query.isNotEmpty()) {
+                Text(
+                    text = "Clear",
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .clickable { onQuery("") }
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                    color = MeasureColours.Ready,
+                    fontSize = 13.sp,
+                )
+            }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ProjectSort.entries.forEach { option ->
+                SortChip(
+                    label = option.label,
+                    selected = option == sort,
+                    onClick = { onSort(option) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) MeasureColours.Ready else MeasureColours.Scrim)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        color = if (selected) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
+        fontSize = 13.sp,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+    )
+}
+
+/**
+ * The list is empty because of the search, not because there is nothing.
+ *
+ * Distinct from [EmptyState] on purpose. "Nothing measured yet" in front of someone who
+ * has measured thirty rooms reads as the app having lost them, and that is the single
+ * worst thing a list screen can imply.
+ */
+@Composable
+private fun NoMatches(query: String) {
+    Column(
+        Modifier.fillMaxWidth().padding(top = 48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "No plans match “$query”",
+            color = MeasureColours.OnScrim,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "Your plans are all still here — only this search is empty.",
+            color = MeasureColours.OnScrimMuted,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
 @Composable
 private fun EmptyState() {
     Column(
@@ -189,7 +325,7 @@ private fun EmptyState() {
 private fun ProjectCard(
     project: ProjectSummary,
     onOpen: () -> Unit,
-    onRename: () -> Unit,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Row(
@@ -227,6 +363,17 @@ private fun ProjectCard(
                 fontSize = 17.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+            // Above the contents, because when someone has bothered to write "14 Ash Road"
+            // that is what they are scanning the list for — not how many rooms it has.
+            if (project.reference.isNotBlank()) {
+                Text(
+                    text = project.reference,
+                    color = MeasureColours.Ready,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             Text(
                 text = project.describeContents(),
                 color = MeasureColours.OnScrimMuted,
@@ -241,7 +388,7 @@ private fun ProjectCard(
         }
 
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            CardAction("Rename", onRename)
+            CardAction("Edit", onEdit)
             CardAction("Delete", onDelete)
         }
     }
@@ -293,32 +440,81 @@ private fun NewMeasurementButton(onClick: () -> Unit, modifier: Modifier = Modif
     )
 }
 
+/**
+ * The name and the reference, edited together.
+ *
+ * One dialog rather than two entries on the card. They are the same act — saying which
+ * plan this is — and splitting them would put a second, rarely-used menu item beside a
+ * frequently-used one, which is how a card of actions turns into a card of clutter.
+ */
 @Composable
-private fun RenameDialog(
-    initial: String,
+private fun DetailsDialog(
+    initialName: String,
+    initialReference: String,
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
+    onConfirm: (name: String, reference: String) -> Unit,
 ) {
-    var text by remember { mutableStateOf(initial) }
+    var name by remember { mutableStateOf(initialName) }
+    var reference by remember { mutableStateOf(initialReference) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename plan") },
+        title = { Text("Plan details") },
         text = {
-            BasicTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 16.sp),
-                cursorBrush = SolidColor(MeasureColours.Ready),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MeasureColours.ScrimSoft)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                DialogField(value = name, onValueChange = { name = it }, hint = "Name")
+                DialogField(
+                    value = reference,
+                    onValueChange = { reference = it },
+                    hint = "Client, address, anything you would search for",
+                )
+                Text(
+                    text = "The reference is searched along with the name. It appears on " +
+                        "exports, so a plan sent to someone says whose it is.",
+                    color = MeasureColours.OnScrimMuted,
+                    fontSize = 12.sp,
+                )
+            }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(text) }) { Text("Rename") } },
+        confirmButton = { TextButton(onClick = { onConfirm(name, reference) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/**
+ * A field that looks like one.
+ *
+ * The hint is drawn behind rather than as a label, and the box is a shade off the dialog
+ * so the edge is visible: the editor shipped fields that were the same colour as the panel
+ * behind them and read as gaps rather than as inputs, which is a fault worth not repeating
+ * in a second screen.
+ */
+@Composable
+private fun DialogField(value: String, onValueChange: (String) -> Unit, hint: String) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(MeasureColours.ScrimSoft)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        if (value.isEmpty()) {
+            Text(
+                text = hint,
+                color = MeasureColours.OnScrimMuted.copy(alpha = 0.7f),
+                fontSize = 15.sp,
+            )
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 15.sp),
+            cursorBrush = SolidColor(MeasureColours.Ready),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** Below this many plans, finding one is not a problem worth putting controls on screen for. */
+private const val SEARCH_THRESHOLD = 5

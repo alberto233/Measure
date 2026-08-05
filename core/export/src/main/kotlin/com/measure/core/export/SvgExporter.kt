@@ -63,7 +63,7 @@ object SvgExporter {
                     "width=\"${mm(width)}mm\" height=\"${mm(height)}mm\" " +
                     "viewBox=\"0 0 ${mm(width)} ${mm(height)}\">\n",
             )
-            append("  <title>${escape(plan.name)}</title>\n")
+            append("  <title>${escape(plan.title)}</title>\n")
             append("  <rect width=\"100%\" height=\"100%\" fill=\"#ffffff\"/>\n")
 
             plan.rooms.forEach { room ->
@@ -182,7 +182,7 @@ object SvgExporter {
             append(
                 "  <text x=\"${mm(MARGIN_MM)}\" y=\"${mm(height - MARGIN_MM / 3)}\" " +
                     "font-family=\"sans-serif\" font-size=\"${mm(TEXT_HEIGHT_MM * 0.8)}\">" +
-                    "${escape(plan.name)} · 1:${number(scaleDenominator)} at A-size · " +
+                    "${escape(plan.title)} · 1:${number(scaleDenominator)} at A-size · " +
                     "measured with Measure</text>\n",
             )
 

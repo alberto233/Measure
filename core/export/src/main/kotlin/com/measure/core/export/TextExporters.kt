@@ -90,6 +90,7 @@ object JsonExporter {
         append("  \"application\": \"Measure\",\n")
         append("  \"units\": \"metres\",\n")
         append("  \"name\": ${string(plan.name)},\n")
+        append("  \"reference\": ${string(plan.reference)},\n")
         // Machine-readable, because this is the format something else reads back, and the
         // thing it most needs to know about the coordinates is whether they mean anything
         // between one room and the next.

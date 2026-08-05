@@ -259,7 +259,7 @@ internal object PlanDrawing {
             textSize = bodyText * 0.8f
             isAntiAlias = true
         }
-        canvas.drawText(plan.name, margin, height - margin * 0.9f, footer)
+        canvas.drawText(plan.title, margin, height - margin * 0.9f, footer)
         canvas.drawText(
             "${plan.rooms.size} ${if (plan.rooms.size == 1) "room" else "rooms"} · " +
                 "${number(plan.totalFloorArea)} m² · measured with Measure",
