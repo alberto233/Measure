@@ -9,7 +9,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 226 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 229 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
@@ -206,6 +206,28 @@ being sent as `application/dxf`, which is not a registered type at all (the real
 `image/vnd.dxf`). Both are fixed, and the share now falls back to
 `application/octet-stream` when nothing resolves the exact type — a file manager or a mail
 client will always take that.
+
+**Field tested twice.** PDF and PNG came out right. Three things followed:
+
+- **Exports carried no dimensions and no drawn distances.** Both are now on every format.
+  Unlike the app, an export shows *every* dimension run at once — on screen a number can
+  be asked for and a plan carrying all of them is unreadable on a phone, but on paper
+  there is nobody to ask, and a drawing that does not carry its dimensions is a picture of
+  a room rather than a description of one. Distances drawn on the plan were reaching no
+  format at all, which quietly made every file less than what the user had on screen. They
+  are exported now, dashed and tilde-marked in the drawings and in their own table in the
+  CSV and JSON, so the difference between observed and derived survives a format that
+  strips every visual cue.
+- **Editing gave no feedback.** Locking a wall, setting a ceiling height, resizing an
+  opening and renaming a room all did their work silently, so the only way to know a
+  button had worked was to notice a number change elsewhere. Every one confirms now, and
+  a success is teal where a refusal is amber — confirming success in the colour reserved
+  for problems teaches people to read every message as a problem, and then to stop
+  reading them.
+- **PNG was labelled "Image"** beside four formats that name themselves. It says PNG.
+
+**Sharing an SVG still fails, and the cause is not known.** Recorded in §8 rather than
+guessed at again.
 
 `PlanGeometry` was also lifted out of `SvgExporter`, where "where does this door sit on
 this wall" had started life as a private helper and then had to be reached by the canvas
@@ -499,6 +521,16 @@ A release signing config is an M10 concern.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+- **Sharing an SVG fails on the A36, and the cause is not yet known.** Every other format
+  shares. `image/svg+xml` is the correct registered type and almost nothing on a handset
+  claims it, so the share falls back to `application/octet-stream` — and it still fails,
+  which means the fallback is not the whole story. A missing `<queries>` element was found
+  and fixed alongside (without it `resolveActivity` returns null on Android 11 and later
+  whatever is installed, so the fallback was firing for the wrong reason rather than on
+  evidence), but that alone does not explain it. The next step is the precise symptom: no
+  chooser at all, a chooser whose targets then fail, or an error. Guessing again without
+  that would be the third guess, and SVG is the format with the weakest claim to a place
+  in the list now that PDF and PNG both work.
 - **Corners hidden behind furniture are still unsolved, and there is now no candidate.**
   Four field sessions have named this as the app's real limitation. Wall-face capture was
   the answer and it did not survive contact with a white wall (see above). What remains is
