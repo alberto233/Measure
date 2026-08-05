@@ -37,11 +37,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.geometry.OpeningKind
+import com.measure.feature.export.ExportSheet
+import com.measure.feature.export.PlanExporter
 import kotlinx.coroutines.delay
 
 /**
@@ -67,6 +70,9 @@ fun EditorScreen(
     val project by viewModel.project.collectAsStateWithLifecycle()
     val rooms = project?.rooms.orEmpty()
     val measurements = project?.measurements.orEmpty()
+
+    val context = LocalContext.current
+    var exporting by remember { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize().background(MeasureColours.Surface)) {
         PlanCanvas(
@@ -109,6 +115,10 @@ fun EditorScreen(
                             if (viewModel.mode == EditorMode.MEASURE) EditorMode.SELECT else EditorMode.MEASURE,
                         )
                     },
+                    // Nothing to send until something has been captured, and a share
+                    // sheet offering an empty drawing is worse than no button.
+                    canExport = rooms.isNotEmpty() || measurements.isNotEmpty(),
+                    onExport = { exporting = true },
                 )
                 if (viewModel.mode == EditorMode.MEASURE) {
                     MeasuringBanner(viewModel)
@@ -122,10 +132,28 @@ fun EditorScreen(
             // The panel is the only thing that must clear the keyboard: the plan behind it
             // should stay where it is rather than being squashed into a letterbox.
             val panelModifier = Modifier.align(Alignment.BottomCenter).imePadding()
-            if (viewModel.mode == EditorMode.MEASURE) {
-                MeasurePanel(viewModel, panelModifier)
-            } else {
-                SelectionPanel(viewModel, panelModifier)
+            when {
+                exporting -> ExportSheet(
+                    onExport = { format ->
+                        exporting = false
+                        val detail = project ?: return@ExportSheet
+                        // Failures are surfaced rather than swallowed: a share sheet that
+                        // does not appear is indistinguishable from a tap that missed.
+                        runCatching {
+                            context.startActivity(
+                                android.content.Intent.createChooser(
+                                    PlanExporter.share(context, detail, format),
+                                    "Send ${detail.name}",
+                                ),
+                            )
+                        }.onFailure { viewModel.reportExportFailure(it) }
+                    },
+                    onDismiss = { exporting = false },
+                    modifier = panelModifier,
+                )
+
+                viewModel.mode == EditorMode.MEASURE -> MeasurePanel(viewModel, panelModifier)
+                else -> SelectionPanel(viewModel, panelModifier)
             }
 
             viewModel.message?.let { text ->
@@ -180,24 +208,35 @@ private fun TopBar(
     onUndo: () -> Unit,
     measuring: Boolean,
     onToggleMeasure: () -> Unit,
+    canExport: Boolean,
+    onExport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier.fillMaxWidth().padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Pill("Back", onClick = onBack)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, color = MeasureColours.OnScrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+    Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Pill("Back", onClick = onBack)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(title, color = MeasureColours.OnScrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+            }
+            Pill("Add", onClick = onAddRoom)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // On its own row rather than crowded into the first. Five pills across a phone
+        // leaves each one too narrow to read, which is how the capture screen's buttons
+        // ended up unreadable at the top edge.
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             // Lit while active. A mode that changes what a tap does has to be visible
             // from the control that turned it on, or the plan simply stops behaving.
             Pill("Measure", highlighted = measuring, onClick = onToggleMeasure)
+            Pill("Send", enabled = canExport, onClick = onExport)
             Pill("Undo", enabled = canUndo, onClick = onUndo)
-            Pill("Add", onClick = onAddRoom)
         }
     }
 }

@@ -54,6 +54,22 @@
             android:label="@string/app_name"
             android:theme="@style/Theme.Measure.Capture" />
 
+        <!--
+          Serves exported files to whatever the user shares them with.
+
+          Scoped to one cache directory by export_paths.xml. A provider rooted any wider
+          would hand another app a readable path into private storage, database included.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.exports"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/export_paths" />
+        </provider>
+
         <!-- The device capability report, reachable from the home screen. -->
         <activity
             android:name=".MainActivity"

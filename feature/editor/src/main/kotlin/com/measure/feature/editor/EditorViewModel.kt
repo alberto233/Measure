@@ -168,6 +168,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         message = null
     }
 
+    /** Says so when a share fails, rather than leaving a tap that appeared to do nothing. */
+    fun reportExportFailure(error: Throwable) {
+        message = "Could not share this plan — ${error.javaClass.simpleName}"
+    }
+
     // --- dragging -------------------------------------------------------------------
 
     fun beginDrag(roomId: Long, index: Int, position: Vec2) {
@@ -400,7 +405,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         // square. Straightening a corner off its corner would be the tool overruling an
         // instruction rather than removing noise.
         val snapped = PlanSnapper.snap(rooms, point, reach)
-        val placed = if (snapped.kind == SnapKind.FREE) straighten(first, snapped) else snapped
+        val placed = when (snapped.kind) {
+            SnapKind.FREE -> straighten(first, snapped)
+            // Landed on a wall: the wall was aimed at and hit, so it keeps its anchor and
+            // only slides along it until the crossing is square.
+            SnapKind.WALL -> squareAcross(first, snapped) ?: snapped
+            SnapKind.CORNER -> snapped
+        }
 
         val candidate = PlanMeasurement(first, placed)
         if (candidate.isDegenerate) {
@@ -452,6 +463,43 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
         lastStraightening = result.description
         return to.copy(anchor = PlanAnchor.Free(result.position), position = result.position)
+    }
+
+    /**
+     * Squares a wall-to-wall measurement by sliding the far end along the wall it hit.
+     *
+     * This is the measurement people most want to be exact — how wide is the room, how
+     * far apart are these two walls — and it was the one case the general straightener
+     * deliberately skipped, because the far end had landed on real geometry. It had, and
+     * it should stay there; what needed fixing was only how far along that wall the line
+     * arrived. Sliding rather than projecting keeps the anchor, so the measurement still
+     * follows the wall when the room is re-solved.
+     */
+    private fun squareAcross(from: ResolvedPoint, to: ResolvedPoint): ResolvedPoint? {
+        val anchor = to.anchor as? PlanAnchor.Wall ?: return null
+        val room = project.value?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
+        val outline = room.outline
+        if (outline.size < 3 || anchor.index !in outline.indices) return null
+
+        // Square to the wall the measurement started from, or to the plan's grid when it
+        // started in open space.
+        val reference = wallDirectionOf(from) ?: dominantDirection()
+
+        val t = PlanConstraints.squareAlongWall(
+            from = from.position,
+            reference = reference,
+            wallStart = outline[anchor.index],
+            wallEnd = outline[(anchor.index + 1) % outline.size],
+            currentPosition = to.position,
+        ) ?: return null
+
+        val squared = PlanSnapper.resolve(
+            project.value?.snapRooms.orEmpty(),
+            anchor.copy(t = t),
+        ) ?: return null
+
+        lastStraightening = "square to ${from.description}"
+        return squared
     }
 
     private fun wallDirectionOf(point: ResolvedPoint): Vec2? {

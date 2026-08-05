@@ -92,4 +92,61 @@ object PlanConstraints {
 
         return Straightened(candidate, 0.0, null)
     }
+
+    /**
+     * How near square a wall-to-wall measurement must already be to be squared exactly.
+     *
+     * Tighter than [SNAP_TOLERANCE_DEGREES] because this one moves a point that landed on
+     * a real wall rather than in open space. The user aimed at that wall and hit it; all
+     * that is being corrected is *where along it* the line arrives, so the correction
+     * should only fire when the intent is unmistakable.
+     */
+    const val SQUARE_TOLERANCE_DEGREES = 5.0
+
+    private val squareSine = kotlin.math.sin(Math.toRadians(SQUARE_TOLERANCE_DEGREES))
+
+    /**
+     * Slides a point along the wall it landed on until the measurement is square to the
+     * wall it started from.
+     *
+     * This is the wall-to-wall case, and it needs its own treatment because the general
+     * straightener deliberately leaves alone any end that landed on real geometry. Here
+     * the end *should* stay on its wall — that is what was aimed at — and the thing worth
+     * fixing is only how far along that wall the line arrives. Sliding it keeps the
+     * anchor, so the measurement still follows the wall when the room is re-solved, and
+     * makes the reading the perpendicular distance rather than a slight hypotenuse.
+     *
+     * Returns the new position along the target wall as a fraction, or null when the two
+     * are too close to parallel to have a square crossing, when the answer would fall off
+     * the end of the wall, or when the line was never close to square to begin with.
+     *
+     * @param reference the direction the measurement should end up square to — the
+     *   starting wall's own direction, or the plan's grid when it started in open space.
+     */
+    fun squareAlongWall(
+        from: Vec2,
+        reference: Vec2,
+        wallStart: Vec2,
+        wallEnd: Vec2,
+        currentPosition: Vec2,
+    ): Double? {
+        val direction = reference.normalised()
+        if (direction.length < Vec2.EPSILON) return null
+
+        // Only when it is nearly square already. Square means no component along the
+        // reference, so the test is on the sine rather than the cosine.
+        val offset = currentPosition - from
+        val distance = offset.length
+        if (distance < Vec2.EPSILON) return null
+        if (abs((offset / distance) dot direction) > squareSine) return null
+
+        val span = wallEnd - wallStart
+        val denominator = span dot direction
+        // The target wall runs the same way as the reference, so every point on it is
+        // equally square and there is nothing to solve for.
+        if (abs(denominator) < Vec2.EPSILON) return null
+
+        val t = -((wallStart - from) dot direction) / denominator
+        return t.takeIf { it in 0.0..1.0 }
+    }
 }

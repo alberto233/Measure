@@ -9,16 +9,17 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry` | Implemented, 200 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 223 tests passing, CI green |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan |
+| `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **M7 export** — see §8 |
+| Next | M7's PNG and PDF, then M13 finding a plan — see §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -160,6 +161,38 @@ no hover and the second tap is what commits; "Redo point" is offered before that
 tap; two taps in the same place are refused with a reason instead of saved as a dot; and
 the end marks are three different shapes so a corner anchor, a wall anchor and a free
 point cannot be confused for each other on the drawing.
+
+**M7 export is implemented for the text formats and untested on hardware.** **Send** in
+the plan editor offers SVG, DXF, CSV and the project's own JSON, writes the file into a
+cache directory and hands it to the system share sheet.
+
+All four exporters live in `:core:export`, which is pure Kotlin and has no Android
+dependency at all. That is worth more here than elsewhere: every one of these formats is
+text, so the whole of it is unit tested, and a single malformed character produces a file
+that opens as an error dialogue in someone else's software rather than as a plan — which
+no device test would catch either, since the failure happens in AutoCAD a week later.
+
+Three decisions worth keeping:
+
+- **The DXF is full size in metres, and says so.** CAD drawings are always full size;
+  scale is applied at printing. `$INSUNITS` is set to metres because most readers assume
+  millimetres when it is absent, which would make a five-metre room five millimetres
+  across. The dialect is the minimal R12 ASCII form — every feature beyond it is another
+  way for one reader in ten to reject the file.
+- **The SVG states its scale on the drawing.** A plan whose relationship to reality is
+  unstated is a picture; one that says 1:50 is something a person can measure off.
+- **Every number is formatted in `Locale.ROOT`.** On a phone set to Spanish the default
+  locale writes a decimal comma, and an SVG coordinate or a JSON number containing a comma
+  is not the number it was meant to be. A test pins this by parsing the output under
+  `es-ES`, because it is exactly the bug that would only ever appear on somebody else's
+  device.
+
+The `FileProvider` is scoped to one cache directory. Rooted any wider it would hand every
+share target a readable path into private storage, database included.
+
+**Not yet done in M7:** PNG and PDF, which need the plan rendered through Android's canvas
+rather than emitted as text, and are therefore the two that cannot be tested the way these
+were.
 
 Nothing substitutes a typical 2.4 m when no ceiling height is known — a guessed paint
 estimate looks exactly like a measured one on screen, and the user would have no way to

@@ -34,6 +34,7 @@ include(":core:units")
 include(":core:geometry")
 include(":core:data")
 include(":core:designsystem")
+include(":core:export")
 
 // ARCore session handling and AR rendering. Everything that imports com.google.ar
 // lives here, so the rest of the app never depends on ARCore directly.
@@ -43,5 +44,6 @@ include(":ar")
 include(":feature:capture")
 include(":feature:projects")
 include(":feature:editor")
+include(":feature:export")
 
 include(":app")

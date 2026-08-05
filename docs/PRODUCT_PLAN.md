@@ -136,7 +136,7 @@ revised order below.
 | **M13** | Finding a plan | 0.5 wk | Sort and search the project list; one free-text field per project (client, address) with filter chips |
 | **M14** | Grouping plans | 1.5 wks | A tier above the project, once M13 has shown whether people want folders or tags |
 
-**Revised order: M12 (done), M7, then the rest.**
+**Revised order: M12 (done), M7 (text formats done), then the rest.**
 
 M11 was to come first, on the strength of three field sessions naming hidden corners as
 the app's real limitation. It was built and then removed: the sensor does not supply the

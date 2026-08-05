@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Only the exports directory is shared, and only that one.
+
+  A FileProvider given a broader root would hand any other app a readable path into the
+  app's private storage, database included. Exports are copies made to be sent; nothing
+  else here is.
+-->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

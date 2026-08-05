@@ -29,7 +29,7 @@ jobs:
       # The measurement logic lives in pure-Kotlin modules with no Android dependency,
       # so the tests that matter most run here in seconds, on every push.
       - name: Test the geometry and units core
-        run: ./gradlew :core:units:test :core:geometry:test --stacktrace
+        run: ./gradlew :core:units:test :core:geometry:test :core:export:test --stacktrace
 
       - name: Upload test reports
         if: failure()

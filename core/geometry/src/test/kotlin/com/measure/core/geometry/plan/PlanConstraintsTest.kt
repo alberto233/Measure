@@ -88,6 +88,89 @@ class PlanConstraintsTest {
         assertNull(result.description)
     }
 
+    // --- wall to wall -----------------------------------------------------------------
+
+    /** The far wall of a 4 m room: runs along x at y = 4. */
+    private val farWall = Vec2(0.0, 4.0) to Vec2(6.0, 4.0)
+
+    @Test
+    fun `a wall to wall measurement is slid square along the far wall`() {
+        // Started on a wall running along x, tapped the opposite wall 20 cm adrift —
+        // about three degrees over four metres, which is a good aim. The reading was
+        // 4.005 m; square across, it is 4.
+        val t = PlanConstraints.squareAlongWall(
+            from = Vec2(2.0, 0.0),
+            reference = Vec2(1.0, 0.0),
+            wallStart = farWall.first,
+            wallEnd = farWall.second,
+            currentPosition = Vec2(2.2, 4.0),
+        )
+
+        assertEquals(2.0 / 6.0, t!!, 1e-9)
+        val squared = farWall.first + (farWall.second - farWall.first) * t
+        assertEquals(4.0, squared.distanceTo(Vec2(2.0, 0.0)), 1e-9)
+    }
+
+    @Test
+    fun `an end that landed on the wall stays on the wall`() {
+        // The whole point of sliding rather than projecting: the anchor survives, so the
+        // measurement still follows the wall when the room is re-solved.
+        val t = PlanConstraints.squareAlongWall(
+            from = Vec2(2.0, 0.0),
+            reference = Vec2(1.0, 0.0),
+            wallStart = farWall.first,
+            wallEnd = farWall.second,
+            currentPosition = Vec2(2.2, 4.0),
+        )!!
+        val squared = farWall.first + (farWall.second - farWall.first) * t
+        assertEquals(4.0, squared.y, 1e-9)
+    }
+
+    @Test
+    fun `a line well off square is left as drawn`() {
+        // Fifteen degrees. Beyond that the user meant a diagonal, and squaring it would
+        // be answering a different question.
+        assertNull(
+            PlanConstraints.squareAlongWall(
+                from = Vec2(2.0, 0.0),
+                reference = Vec2(1.0, 0.0),
+                wallStart = farWall.first,
+                wallEnd = farWall.second,
+                currentPosition = Vec2(3.07, 4.0),
+            ),
+        )
+    }
+
+    @Test
+    fun `a square crossing that would fall off the end of the wall is refused`() {
+        // Starting beyond where the far wall reaches: there is no point on it square to
+        // this one, and inventing a position past its end would put the measurement in
+        // mid-air.
+        assertNull(
+            PlanConstraints.squareAlongWall(
+                from = Vec2(9.0, 0.0),
+                reference = Vec2(1.0, 0.0),
+                wallStart = farWall.first,
+                wallEnd = farWall.second,
+                currentPosition = Vec2(9.0, 4.0),
+            ),
+        )
+    }
+
+    @Test
+    fun `a wall running the same way as the reference has nothing to solve`() {
+        // Every point on it is equally square, so there is no unique answer to give.
+        assertNull(
+            PlanConstraints.squareAlongWall(
+                from = Vec2(0.0, 0.0),
+                reference = Vec2(0.0, 1.0),
+                wallStart = farWall.first,
+                wallEnd = farWall.second,
+                currentPosition = Vec2(0.1, 4.0),
+            ),
+        )
+    }
+
     @Test
     fun `nothing preferred means nothing moves`() {
         val result = PlanConstraints.straighten(Vec2.ZERO, Vec2(0.1, 2.0), emptyList())

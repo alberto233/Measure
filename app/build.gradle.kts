@@ -82,6 +82,7 @@ dependencies {
     implementation(project(":feature:capture"))
     implementation(project(":feature:projects"))
     implementation(project(":feature:editor"))
+    implementation(project(":feature:export"))
 
     // Still needed here for the capability gate on the launch screen, which reports
     // ARCore availability and Depth support before any session is ever opened.
