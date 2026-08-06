@@ -41,7 +41,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
+import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureField
 import com.measure.core.designsystem.touchTarget
 import com.measure.core.geometry.OpeningKind
 import com.measure.feature.export.ExportSheet
@@ -334,11 +336,11 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
                     drawing -> "Corners and walls pull the point onto them"
                     else -> "Sizes are marked around the plan"
                 },
-                color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Ready,
+                color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Accent,
                 fontSize = 12.sp,
             )
             viewModel.lastStraightening?.let { straightened ->
-                Text("Pulled $straightened", color = MeasureColours.Ready, fontSize = 11.sp)
+                Text("Pulled $straightened", color = MeasureColours.Accent, fontSize = 11.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -893,7 +895,7 @@ private fun OpeningsSection(
     ) {
         Text(
             text = describeOpenings(openings),
-            color = if (openings.isEmpty()) MeasureColours.OnScrimMuted else MeasureColours.Ready,
+            color = if (openings.isEmpty()) MeasureColours.OnScrimMuted else MeasureColours.OnScrim,
             fontSize = 12.sp,
             fontWeight = if (openings.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
         )
@@ -977,6 +979,15 @@ private fun OpeningRow(
  * greyed hint say what the box is for before it is tapped, and the edge lights up when
  * it has focus so it is obvious which of four boxes the keyboard is typing into.
  */
+/**
+ * The editor's field and button, which are now the shared ones.
+ *
+ * These were the last two duplicates. `Field` and `Pill` existed here because the versions
+ * in the projects module were in another module, and between them they were most of the
+ * reason restyling this app meant editing 87 call sites. They stay as named functions so
+ * that the several dozen uses below did not all have to change in the same commit, and
+ * both are now one line.
+ */
 @Composable
 private fun Field(
     value: String,
@@ -984,42 +995,7 @@ private fun Field(
     numeric: Boolean = false,
     hint: String = "",
     modifier: Modifier = Modifier,
-) {
-    var focused by remember { mutableStateOf(false) }
-
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        textStyle = TextStyle(color = MeasureColours.OnScrim, fontSize = 15.sp),
-        cursorBrush = SolidColor(MeasureColours.Ready),
-        keyboardOptions = if (numeric) {
-            KeyboardOptions(keyboardType = KeyboardType.Decimal)
-        } else {
-            KeyboardOptions.Default
-        },
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MeasureColours.Surface)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) MeasureColours.Ready else MeasureColours.OnScrimMuted.copy(alpha = 0.45f),
-                shape = RoundedCornerShape(8.dp),
-            )
-            .onFocusChanged { focused = it.isFocused }
-            // A field is a target too, and a shallow one is hard to put a cursor in.
-            .touchTarget()
-            .padding(horizontal = 10.dp, vertical = 10.dp),
-        decorationBox = { field ->
-            Box(contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) {
-                    Text(hint, color = MeasureColours.OnScrimMuted.copy(alpha = 0.7f), fontSize = 15.sp)
-                }
-                field()
-            }
-        },
-    )
-}
+) = MeasureField(value, onValueChange, modifier, hint, numeric)
 
 @Composable
 private fun Pill(
@@ -1028,34 +1004,7 @@ private fun Pill(
     highlighted: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier
-            .clip(CircleShape)
-            .background(
-                when {
-                    !enabled -> MeasureColours.ScrimSoft
-                    highlighted -> MeasureColours.Ready
-                    else -> MeasureColours.ScrimSoft
-                },
-            )
-            .clickable(enabled = enabled, onClick = onClick)
-            .touchTarget()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            color = when {
-                !enabled -> MeasureColours.OnScrimMuted
-                highlighted -> Color(0xFF06231F)
-                else -> MeasureColours.OnScrim
-            },
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-        )
-    }
-}
+) = MeasureButton(label, onClick, modifier, primary = highlighted, enabled = enabled)
 
 private const val MESSAGE_DURATION_MS = 3000L
 

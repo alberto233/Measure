@@ -275,7 +275,7 @@ internal fun PlanCanvas(
                 screen.drop(1).forEach { lineTo(it.x, it.y) }
                 close()
             }
-            drawPath(path, MeasureColours.Ready.copy(alpha = if (isSelected) 0.20f else 0.10f))
+            drawPath(path, MeasureColours.OnScrim.copy(alpha = if (isSelected) 0.14f else 0.06f))
 
             val polygon = Polygon(outline)
 
@@ -288,7 +288,7 @@ internal fun PlanCanvas(
 
                 drawLine(
                     color = when {
-                        selected -> MeasureColours.Sampling
+                        selected -> MeasureColours.Accent
                         locked -> MeasureColours.Ready
                         else -> MeasureColours.OnScrim
                     },
@@ -441,9 +441,9 @@ private fun DrawScope.drawOpening(
             // leaf is hinged at the near jamb because that is where the opening's offset
             // is measured from, so the symbol and the number agree.
             val leaf = jambA + inward * width
-            drawLine(MeasureColours.Ready, jambA, leaf, strokeWidth = 4f)
+            drawLine(MeasureColours.OnScrimMuted, jambA, leaf, strokeWidth = 4f)
             drawArc(
-                color = MeasureColours.Ready.copy(alpha = 0.75f),
+                color = MeasureColours.OnScrimMuted.copy(alpha = 0.75f),
                 startAngle = screenAngle(inward),
                 sweepAngle = quarterTurn(inward, along),
                 useCenter = false,
