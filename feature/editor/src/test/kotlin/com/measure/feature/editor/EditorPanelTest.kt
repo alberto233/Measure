@@ -150,13 +150,13 @@ class EditorPanelTest {
         val viewModel = editor(projectId)
 
         assertTrue(viewModel.current?.rooms?.size == 1)
-        compose.onNodeWithText("Test plan").assertIsDisplayed()
+        compose.onNodeWithText("Test plan", ignoreCase = true).assertIsDisplayed()
 
         // The room's name is not on the plan. The canvas draws geometry, and the name lives
         // in the room's own panel — which this asserted without checking first, and which is
         // the sort of guess these tests exist to stop being made about the interface.
         viewModel.select(Selection.Room(roomId))
-        compose.onNodeWithText("Kitchen").assertExists()
+        compose.onNodeWithText("Kitchen", ignoreCase = true).assertExists()
     }
 
     /**
@@ -173,18 +173,18 @@ class EditorPanelTest {
         val viewModel = editor(projectId)
 
         viewModel.select(Selection.Wall(roomId, 0))
-        compose.onNodeWithText("No doors or windows").assertExists()
+        compose.onNodeWithText("No doors or windows", ignoreCase = true).assertExists()
 
-        compose.onNodeWithText("+ Door").performClick()
+        compose.onNodeWithText("+ Door", ignoreCase = true).performClick()
 
         // Nothing is touched in between. Before the fix the panel went on saying "No doors
         // or windows" until the selection changed, which is what sent the user hunting for
         // a way to make the button work.
         compose.waitUntil(TIMEOUT_MS) {
-            compose.onAllNodesWithText("Remove").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Remove", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onAllNodesWithText("Remove").assertCountEquals(1)
-        compose.onNodeWithText("1 door").assertExists()
+        compose.onAllNodesWithText("Remove", ignoreCase = true).assertCountEquals(1)
+        compose.onNodeWithText("1 door", ignoreCase = true).assertExists()
     }
 
     /** And the same for removing one: the panel has to go back to saying there are none. */
@@ -194,16 +194,16 @@ class EditorPanelTest {
         val viewModel = editor(projectId)
 
         viewModel.select(Selection.Wall(roomId, 0))
-        compose.onNodeWithText("+ Door").performClick()
+        compose.onNodeWithText("+ Door", ignoreCase = true).performClick()
         compose.waitUntil(TIMEOUT_MS) {
-            compose.onAllNodesWithText("Remove").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("Remove", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
         }
 
-        compose.onNodeWithText("Remove").performClick()
+        compose.onNodeWithText("Remove", ignoreCase = true).performClick()
         compose.waitUntil(TIMEOUT_MS) {
-            compose.onAllNodesWithText("No doors or windows").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithText("No doors or windows", ignoreCase = true).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("No doors or windows").assertExists()
+        compose.onNodeWithText("No doors or windows", ignoreCase = true).assertExists()
     }
 
     private companion object {

@@ -753,6 +753,22 @@ Still carrying the old styling at the time of writing: the editor (the bulk of i
 layout as distinct from its controls, and the device check, which needs porting out of plain
 Android views rather than restyling.
 
+## Uppercase button labels, and one hazard they carry
+
+`MeasureButton` uppercases its label. That is the direction A look, and it is done in the
+component so that no call site has to remember it and a translated string is uppercased by
+the same rule as an English one.
+
+It broke three interface tests the moment it landed — they matched on `"Send"` while the
+screen now says `"SEND"` — which is the tests doing their job: a visual change the compiler
+could not see, caught before a device did. They match case-insensitively now, because a test
+pinned to the source casing is testing the design rather than the behaviour.
+
+**The hazard to remember at M10c:** `String.uppercase()` uses the default locale, and in
+Turkish that turns `i` into `İ`. Spanish is unaffected, so this is not urgent, but the
+moment the app ships a language list this needs deciding — either a locale-safe cast or
+dropping the transform and setting the labels uppercase in the string resources.
+
 ## 8. Open decisions
 
 - **The device check stays, and needs the design pass.** It answers one question a

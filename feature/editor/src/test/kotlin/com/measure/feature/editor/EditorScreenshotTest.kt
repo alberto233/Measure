@@ -151,7 +151,7 @@ class EditorScreenshotTest {
     fun `the export sheet`() {
         val (projectId, _) = seed()
         editor(projectId)
-        compose.onNodeWithText("Send").performClick()
+        compose.onNodeWithText("Send", ignoreCase = true).performClick()
         shoot("editor-export")
     }
 
