@@ -121,7 +121,9 @@ promising dates.
 | **M7** | Export | 2 wks | PNG, PDF, SVG, DXF, CSV, JSON project file |
 | **M8** | Multi-room | 2 wks | Register a new capture against an existing plan, snap shared walls. *Partly landed early as a correctness fix: rooms from separate captures no longer overlap, are placed clear of each other, can be dragged into position, and every screen and file says the arrangement was not measured. What remains is making it measured.* |
 | **M9** | 3D view | 1.5 wks | Extruded walls, orbit camera |
-| **M10** | Beta polish | 2 wks | Onboarding, accuracy tutorial, device calibration, localisation, crash reporting, store listing |
+| **M10a** | Design system | — | Figma: tokens, component inventory, screen structure. Signed off before any of it is built — see below |
+| **M10b** | Design implementation | 2 wks | The tokens as Kotlin, one component set, every screen migrated onto it. Gated on the test seam |
+| **M10c** | Beta polish | 2 wks | Onboarding, accuracy tutorial, device calibration, localisation, crash reporting, store listing |
 
 ### Added after field testing
 
@@ -168,6 +170,77 @@ Two things it must get right, both of them §5 positioning rather than polish:
 
 The "distance from the wall to the bed" version of this needs the bed in the plan, which
 means object footprints — a separate feature, deliberately not in M12.
+
+### M10a: the design happens in Figma, before any of it is built
+
+The app was built screen by screen with no design system behind it, and the debt is
+measurable rather than a matter of taste: two files in `:core:designsystem` (a palette and
+the plan renderer), **twelve distinct font sizes** as bare literals across 87 usages, **two
+text-field implementations**, **three chip implementations**, and — until it was fixed —
+every tappable control under the minimum hittable size. Restyling that today means editing
+87 call sites.
+
+So the design is defined first, in Figma, and the code follows it. What comes back has to
+be usable as an input to code rather than as a picture to copy:
+
+**Use Figma Variables and named styles, not ad-hoc values.** A named token maps one-to-one
+onto a Kotlin constant and can be read back mechanically; a hex code typed into a rectangle
+cannot. This is the single thing that decides whether the handover is an afternoon or a
+fortnight.
+
+What M10a should produce:
+
+1. **Tokens.** A type scale (the twelve sizes should become five or six), a spacing scale,
+   corner radii, and colour as **semantic roles** rather than swatches.
+2. **A component inventory with every state.** Chip, field, panel, card, list row, dialog,
+   banner — each with default, pressed, disabled, focused, and error. Most of the faults
+   found in the field were missing states: fields that read as gaps because they had no
+   border, controls that gave no pressed feedback.
+3. **Screen structure and flow.** Where things live and how they are reached. This is the
+   part that most needs a designer's eye and least needs mine.
+
+Five constraints the design has to respect. They are not preferences — each is either a
+hard requirement or something already learned the expensive way:
+
+- **48 dp minimum for anything tappable.** Non-negotiable, and the app is used standing up
+  in someone else's house, one-handed, with a tape in the other. That is the least accurate
+  a person's aim ever gets.
+- **State colour is load-bearing and is not brand colour.** `Ready`, `Sampling` and
+  `Warning` encode tracking quality and measurement confidence — they come from
+  `ACCURACY.md`, not from a palette. A visual identity has to sit *around* them without
+  taking them over, and nothing decorative may reuse them. Today `Ready` means good state,
+  selected, interactive and reference text all at once, which is the specific thing to fix.
+- **The capture screen sits over a live camera feed.** Any colour or text there must stay
+  legible against an arbitrary, moving, sometimes bright background. It cannot be designed
+  against a flat canvas.
+- **The editor is a drawing.** Chrome that grows eats the plan, which is the thing the user
+  came to look at. The panel is already capped and scrolls for this reason.
+- **Spanish runs 20–30% longer than English.** Components sized to fit an English label
+  will break, and this app is being tested in Spanish. Nothing may be fixed-width to its
+  text. The same applies to large system font scales.
+
+Two things that are *not* app UI and need their own treatment: the **exports**, which are
+light-on-white and printed and deliberately do not follow the app's dark palette; and the
+**app icon and name**, which is the branding decision already listed as an open question.
+
+### M10b comes after the test seam
+
+Migrating every screen onto a new component set is a large, mechanical, blind change —
+exactly the kind that regresses behaviour without anyone noticing. Three UI faults have now
+reached the field: text fields that read as gaps, a keyboard that threw the panel off
+screen, and panels that silently stopped reflecting the model.
+
+The last of those is the argument. `viewModel.roomById()` read a plain field, so Compose
+recorded no dependency and skipped the panel; the same root cause had already been reported
+twice and "fixed" twice by changing an unrelated parameter. Nothing in the repository could
+have caught it.
+
+So before M10b: a seam for the repository — `EditorViewModel` builds its own from the
+`MeasureData` singleton, and that "no DI until there is a graph worth wiring" decision has
+come due — then Robolectric-hosted Compose tests, which run on the JVM in the existing fast
+job rather than on an emulator. Roborazzi screenshots on the same harness are the natural
+extension, and they close the other gap: the screens can be *looked at* rather than reasoned
+about.
 
 ### M13 before M14, deliberately
 

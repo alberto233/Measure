@@ -19,7 +19,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M14 grouping, or M8 registration — see §8 |
+| Next | M10a design system, in Figma — see `docs/PRODUCT_PLAN.md` §8 |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -653,6 +653,35 @@ scrolling — they were already capped at `PANEL_MAX_HEIGHT` with `verticalScrol
 Not covered here, and left for M10: `Role.Button` semantics on the clickable `Text`s. Every
 control in this app is a text label, so TalkBack does read them — the gap is that it
 announces them as text rather than as buttons.
+
+## What the design pass inherits
+
+Written down so whoever defines the design system in Figma (M10a) is working from the real
+state of the code rather than from a screenshot.
+
+| | Today |
+| --- | --- |
+| `:core:designsystem` | Two files: a colour palette and the plan renderer |
+| Type | 12 distinct sizes, bare literals, 87 usages. `12.sp` appears 29 times |
+| Spacing | No scale. 16/14/12/10/8 dp chosen per site |
+| Fields | Two implementations — `Field` (editor), `DialogField` (projects) |
+| Chips | Three — `Pill` (editor), `PillButton` (capture), `SortChip`/`CardAction` (projects) |
+| Top bars | Two, unrelated |
+| Touch targets | Fixed: all now ≥48 dp via `touchTarget()` |
+| Semantics | None. Controls are text labels, so TalkBack reads them, but as text rather than as buttons |
+| `MainActivity` | 442 lines of plain Android views while everything else is Compose |
+
+Two things in the palette are **not** free for a designer to reassign:
+
+- `Ready`, `Sampling` and `Warning` encode tracking quality and measurement confidence.
+  They come from `ACCURACY.md` and appear in the AR overlay, the reticle, the plan and the
+  panels. Reusing them decoratively breaks the one thing this app claims (§5 of the product
+  plan). `Ready` currently doubles as "selected" and "interactive" — that overload is the
+  thing to untangle, by giving the interactive role its own colour.
+- The **exports** are light-on-white by design and share nothing with the app's dark
+  palette. They are printed, attached to quotes, and opened on laptops; a dark drawing comes
+  out of a printer as a page of toner. `PlanDrawing` and `SvgExporter` own that palette
+  separately and should stay that way.
 
 ## 8. Open decisions
 
