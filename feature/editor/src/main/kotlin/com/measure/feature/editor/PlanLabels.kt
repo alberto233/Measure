@@ -13,11 +13,11 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.measure.core.data.SavedMeasurement
 import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureType
 import com.measure.core.geometry.Vec2
 import com.measure.core.geometry.plan.DimensionChain
 
@@ -51,7 +51,7 @@ internal fun PlanLabels(labels: List<PlanLabel>) {
                         .background(MeasureColours.Scrim)
                         .padding(horizontal = 6.dp, vertical = 3.dp),
                     color = label.colour,
-                    fontSize = 12.sp,
+                    fontSize = MeasureType.Small.fontSize,
                     fontWeight = if (label.bold) FontWeight.Bold else FontWeight.Medium,
                 )
             }

@@ -16,8 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureType
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.RangeAdvice
 import com.measure.core.geometry.capture.TrackingIssue
@@ -60,13 +60,13 @@ internal fun TrackingChip(
         Text(
             text = text,
             color = MeasureColours.OnScrim,
-            fontSize = 13.sp,
+            fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.Medium,
         )
         // Worth surfacing: with depth, hit tests work on surfaces ARCore has not yet
         // fitted a plane to, which is most of the room for the first few seconds.
         if (depthEnabled) {
-            Text("· depth", color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+            Text("· depth", color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Small.fontSize)
         }
     }
 }
@@ -106,7 +106,7 @@ internal fun AimAdvice(
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         lines.forEach { (text, colour) ->
-            Text(text, color = colour, fontSize = 13.sp)
+            Text(text, color = colour, fontSize = MeasureType.Label.fontSize)
         }
     }
 }
@@ -125,7 +125,7 @@ internal fun MeasurementLabel(
             .background(if (emphasised) MeasureColours.Scrim else MeasureColours.ScrimSoft)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         color = if (emphasised) MeasureColours.Ready else MeasureColours.OnScrim,
-        fontSize = if (emphasised) 16.sp else 14.sp,
+        fontSize = if (emphasised) MeasureType.Body.fontSize else MeasureType.Label.fontSize,
         fontWeight = FontWeight.SemiBold,
     )
 }

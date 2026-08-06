@@ -37,12 +37,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureType
 import com.measure.core.designsystem.MeasureField
 import com.measure.core.designsystem.touchTarget
 import com.measure.core.geometry.OpeningKind
@@ -187,7 +187,7 @@ fun EditorScreen(
                     } else {
                         MeasureColours.Ready
                     },
-                    fontSize = 14.sp,
+                    fontSize = MeasureType.Label.fontSize,
                 )
             }
         }
@@ -238,8 +238,8 @@ private fun TopBar(
         ) {
             Pill("Back", onClick = onBack)
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, color = MeasureColours.OnScrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+                Text(title, color = MeasureColours.OnScrim, fontSize = MeasureType.Title.fontSize, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Small.fontSize)
             }
             Pill("Add", onClick = onAddRoom)
         }
@@ -284,14 +284,14 @@ private fun UnrelatedCapturesNote() {
         Text(
             text = "Rooms from separate captures",
             color = MeasureColours.Warning,
-            fontSize = 14.sp,
+            fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "Each room is measured, but how they sit together is not — " +
                 "long-press a room and drag to place it.",
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     }
 }
@@ -327,7 +327,7 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
                     else -> "Tap a dimension to read it"
                 },
                 color = MeasureColours.OnScrim,
-                fontSize = 14.sp,
+                fontSize = MeasureType.Label.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -337,10 +337,10 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
                     else -> "Sizes are marked around the plan"
                 },
                 color = if (pending == null) MeasureColours.OnScrimMuted else MeasureColours.Accent,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
             viewModel.lastStraightening?.let { straightened ->
-                Text("Pulled $straightened", color = MeasureColours.Accent, fontSize = 11.sp)
+                Text("Pulled $straightened", color = MeasureColours.Accent, fontSize = MeasureType.Small.fontSize)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -368,11 +368,11 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
 @Composable
 private fun EmptyPlan(modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Nothing to edit yet", color = MeasureColours.OnScrim, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text("Nothing to edit yet", color = MeasureColours.OnScrim, fontSize = MeasureType.Title.fontSize, fontWeight = FontWeight.SemiBold)
         Text(
             "Capture a room and it appears here",
             color = MeasureColours.OnScrimMuted,
-            fontSize = 13.sp,
+            fontSize = MeasureType.Label.fontSize,
             modifier = Modifier.padding(top = 4.dp),
         )
     }
@@ -429,7 +429,7 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
                     text = "Pinch to zoom · tap a wall to set its true length · " +
                         "long-press a corner to move it · Measure for sizes and distances",
                     color = MeasureColours.OnScrimMuted,
-                    fontSize = 13.sp,
+                    fontSize = MeasureType.Label.fontSize,
                 )
             }
 
@@ -475,7 +475,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     Text(
         text = "${viewModel.formatArea(room)} floor · ${viewModel.formatLength(room.perimeter.metres)} perimeter",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
 
     // Placing a room takes both of these. Moving alone leaves a plan whose pieces slide
@@ -485,7 +485,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     Text(
         text = "Long-press this room and drag to move it",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Pill("Square to plan", onClick = { viewModel.squareRoomToPlan(room.id) })
@@ -501,7 +501,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         Text(
             text = "Fits inside ${viewModel.formatLength(width)} × ${viewModel.formatLength(depth)}",
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     }
 
@@ -510,7 +510,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Ceiling", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+        Text("Ceiling", color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Label.fontSize)
         Field(
             value = height,
             onValueChange = { height = it },
@@ -526,14 +526,14 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
             text = "Set a ceiling height for wall area and volume. Look up while capturing " +
                 "and it fills itself in.",
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     } else {
         Text(
             text = "Walls ${com.measure.core.units.AreaFormatter.format(surfaces.netWallArea, viewModel.unitSystem())}" +
                 " · volume ${com.measure.core.units.VolumeFormatter.format(surfaces.volume, viewModel.unitSystem())}",
             color = MeasureColours.OnScrim,
-            fontSize = 14.sp,
+            fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.SemiBold,
         )
         if (surfaces.openingArea.squareMetres > 0.0) {
@@ -542,7 +542,7 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
                     com.measure.core.units.AreaFormatter.format(surfaces.openingArea, viewModel.unitSystem()) +
                     " of doors and windows",
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
         }
     }
@@ -572,7 +572,7 @@ private fun MeasurementList(
     Text(
         text = "${measurements.size} ${if (measurements.size == 1) "measurement" else "measurements"}",
         color = MeasureColours.OnScrim,
-        fontSize = 15.sp,
+        fontSize = MeasureType.Body.fontSize,
         fontWeight = FontWeight.SemiBold,
     )
 
@@ -595,13 +595,13 @@ private fun MeasurementList(
                     viewModel.unitSystem(),
                 ),
                 color = MeasureColours.OnScrim,
-                fontSize = 16.sp,
+                fontSize = MeasureType.Body.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = measurement.mode.label,
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
         }
     }
@@ -632,7 +632,7 @@ private fun MeasurePanel(viewModel: EditorViewModel, modifier: Modifier = Modifi
                 text = "Tap any dimension line for its size · " +
                     "+ Distance measures between two points you choose",
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 13.sp,
+                fontSize = MeasureType.Label.fontSize,
             )
 
             is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
@@ -648,18 +648,18 @@ private fun DimensionReadout(viewModel: EditorViewModel, focus: MeasureFocus.Dim
     Text(
         text = viewModel.formatLength(length),
         color = MeasureColours.OnScrim,
-        fontSize = 24.sp,
+        fontSize = MeasureType.Title.fontSize,
         fontWeight = FontWeight.Bold,
     )
     Text(
         text = if (focus.isOverall) "Overall, across the whole plan" else "Between the marked corners",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
     Text(
         text = "The dashed lines show which part of the plan this covers.",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
 }
 
@@ -680,7 +680,7 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
         Text(
             text = "This distance was attached to geometry that has gone",
             color = MeasureColours.Warning,
-            fontSize = 14.sp,
+            fontSize = MeasureType.Label.fontSize,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
@@ -695,25 +695,25 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
             viewModel.unitSystem(),
         ),
         color = MeasureColours.OnScrim,
-        fontSize = 24.sp,
+        fontSize = MeasureType.Title.fontSize,
         fontWeight = FontWeight.Bold,
     )
     Text(
         text = "Off the plan, not measured in the room",
         color = MeasureColours.Warning,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
     Text(
         text = "${measurement.from.description} → ${measurement.to.description}",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
     if (measurement.isModelled) {
         Text(
             text = "One end sits on a corner the solver squared up, so part of this " +
                 "distance is the model rather than the room.",
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     }
 
@@ -750,13 +750,13 @@ private fun MeasurementPanel(viewModel: EditorViewModel, selection: Selection.Me
                     viewModel.unitSystem(),
                 ),
                 color = MeasureColours.OnScrim,
-                fontSize = 20.sp,
+                fontSize = MeasureType.Title.fontSize,
                 fontWeight = FontWeight.Bold,
             )
             Text(
                 text = measurement.mode.label + " measurement",
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -773,14 +773,14 @@ private fun CornerPanel(viewModel: EditorViewModel, selection: Selection.Corner)
     Text(
         text = "${room.name} · corner ${selection.index + 1}",
         color = MeasureColours.OnScrim,
-        fontSize = 15.sp,
+        fontSize = MeasureType.Body.fontSize,
         fontWeight = FontWeight.SemiBold,
     )
     Text(
         text = "Long-press and drag to move it. The room re-solves when you let go, so " +
             "right angles and locked walls still hold.",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Pill("Done", onClick = viewModel::clearSelection)
@@ -811,7 +811,7 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
             Text(
                 text = "${room.name} · wall ${selection.index + 1}",
                 color = MeasureColours.OnScrim,
-                fontSize = 15.sp,
+                fontSize = MeasureType.Body.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
@@ -821,17 +821,17 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
                     "Measured ${viewModel.formatLength(current)}"
                 },
                 color = if (locked != null) MeasureColours.Ready else MeasureColours.OnScrimMuted,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
         }
-        Text(viewModel.formatArea(room), color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+        Text(viewModel.formatArea(room), color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Small.fontSize)
     }
 
     Text(
         text = "Measured this wall with a tape? Type the true length — the whole room " +
             "tightens around it.",
         color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
+        fontSize = MeasureType.Small.fontSize,
     )
 
     Row(
@@ -896,7 +896,7 @@ private fun OpeningsSection(
         Text(
             text = describeOpenings(openings),
             color = if (openings.isEmpty()) MeasureColours.OnScrimMuted else MeasureColours.OnScrim,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
             fontWeight = if (openings.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -938,7 +938,7 @@ private fun OpeningRow(
             Text(
                 text = "${saved.opening.kind.label} $position",
                 color = MeasureColours.OnScrim,
-                fontSize = 13.sp,
+                fontSize = MeasureType.Label.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             Pill("Remove", onClick = { viewModel.deleteOpening(saved.id) })
@@ -949,9 +949,9 @@ private fun OpeningRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Field(width, { width = it }, numeric = true, hint = "wide", modifier = Modifier.weight(1f))
-            Text("×", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+            Text("×", color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Label.fontSize)
             Field(height, { height = it }, numeric = true, hint = "high", modifier = Modifier.weight(1f))
-            Text("at", color = MeasureColours.OnScrimMuted, fontSize = 13.sp)
+            Text("at", color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Label.fontSize)
             Field(offset, { offset = it }, numeric = true, hint = "from", modifier = Modifier.weight(1f))
             Pill(
                 label = "Set",

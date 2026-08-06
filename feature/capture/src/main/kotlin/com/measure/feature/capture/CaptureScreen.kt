@@ -32,7 +32,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -47,6 +46,7 @@ import com.measure.ar.MeasureArController
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.delay
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureType
 
 /**
  * The M1 capture screen: point at something, tap, point at the other end, tap, read the
@@ -335,7 +335,7 @@ private fun RoomReadout(
             Text(
                 text = viewModel.formatArea(solution),
                 color = MeasureColours.OnScrim,
-                fontSize = 26.sp,
+                fontSize = MeasureType.Display.fontSize,
                 fontWeight = FontWeight.Bold,
             )
             Text(
@@ -343,7 +343,7 @@ private fun RoomReadout(
                     " · ${solution.polygon.size} walls" +
                     (viewModel.detectedCeilingHeight?.let { " · ${viewModel.formatLength(it)} high" } ?: ""),
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
             Text(
                 text = when {
@@ -358,7 +358,7 @@ private fun RoomReadout(
                         "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
                 },
                 color = if (solution.isReliable) MeasureColours.OnScrimMuted else MeasureColours.Warning,
-                fontSize = 12.sp,
+                fontSize = MeasureType.Small.fontSize,
             )
             return@Column
         }
@@ -373,7 +373,7 @@ private fun RoomReadout(
                 else -> "$corners ${if (corners == 1) "corner" else "corners"}"
             },
             color = if (viewModel.isNearStartCorner) MeasureColours.Ready else MeasureColours.OnScrim,
-            fontSize = 20.sp,
+            fontSize = MeasureType.Title.fontSize,
             fontWeight = FontWeight.Bold,
         )
         Text(
@@ -390,7 +390,7 @@ private fun RoomReadout(
                 else -> "Return to the first corner to close"
             },
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     }
 }
@@ -410,14 +410,14 @@ private fun LatestMeasurement(viewModel: CaptureViewModel, modifier: Modifier = 
         Text(
             text = viewModel.format(latest),
             color = MeasureColours.OnScrim,
-            fontSize = 26.sp,
+            fontSize = MeasureType.Display.fontSize,
             fontWeight = FontWeight.Bold,
         )
         val suffix = if (viewModel.segments.size > 1) " · ${viewModel.segments.size} measurements" else ""
         Text(
             text = latest.mode.label + suffix,
             color = MeasureColours.OnScrimMuted,
-            fontSize = 12.sp,
+            fontSize = MeasureType.Small.fontSize,
         )
     }
 }
@@ -501,7 +501,7 @@ private fun Notice(viewModel: CaptureViewModel, modifier: Modifier = Modifier) {
             is CaptureNotice.Warning -> MeasureColours.Warning
             is CaptureNotice.Advice -> MeasureColours.OnScrim
         },
-        fontSize = 14.sp,
+        fontSize = MeasureType.Label.fontSize,
         textAlign = TextAlign.Center,
     )
 }
@@ -533,7 +533,7 @@ private fun SessionProblem(
         Text(
             text = title,
             color = MeasureColours.OnScrim,
-            fontSize = 20.sp,
+            fontSize = MeasureType.Title.fontSize,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
@@ -542,7 +542,7 @@ private fun SessionProblem(
                 text = it,
                 modifier = Modifier.padding(top = 10.dp),
                 color = MeasureColours.OnScrimMuted,
-                fontSize = 15.sp,
+                fontSize = MeasureType.Body.fontSize,
                 textAlign = TextAlign.Center,
             )
         }

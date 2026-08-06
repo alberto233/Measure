@@ -330,34 +330,89 @@ class MainActivity : Activity() {
      * label became unreadable. Actions that are always available should always be
      * visible, and the bottom of the screen is also where a thumb already is.
      */
+
+    // --- direction A, in plain views ------------------------------------------------
+    //
+    // Mirrors :core:designsystem rather than importing it: this screen is not Compose, and
+    // pulling a Compose module into :app for four colours would be the wrong trade for a
+    // file that is going to be ported anyway. If the palette moves, it moves here too —
+    // which is a real duplication, and the reason porting this screen is still on the list.
+
+    private val SURFACE = Color.parseColor("#FF0B0B0C")
+    private val PANEL = Color.parseColor("#FF141416")
+    private val LINE = Color.parseColor("#FF2A2A2E")
+    private val INK = Color.parseColor("#FFF2F2F0")
+    private val MUTED = Color.parseColor("#FF8A8A90")
+    private val ACCENT = Color.parseColor("#FFFF4A1C")
+
+    /** The primary action: filled, hard-edged, and the only accent on the screen. */
+    private fun accentButton(label: String, onClick: () -> Unit): Button =
+        Button(this).apply {
+            text = label.uppercase()
+            isAllCaps = false
+            letterSpacing = 0.08f
+            setTextColor(SURFACE)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(ACCENT)
+                cornerRadius = dp(2).toFloat()
+            }
+            setOnClickListener { onClick() }
+        }
+
+    /** Everything else: a bordered box, so a control looks machined rather than moulded. */
+    private fun outlineButton(label: String): Button =
+        Button(this).apply {
+            text = label.uppercase()
+            isAllCaps = false
+            letterSpacing = 0.08f
+            setTextColor(INK)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                setColor(PANEL)
+                cornerRadius = dp(2).toFloat()
+                setStroke(dp(1), LINE)
+            }
+        }
+
     private fun buildLayout(): LinearLayout {
         val padding = dp(20)
 
-        val title = TextView(this).apply {
-            text = "Measure — device capability"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+        val eyebrow = TextView(this).apply {
+            text = "DEVICE CAPABILITY"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
+            letterSpacing = 0.12f
             setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, 0, 0, dp(16))
+            setTextColor(MUTED)
         }
 
+        val title = TextView(this).apply {
+            text = "What this phone can do"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(INK)
+            setPadding(0, dp(4), 0, dp(16))
+        }
+
+        // Monospaced, and now on the app's own ground rather than the platform's.
+        //
+        // This screen is still plain Android views while everything else is Compose — the
+        // port is M10b's last job. Until then it at least stops being the one light screen
+        // in a dark app, which is what it looked like: the manifest gives it
+        // Theme.Material.Light, so it arrived white with black text in an app that is
+        // near-black everywhere else.
         reportView = TextView(this).apply {
             typeface = Typeface.MONOSPACE
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setTextColor(Color.DKGRAY)
+            setTextColor(MUTED)
             setTextIsSelectable(true)
         }
 
-        measureButton = Button(this).apply {
-            text = "Start measuring"
-            setOnClickListener { startActivity(Intent(this@MainActivity, CaptureActivity::class.java)) }
+        measureButton = accentButton("Start measuring") {
+            startActivity(Intent(this@MainActivity, CaptureActivity::class.java))
         }
 
-        actionButton = Button(this).apply {
-            text = "Re-run checks"
-        }
+        actionButton = outlineButton("Re-run checks")
 
-        clearCrashButton = Button(this).apply {
-            text = "Clear crash report"
+        clearCrashButton = outlineButton("Clear crash report").apply {
             visibility = View.GONE
             setOnClickListener {
                 CrashLog.clear(this@MainActivity)
@@ -370,6 +425,7 @@ class MainActivity : Activity() {
                 LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     setPadding(padding, padding, padding, padding)
+                    addView(eyebrow)
                     addView(title)
                     addView(reportView)
                 },
@@ -386,6 +442,7 @@ class MainActivity : Activity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            setBackgroundColor(SURFACE)
             addView(
                 scrollingReport,
                 LinearLayout.LayoutParams(
