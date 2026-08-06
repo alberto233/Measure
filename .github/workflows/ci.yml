@@ -100,11 +100,13 @@ jobs:
             feature/editor/build/test-results/
             feature/projects/build/reports/tests/
             feature/projects/build/test-results/
+            feature/capture/build/reports/tests/
+            feature/capture/build/test-results/
             app/build/reports/tests/
             app/build/test-results/
           retention-days: 7
 
-      # Renders the editor, the plan list and the device check to PNG. Recording rather
+      # Renders the editor, the plan list, the capture overlays and the device check to PNG. Recording rather
       # than verifying: locking the current appearance in as correct would be backwards
       # while M10a is still changing it. The value now is that these screens have never
       # been looked at — three interface faults reached a user because they were reasoned
@@ -114,6 +116,7 @@ jobs:
         run: |
           ./gradlew :feature:editor:recordRoborazziDebug \
                     :feature:projects:recordRoborazziDebug \
+                    :feature:capture:recordRoborazziDebug \
                     :app:recordRoborazziDebug --stacktrace
 
       - name: Publish the screenshots
@@ -124,6 +127,7 @@ jobs:
           path: |
             feature/editor/build/outputs/roborazzi/
             feature/projects/build/outputs/roborazzi/
+            feature/capture/build/outputs/roborazzi/
             app/build/outputs/roborazzi/
           retention-days: 14
           if-no-files-found: warn

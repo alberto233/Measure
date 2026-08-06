@@ -11,7 +11,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database, repository, project search and sort. 23 tests |
-| Interface tests | Robolectric-hosted Compose tests, 3, plus 16 Roborazzi screenshots across `:feature:editor`, `:feature:projects` and `:app`. The first thing here that renders a screen and looks at it |
+| Interface tests | Robolectric-hosted Compose tests, 3, plus 19 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction A: tokens, palette, shared controls, the plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
@@ -20,7 +20,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test M10b's structure.** Then capture-screen screenshot coverage, and M10c. See below |
+| Next | **Field test M10b's structure**, then M10c. See below |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -822,17 +822,27 @@ states — no ARCore, an ARCore too old, an unsupported device, a session that w
 would have stayed that way. As a pure function from an availability value to a report, every
 one of them is a screenshot.
 
-**Screenshot coverage now runs to sixteen pictures across three modules**: the editor, the
-plan list, and the device check. That is not for pixel regressions — `recordRoborazzi`, not
+**Screenshot coverage now runs to nineteen pictures across four modules**: the editor, the
+plan list, the capture overlays, and the device check. That is not for pixel regressions — `recordRoborazzi`, not
 `verify` — it is so the screens can be *looked at*. The first picture ever taken of the plan
 list found a fault that had been shipping: with six plans the "Device check" button at the
 foot of the list came to rest underneath the floating "New measurement" bar and the two
 overlapped, because the bar had no background and the list had too little bottom padding to
 scroll clear of it.
 
-**Capture still has none**, and it is the hardest: the screen is driven by a live ARCore
-session. The pieces worth covering are the HUD overlays, which take plain state and would
-render on the JVM; the camera behind them would not.
+**Capture is covered too, as parts rather than as a screen.** `CaptureScreen`'s bars are
+driven by a live `ArUiState` from an ARCore session and cannot be stood up on the JVM, so
+laying them out again in a test would produce a picture that looks like the app and tests a
+layout the app does not use. Instead every overlay — chip, aim advice, labels, reticle,
+minimap, the selectors and the shutter — is rendered over three stand-in camera images:
+near-black, near-white, and a gradient that changes underneath a single control.
+
+That found a fault the app was shipping. `MeasureButton`'s unselected state filled with
+`Color.Transparent` and wrote near-white text on it, which is fine on a panel and invisible
+over a sunlit wall — on the capture screen "DISTANCE", "FREE" and "PLUMB" simply were not
+there. The fill is `Panel` now, which changes nothing on a panel and everything over a
+camera. It is the clearest case yet for these pictures: three field sessions looked straight
+past it, because the screen is used indoors in the evening.
 
 ## 8. Open decisions
 

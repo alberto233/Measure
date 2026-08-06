@@ -100,6 +100,13 @@ fun MeasureReading(
  * Filled with the accent when it is the primary action or a selected mode; a bordered box
  * otherwise. Hard-edged, because the difference between an instrument and a consumer app is
  * largely whether the controls look machined or moulded.
+ *
+ * The unselected fill is [MeasureColours.Panel] and not transparent, which matters in
+ * exactly one place and matters a lot there. On the capture screen these sit over a live
+ * camera image, and a transparent box with near-white text is invisible against a sunlit
+ * wall — "DISTANCE" and "FREE" simply were not there. It was shipping that way, and it took
+ * rendering the overlays over a bright background to see it. On a panel the fill is the same
+ * colour as what is behind it, so nothing else changes.
  */
 @Composable
 fun MeasureButton(
@@ -116,7 +123,7 @@ fun MeasureButton(
     Box(
         modifier
             .clip(shape)
-            .background(if (filled) MeasureColours.Accent else Color.Transparent)
+            .background(if (filled) MeasureColours.Accent else MeasureColours.Panel)
             .border(Hairline, if (filled) MeasureColours.Accent else MeasureColours.Line, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .touchTarget()
