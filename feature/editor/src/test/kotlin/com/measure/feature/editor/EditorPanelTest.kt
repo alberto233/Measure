@@ -117,7 +117,15 @@ class EditorPanelTest {
         }
         // The project arrives from the database asynchronously; nothing below means
         // anything until it has.
-        compose.waitUntil(TIMEOUT_MS) { viewModel.current?.rooms?.isNotEmpty() == true }
+        //
+        // A much longer wait than the assertions use, because this one also absorbs cold
+        // start. Whichever test happens to run first pays for Robolectric standing up an
+        // Android runtime, Room opening a database and Compose loading — and it was that
+        // test, not a particular test, that kept timing out here: the failure moved
+        // between runs while always landing on this line, which a logic fault would not
+        // do. The assertions keep a short timeout, because by then everything is warm and
+        // a slow answer there would be a real fault.
+        compose.waitUntil(LOAD_TIMEOUT_MS) { viewModel.current?.rooms?.isNotEmpty() == true }
         return viewModel
     }
 
@@ -190,7 +198,10 @@ class EditorPanelTest {
     }
 
     private companion object {
-        /** Generous: the first Robolectric test in a run pays for the runtime starting up. */
+        /** Once the screen is up, an answer is either quick or wrong. */
         const val TIMEOUT_MS = 5_000L
+
+        /** Cold start on a CI runner: the whole Android runtime, Room and Compose. */
+        const val LOAD_TIMEOUT_MS = 60_000L
     }
 }
