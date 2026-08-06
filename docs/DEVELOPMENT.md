@@ -13,14 +13,14 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:core:data` | Room database, repository, project search and sort. 23 tests |
 | `:feature:editor` tests | Robolectric-hosted Compose tests, 3. The first thing here that renders a screen and presses something |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
-| `:core:designsystem` | Palette and the shared plan renderer |
+| `:core:designsystem` | Direction A: tokens, palette, shared controls, the plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | M10a design system, in Figma — see `docs/PRODUCT_PLAN.md` §8 |
+| Next | **M10b structure** — the style landed, the structural changes did not. See below |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -768,6 +768,42 @@ pinned to the source casing is testing the design rather than the behaviour.
 Turkish that turns `i` into `İ`. Spanish is unaffected, so this is not urgent, but the
 moment the app ships a language list this needs deciding — either a locale-safe cast or
 dropping the transform and setting the labels uppercase in the string resources.
+
+## Where M10b actually stands
+
+**The style is applied. The structure is not.** That distinction matters more than it
+sounds, and it is the honest state of the branch.
+
+Done, and field-tested on an A36:
+
+- `MeasureType`, `MeasureSpace`, `MeasureShape`, the direction A palette, and one set of
+  controls in `:core:designsystem`. Zero hardcoded colours and zero hardcoded font sizes
+  remain in any feature module.
+- `Accent` untangled from the measurement-state colours — see the colour rule above.
+- Plans, the export sheet, the capture controls, the editor's controls, and the device
+  check all carry the new palette and type.
+
+**Not done — the structural half of M10a, which is the more valuable half:**
+
+1. **The Quantities view does not exist.** Use cases 3 and 4 in `docs/PRODUCT_PLAN.md` §3 —
+   how much flooring, how much paint — still have no surface. The numbers are inside a
+   selection panel, behind a tap on a room. This is a missing screen rather than a
+   rearrangement, and it is the first thing to build.
+2. **The editor's top bar is still two rows.** Measure, Send and Undo sit on a second row
+   because they had nowhere else to go; the segmented control was what gave them somewhere.
+3. **Plan / Measure / Quantities is not built.** Mode is still a toggle button.
+4. **The panel is still capped at `PANEL_MAX_HEIGHT` and scrolls inside itself**, rather
+   than being a sheet with peek and expanded states. The cap is why an opening added to a
+   wall that already had two lands below the fold.
+
+Three faults the first field test found, now fixed, as a warning about what this kind of
+migration misses: the units toggle was labelled `"m"` and the uppercase transform turned it
+into a lone letter in a box; the slabs over the camera were still consumer-rounded while
+every control around them had gone hard-edged; and the device check was a bare uppercase
+label that read as a heading, because a label carries no affordance at all.
+
+**Screenshot coverage is still editor-only.** Plans and capture changed most and have none,
+which is why all three of those faults reached a phone rather than CI.
 
 ## 8. Open decisions
 
