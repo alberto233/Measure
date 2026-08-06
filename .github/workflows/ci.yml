@@ -85,8 +85,12 @@ jobs:
       # the one class of fault the 247 geometry tests are blind to: a screen that stops
       # reflecting the model. That reached the user three times before anything could
       # catch it.
-      - name: Test the editor's interface
-        run: ./gradlew :feature:editor:testDebugUnitTest --stacktrace
+      - name: Test the interface
+        run: |
+          ./gradlew :feature:editor:testDebugUnitTest \
+                    :feature:projects:testDebugUnitTest \
+                    :feature:capture:testDebugUnitTest \
+                    :app:testDebugUnitTest --stacktrace
 
       - name: Upload data test reports
         if: always()
