@@ -70,7 +70,18 @@ class EditorPanelTest {
     @After
     fun tearDown() {
         MeasureData.useForTesting(null)
-        database.close()
+        // The database is deliberately **not** closed.
+        //
+        // A JUnit rule wraps @Before/@Test/@After, so the Compose rule tears the
+        // composition down *after* this runs — closing here pulled the database out from
+        // under a live `EditorViewModel`, whose init block collects the project for the
+        // whole life of the view model. The collector then threw on the main dispatcher,
+        // and once that dispatcher is damaged nothing in a later test dispatches at all:
+        // the first two tests passed and the third timed out waiting for a project that
+        // was never going to arrive.
+        //
+        // Nothing needs closing. Each test builds its own in-memory database, and an
+        // in-memory database is gone when the process is.
     }
 
     /** A four-corner room, five by four, saved into a fresh project. Returns both ids. */
