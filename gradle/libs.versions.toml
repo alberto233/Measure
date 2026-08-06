@@ -23,6 +23,7 @@ junit5 = "5.11.4"
 # moving part in a harness that already has several.
 junit4 = "4.13.2"
 robolectric = "4.16"
+roborazzi = "1.70.0"
 androidxTest = "1.7.0"
 androidxCore = "1.16.0"
 
@@ -60,6 +61,10 @@ androidx-test-core = { group = "androidx.test", name = "core", version.ref = "an
 compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
@@ -68,3 +73,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 # No kotlin-android entry: AGP 9 compiles Kotlin itself and rejects that plugin.
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

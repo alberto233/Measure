@@ -715,12 +715,26 @@ rounds were spent learning one sentence. Verified against a synthetic failing XM
 than only a green run: a reporter that prints nothing when everything passes and nothing
 when something fails looks identical from the outside.
 
-**Not yet done:** Roborazzi. The same harness renders to PNG, which is what would let this
-project's screens be looked at rather than reasoned about — the gap behind the invisible
-text fields, the keyboard fault and the undersized touch targets.
+**Roborazzi renders the editor to PNG** on the same harness — `recordRoborazziDebug`,
+published by CI as the `editor-screenshots` artifact. Recording, not verifying: failing a
+build on a pixel diff would lock the current appearance in as correct, and M10a exists
+because it is about to change. Once the design system lands, `verifyRoborazziDebug` turns
+these into regression tests without a line of them changing.
+
+They exist because this project's screens had never been *seen*. All three interface faults
+that reached a user on hardware — text fields the same colour as the panel behind them, the
+keyboard throwing the panel off screen, every control under the minimum touch size — are
+obvious in a picture and invisible in a diff of Kotlin.
 
 ## 8. Open decisions
 
+- **The device check stays, and needs the design pass.** It answers one question a
+  supported device can still get wrong — whether Depth is available — and it is the only
+  screen left in plain Android views, 442 lines of them. M10b has to port it, not restyle
+  it.
+- **AR is required in release and optional in debug.** `app/src/release/AndroidManifest.xml`
+  overrides both the feature and the ARCore metadata. Revisit if a non-AR drawing mode ever
+  lands, because that override forecloses it.
 - **App name.** `Measure` is a working title and too generic for the Play Store.
 - **Capture thresholds.** The sampling dispersion limit (3 cm) and the per-source sigmas
   and correlations in `HitSource` are still reasoned estimates rather than measurements.

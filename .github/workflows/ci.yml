@@ -100,6 +100,22 @@ jobs:
             feature/editor/build/test-results/
           retention-days: 7
 
+      # Renders every editor screen to PNG. Recording rather than verifying: locking the
+      # current appearance in as correct would be backwards while M10a is about to change
+      # it. The value now is that these screens have never been looked at — three interface
+      # faults reached a user because they were reasoned about instead.
+      - name: Render screenshots of the editor
+        run: ./gradlew :feature:editor:recordRoborazziDebug --stacktrace
+
+      - name: Publish the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-screenshots
+          path: feature/editor/build/outputs/roborazzi/
+          retention-days: 14
+          if-no-files-found: warn
+
       # Gradle puts the reason a test failed into an HTML report, which on CI is a file
       # nobody can open without downloading an artifact. Reading it cost two full round
       # trips through this pipeline to learn one sentence, so the sentence is printed.

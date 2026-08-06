@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.roborazzi)
 }
 
 android {
@@ -65,6 +66,15 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(platform(libs.compose.bom))
     testImplementation(libs.compose.ui.test.junit4)
+
+    // Screenshots from the same harness. The point is not catching pixel regressions —
+    // it is that the screens in this project have never been looked at. Three interface
+    // faults reached the user because they were reasoned about instead: text fields the
+    // same colour as the panel behind them, a keyboard that threw the panel off screen,
+    // and every control under the minimum touch size.
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
     testImplementation(libs.room.runtime)
     // Dispatchers.Main has no implementation on a bare JVM, and viewModelScope is built on
     // it — without this every coroutine the editor launches fails to dispatch.
