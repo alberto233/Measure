@@ -726,6 +726,33 @@ that reached a user on hardware — text fields the same colour as the panel beh
 keyboard throwing the panel off screen, every control under the minimum touch size — are
 obvious in a picture and invisible in a diff of Kotlin.
 
+## The colour rule, for the rest of the migration
+
+Direction A separated two families that `MeasureColours` had tangled, and the rest of M10b
+is largely applying this one rule. When in doubt, ask what the colour is *claiming*:
+
+| Role | Colour | Means |
+| --- | --- | --- |
+| Interaction | `Accent` | you can act on this — selected, focused, primary, the cursor |
+| Measurement state | `Ready` / `Sampling` / `Warning` / `Blocked` / `Idle` | how good the measurement is, per `docs/ACCURACY.md` |
+| Certainty in the data | `Ready` | a wall locked to a tape length — the one number in a plan that is not a camera estimate |
+| Everything else | `OnScrim` / `OnScrimMuted` / `Line` | structure and text |
+
+Two consequences that are easy to get wrong:
+
+- **The shutter keeps the state colours.** Its face is not saying "press me", it is saying
+  whether a capture would be accepted and whether a burst is in flight. That is the most
+  useful thing on the screen at the moment of pressing, and it is the one control where
+  state beats interaction.
+- **Confirmations are not green.** Success feedback is ordinary text; only warnings take a
+  colour. A confirmation tinted with a measurement-quality colour would be claiming
+  something about the measurement that it does not know.
+
+Still carrying the old styling at the time of writing: the editor (the bulk of it — its
+`Pill` and `Field` are the last duplicates of the shared controls), the capture screen's own
+layout as distinct from its controls, and the device check, which needs porting out of plain
+Android views rather than restyling.
+
 ## 8. Open decisions
 
 - **The device check stays, and needs the design pass.** It answers one question a
