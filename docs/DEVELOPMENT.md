@@ -9,9 +9,10 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Area | State |
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
-| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 247 tests passing, CI green |
+| `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
+| `:core:data` | Room database, repository, project search and sort. 23 tests |
+| `:feature:editor` tests | Robolectric-hosted Compose tests, 3. The first thing here that renders a screen and presses something |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
-| `:core:data` | Room database, repository. Autosave, project list queries |
 | `:core:designsystem` | Palette and the shared plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
@@ -682,6 +683,41 @@ Two things in the palette are **not** free for a designer to reassign:
   palette. They are printed, attached to quotes, and opened on laptops; a dark drawing comes
   out of a printer as a page of toner. `PlanDrawing` and `SvgExporter` own that palette
   separately and should stay that way.
+
+## Interface tests, and three wrong theories
+
+`:feature:editor` now has Robolectric-hosted Compose tests: a real in-memory database, the
+editor rendered, a button pressed, the panel asserted. They exist because a panel that
+silently stopped reflecting the model reached the user three times and 236 geometry tests
+would all have passed. The gap was never the maths — nothing had ever rendered a screen.
+
+`MeasureData.useForTesting` is the seam. One settable instance rather than Hilt, because one
+substitution point is not a graph either.
+
+**Two things make these tests work, and both cost a wrong guess first.**
+
+- **Room's executors run inline.** Compose's test rule drives a *virtual* clock, so
+  `waitUntil` can spend its whole timeout in a few milliseconds of real time. Room on its
+  own executor delivers from a real background thread, on real time the test never spends,
+  and whether the flow arrives first is a race. Raising the timeout to a minute made it
+  *worse* — two failures instead of one — which is what ruled the theory out. A timeout
+  cannot fix a race against a clock that is not real.
+- **The database is never closed.** A JUnit rule wraps `@Before`/`@Test`/`@After`, so the
+  Compose rule tears the composition down after `@After` — closing there pulls the database
+  out from under a live view model whose init block collects for its whole life. This was
+  also, wrongly, blamed for the timeouts; removing it moved which test failed rather than
+  fixing anything.
+
+Both wrong theories were only visible as wrong because CI prints failures.
+`.github/scripts/print-test-failures.py` reads the JUnit XML in both jobs, because Gradle
+puts the reason in an HTML report and on CI that is a file nobody opens. Before it, two
+rounds were spent learning one sentence. Verified against a synthetic failing XML rather
+than only a green run: a reporter that prints nothing when everything passes and nothing
+when something fails looks identical from the outside.
+
+**Not yet done:** Roborazzi. The same harness renders to PNG, which is what would let this
+project's screens be looked at rather than reasoned about — the gap behind the invisible
+text fields, the keyboard fault and the undersized touch targets.
 
 ## 8. Open decisions
 
