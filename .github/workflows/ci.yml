@@ -98,21 +98,33 @@ jobs:
             core/data/build/test-results/
             feature/editor/build/reports/tests/
             feature/editor/build/test-results/
+            feature/projects/build/reports/tests/
+            feature/projects/build/test-results/
+            app/build/reports/tests/
+            app/build/test-results/
           retention-days: 7
 
-      # Renders every editor screen to PNG. Recording rather than verifying: locking the
-      # current appearance in as correct would be backwards while M10a is about to change
-      # it. The value now is that these screens have never been looked at — three interface
-      # faults reached a user because they were reasoned about instead.
-      - name: Render screenshots of the editor
-        run: ./gradlew :feature:editor:recordRoborazziDebug --stacktrace
+      # Renders the editor, the plan list and the device check to PNG. Recording rather
+      # than verifying: locking the current appearance in as correct would be backwards
+      # while M10a is still changing it. The value now is that these screens have never
+      # been looked at — three interface faults reached a user because they were reasoned
+      # about instead, and a fourth (the plan list's bottom bar overlapping its own last
+      # entry) was found by the first picture ever taken of that screen.
+      - name: Render screenshots
+        run: |
+          ./gradlew :feature:editor:recordRoborazziDebug \
+                    :feature:projects:recordRoborazziDebug \
+                    :app:recordRoborazziDebug --stacktrace
 
       - name: Publish the screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: editor-screenshots
-          path: feature/editor/build/outputs/roborazzi/
+          name: screenshots
+          path: |
+            feature/editor/build/outputs/roborazzi/
+            feature/projects/build/outputs/roborazzi/
+            app/build/outputs/roborazzi/
           retention-days: 14
           if-no-files-found: warn
 

@@ -89,7 +89,11 @@ fun ProjectsScreen(
                 start = MeasureSpace.Wide,
                 end = MeasureSpace.Wide,
                 top = MeasureSpace.Base,
-                bottom = 120.dp,
+                // Clears the bar below, which floats over the list rather than sitting in
+                // it. Too small and the last entry can never be scrolled out from under
+                // the bar — which is what happened: with six plans the device check button
+                // came to rest underneath "New measurement" and the two overlapped.
+                bottom = BOTTOM_BAR_CLEARANCE,
             ),
             verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
         ) {
@@ -133,16 +137,28 @@ fun ProjectsScreen(
             }
         }
 
-        MeasureButton(
-            label = "New measurement",
-            onClick = onNewMeasurement,
-            primary = true,
-            modifier = Modifier
+        // Opaque, and ruled off from the list above it.
+        //
+        // It used to be a bare button floating over the list, which meant entries scrolled
+        // past it in the gaps around its edges and, at six plans, the device check button
+        // came to rest directly underneath it. A bar that covers what passes beneath it is
+        // the difference between a fixed action and a rendering fault.
+        Column(
+            Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = MeasureSpace.Wide)
-                .padding(bottom = MeasureSpace.Wide + MeasureSpace.Tight),
-        )
+                .background(MeasureColours.Surface),
+        ) {
+            MeasureRule()
+            MeasureButton(
+                label = "New measurement",
+                onClick = onNewMeasurement,
+                primary = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(MeasureSpace.Wide),
+            )
+        }
     }
 
     editing?.let { project ->
@@ -456,3 +472,6 @@ private fun DetailsDialog(
 
 /** Below this many plans, finding one is not a problem worth putting controls on screen for. */
 private const val SEARCH_THRESHOLD = 5
+
+/** A rule, a button and its padding — see the bar at the bottom of the screen. */
+private val BOTTOM_BAR_CLEARANCE = 112.dp

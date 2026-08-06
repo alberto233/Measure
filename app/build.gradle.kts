@@ -3,6 +3,7 @@
 // applying it fails the build outright.
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.roborazzi)
     // Required in *every* module containing a @Composable, including this one, whose
     // only Compose code is a single setContent call. Without it the Kotlin compiler
     // still type-checks the composable lambda but emits it untransformed, as a plain
@@ -23,8 +24,8 @@ android {
         // Bumped whenever a build goes out for testing. Android will not install a
         // lower code over a higher one, and a version that never changes gives the user
         // no way to tell which build is on the phone.
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
     }
 
     // A debug keystore committed to the repository, so every build — CI, local, anyone's
@@ -62,6 +63,14 @@ android {
         compose = true
     }
 
+    // Robolectric needs the merged resources and manifest to stand a real Android
+    // environment up on the JVM.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -79,6 +88,9 @@ kotlin {
 dependencies {
     implementation(project(":core:units"))
     implementation(project(":core:geometry"))
+    // The device check is Compose now, and uses the same tokens and controls as every
+    // other screen rather than the six duplicated Color.parseColor constants it had.
+    implementation(project(":core:designsystem"))
     implementation(project(":feature:capture"))
     implementation(project(":feature:projects"))
     implementation(project(":feature:editor"))
@@ -89,4 +101,22 @@ dependencies {
     implementation(libs.arcore)
 
     implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.ui)
+
+    // Pictures of the device check. It is the one screen a user meets before anything
+    // works, it has five distinct states, and four of them only occur on hardware this
+    // repository has no access to — which is exactly the case for rendering them here.
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+
+    debugImplementation(libs.compose.ui.test.manifest)
 }

@@ -11,16 +11,16 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database, repository, project search and sort. 23 tests |
-| `:feature:editor` tests | Robolectric-hosted Compose tests, 3, plus 7 Roborazzi screenshots. The first thing here that renders a screen and presses something |
+| Interface tests | Robolectric-hosted Compose tests, 3, plus 16 Roborazzi screenshots across `:feature:editor`, `:feature:projects` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction A: tokens, palette, shared controls, the plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
-| `:app` | Assembly. The capability report is now a screen reachable from home |
+| `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test M10b's structure**, then the device check port and screenshot coverage for Plans and Capture. See below |
+| Next | **Field test M10b's structure.** Then capture-screen screenshot coverage, and M10c. See below |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -810,17 +810,36 @@ into a lone letter in a box; the slabs over the camera were still consumer-round
 every control around them had gone hard-edged; and the device check was a bare uppercase
 label that read as a heading, because a label carries no affordance at all.
 
-**Still outstanding.** The device check is still 442 lines of plain Android views with the
-palette duplicated as `Color.parseColor` constants in `:app`; it needs porting rather than
-restyling. And **screenshot coverage is still editor-only** — seven pictures, none of them
-of Plans or Capture, which is why all three of those faults reached a phone rather than CI.
+**The device check is Compose now**, and the six duplicated `Color.parseColor` constants in
+`:app` are gone with it. It was a log — everything the checks produced in one monospaced
+`TextView`, with the answer somewhere around line fourteen — and it is now a verdict at the
+top, the checks it came from underneath, and the crash trace above everything because on a
+sideloaded build there is nowhere else a stack trace can be read.
+
+`DeviceCheck` is separated from `MainActivity` on purpose. Four of that screen's five
+states — no ARCore, an ARCore too old, an unsupported device, a session that will not open
+— cannot be produced on the A36 or on any build machine, so they were written blind and
+would have stayed that way. As a pure function from an availability value to a report, every
+one of them is a screenshot.
+
+**Screenshot coverage now runs to sixteen pictures across three modules**: the editor, the
+plan list, and the device check. That is not for pixel regressions — `recordRoborazzi`, not
+`verify` — it is so the screens can be *looked at*. The first picture ever taken of the plan
+list found a fault that had been shipping: with six plans the "Device check" button at the
+foot of the list came to rest underneath the floating "New measurement" bar and the two
+overlapped, because the bar had no background and the list had too little bottom padding to
+scroll clear of it.
+
+**Capture still has none**, and it is the hardest: the screen is driven by a live ARCore
+session. The pieces worth covering are the HUD overlays, which take plain state and would
+render on the JVM; the camera behind them would not.
 
 ## 8. Open decisions
 
-- **The device check stays, and needs the design pass.** It answers one question a
-  supported device can still get wrong — whether Depth is available — and it is the only
-  screen left in plain Android views, 442 lines of them. M10b has to port it, not restyle
-  it.
+- **The device check stays**, and is ported. It answers one question a supported device can
+  still get wrong — whether Depth is available — and it is now Compose like everything
+  else. What is still unverified is its four failure states: they render, but no phone that
+  actually produces one has ever run this app.
 - **AR is required in release and optional in debug.** `app/src/release/AndroidManifest.xml`
   overrides both the feature and the ARCore metadata. Revisit if a non-AR drawing mode ever
   lands, because that override forecloses it.
