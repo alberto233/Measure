@@ -118,11 +118,16 @@ class EditorPanelTest {
      */
     @Test
     fun `the editor renders a saved room`() {
-        val (projectId, _) = seedRoom()
+        val (projectId, roomId) = seedRoom()
         val viewModel = editor(projectId)
 
         assertTrue(viewModel.current?.rooms?.size == 1)
         compose.onNodeWithText("Test plan").assertIsDisplayed()
+
+        // The room's name is not on the plan. The canvas draws geometry, and the name lives
+        // in the room's own panel — which this asserted without checking first, and which is
+        // the sort of guess these tests exist to stop being made about the interface.
+        viewModel.select(Selection.Room(roomId))
         compose.onNodeWithText("Kitchen").assertExists()
     }
 
