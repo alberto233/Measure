@@ -32,9 +32,28 @@ object AreaFormatter {
         area: Area,
         system: UnitSystem,
         locale: Locale = Locale.getDefault(),
+    ): String = "${value(area, system, locale)} ${unit(system)}"
+
+    /**
+     * The number without its unit, and the unit on its own.
+     *
+     * Split because a reading sets them at different sizes: "23.4 m²" written as one string
+     * puts the unit at the size of the measurement, which is the most common way a number
+     * stops looking like a reading. Joined back together by [format] so there is still one
+     * place that decides how many decimals an area gets.
+     */
+    fun value(
+        area: Area,
+        system: UnitSystem,
+        locale: Locale = Locale.getDefault(),
     ): String = when (system) {
-        UnitSystem.METRIC -> "${round(area.squareMetres, 2, locale)} m²"
-        UnitSystem.IMPERIAL -> "${round(area.squareFeet, 1, locale)} ft²"
+        UnitSystem.METRIC -> round(area.squareMetres, 2, locale)
+        UnitSystem.IMPERIAL -> round(area.squareFeet, 1, locale)
+    }
+
+    fun unit(system: UnitSystem): String = when (system) {
+        UnitSystem.METRIC -> "m²"
+        UnitSystem.IMPERIAL -> "ft²"
     }
 
     /**

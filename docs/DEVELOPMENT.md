@@ -11,16 +11,16 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database, repository, project search and sort. 23 tests |
-| `:feature:editor` tests | Robolectric-hosted Compose tests, 3. The first thing here that renders a screen and presses something |
+| `:feature:editor` tests | Robolectric-hosted Compose tests, 3, plus 7 Roborazzi screenshots. The first thing here that renders a screen and presses something |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction A: tokens, palette, shared controls, the plan renderer |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
-| `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan |
+| `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly. The capability report is now a screen reachable from home |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **M10b structure** — the style landed, the structural changes did not. See below |
+| Next | **Field test M10b's structure**, then the device check port and screenshot coverage for Plans and Capture. See below |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -771,8 +771,9 @@ dropping the transform and setting the labels uppercase in the string resources.
 
 ## Where M10b actually stands
 
-**The style is applied. The structure is not.** That distinction matters more than it
-sounds, and it is the honest state of the branch.
+The style landed first and the structure second, and for a while the branch had only the
+first — which is worth recording, because "restyled" reads as "redesigned" in a commit log
+and it is not the same thing.
 
 Done, and field-tested on an A36:
 
@@ -783,18 +784,25 @@ Done, and field-tested on an A36:
 - Plans, the export sheet, the capture controls, the editor's controls, and the device
   check all carry the new palette and type.
 
-**Not done — the structural half of M10a, which is the more valuable half:**
+Done, and **not** yet field-tested — the structural half of M10a:
 
-1. **The Quantities view does not exist.** Use cases 3 and 4 in `docs/PRODUCT_PLAN.md` §3 —
-   how much flooring, how much paint — still have no surface. The numbers are inside a
-   selection panel, behind a tap on a room. This is a missing screen rather than a
-   rearrangement, and it is the first thing to build.
-2. **The editor's top bar is still two rows.** Measure, Send and Undo sit on a second row
-   because they had nowhere else to go; the segmented control was what gave them somewhere.
-3. **Plan / Measure / Quantities is not built.** Mode is still a toggle button.
-4. **The panel is still capped at `PANEL_MAX_HEIGHT` and scrolls inside itself**, rather
-   than being a sheet with peek and expanded states. The cap is why an opening added to a
-   wall that already had two lands below the fold.
+1. **The Quantities view exists.** `QuantitiesContent` in `EditorScreen.kt`, on
+   `Takeoff`/`Flooring`/`Painting` in `:core:geometry`. Use cases 3 and 4 in
+   `docs/PRODUCT_PLAN.md` §3 — how much flooring, how much paint — now have a surface that
+   adds the whole plan up rather than making the user total a room at a time. Waste
+   percentage and coat count are controls beside the answer rather than settings, because
+   they are part of the question. A room with no ceiling height is counted for its floor,
+   excluded from its walls, and **named on screen** — an amber subtotal that says which
+   rooms are missing, rather than a total that looks complete and is not.
+2. **The editor's top bar is one row.** Back, title, Undo, Send. Add moved into the plan
+   view's own panel: adding a room is something you do to a plan rather than to the editor.
+3. **Plan / Measure / Quantities is a segmented control** — `MeasureSegmented`. This is
+   what freed the second row, and it is also what made the quantities view reachable: a
+   toggle button can only say "on", so a third mode had nowhere to be named.
+4. **The panel is a draggable sheet** — `MeasureSheet`, peek and expanded, two anchors and
+   no free height. `PANEL_MAX_HEIGHT` is gone. Expanded is 62% of the screen against the
+   old 340 dp cap, and the editor expands it whenever something is selected, because a
+   panel of text fields under a keyboard needs the room.
 
 Three faults the first field test found, now fixed, as a warning about what this kind of
 migration misses: the units toggle was labelled `"m"` and the uppercase transform turned it
@@ -802,8 +810,10 @@ into a lone letter in a box; the slabs over the camera were still consumer-round
 every control around them had gone hard-edged; and the device check was a bare uppercase
 label that read as a heading, because a label carries no affordance at all.
 
-**Screenshot coverage is still editor-only.** Plans and capture changed most and have none,
-which is why all three of those faults reached a phone rather than CI.
+**Still outstanding.** The device check is still 442 lines of plain Android views with the
+palette duplicated as `Color.parseColor` constants in `:app`; it needs porting rather than
+restyling. And **screenshot coverage is still editor-only** — seven pictures, none of them
+of Plans or Capture, which is why all three of those faults reached a phone rather than CI.
 
 ## 8. Open decisions
 
@@ -826,6 +836,13 @@ which is why all three of those faults reached a phone rather than CI.
   but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
   is deliberately not used: re-measuring a room means walking it again with a tape, which
   is exactly the work this app exists to save.
+
+  Two gaps in the exported schemas, found while committing `7.json`: **`6.json` was never
+  committed** — the export writes only the current version, so a schema is lost unless
+  somebody commits it in the same change that bumped the version — and no test opens a
+  version-1 database and migrates it forward. The second is the one that matters; a
+  migration test with a seeded old database is a day's work and is the only thing that
+  would turn "Room validated the SQL" into "the upgrade works".
 - **The plan-wide overall dimension is gone, deliberately**, along with plan-wide chains.
   It is the number people want for "how wide is the flat", and it comes back the moment
   the app knows a shared wall rather than inferring one from where it drew two rooms.

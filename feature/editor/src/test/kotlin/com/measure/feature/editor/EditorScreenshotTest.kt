@@ -146,6 +146,42 @@ class EditorScreenshotTest {
         shoot("editor-measure")
     }
 
+    /** Use cases 3 and 4: how much flooring, how much paint. */
+    @Test
+    fun `the quantities view`() {
+        val (projectId, _) = seed()
+        val viewModel = editor(projectId)
+        viewModel.selectMode(EditorMode.QUANTITIES)
+        shoot("editor-quantities")
+    }
+
+    /**
+     * The same view with a room that has no ceiling height.
+     *
+     * Worth a picture of its own because it is the state where the wall total is a subtotal,
+     * and the whole design of the view turns on that being visible rather than merely true.
+     */
+    @Test
+    fun `quantities with a room whose height is unknown`() {
+        val (projectId, _) = seed()
+        runBlocking {
+            val corners = listOf(Vec2(0.0, 0.0), Vec2(3.0, 0.0), Vec2(3.0, 2.5), Vec2(0.0, 2.5))
+            repository.saveRoom(
+                projectId = projectId,
+                name = "Hall",
+                solution = RoomSolver.solve(RoomCapture(corners.map { CapturedCorner(it, 0.02) })),
+                measured = corners,
+                sigmas = corners.map { 0.02 },
+                ceilingHeight = null,
+                captureSession = "screenshot",
+            )
+        }
+        val viewModel = editor(projectId)
+        compose.waitUntil(LOAD_TIMEOUT_MS) { viewModel.current?.rooms?.size == 2 }
+        viewModel.selectMode(EditorMode.QUANTITIES)
+        shoot("editor-quantities-incomplete")
+    }
+
     /** The share sheet, which is the last thing a user sees before sending a plan on. */
     @Test
     fun `the export sheet`() {

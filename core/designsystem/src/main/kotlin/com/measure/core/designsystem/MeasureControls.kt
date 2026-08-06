@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -133,6 +134,68 @@ fun MeasureButton(
         )
     }
 }
+
+/**
+ * One choice from a short, fixed set — the mode switch, and anything else shaped like it.
+ *
+ * A segmented control rather than a toggle button, because a toggle can only say "on" and
+ * the editor has three modes. It also states the whole set: the editor's Quantities view was
+ * unreachable and effectively invisible while mode was a button labelled "Measure", since a
+ * button that is off tells you nothing about what else exists.
+ *
+ * Sized by weight rather than by content so the segments do not shuffle when a translation
+ * is longer — Spanish runs 20–30% longer, which is one of M10a's five constraints.
+ */
+@Composable
+fun MeasureSegmented(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(MeasureShape.Edge)
+
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(MeasureColours.Panel)
+            .border(Hairline, MeasureColours.Line, shape),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEachIndexed { index, label ->
+            // A hairline between segments rather than a gap, so the control reads as one
+            // object with divisions instead of as several buttons that happen to touch.
+            if (index > 0) {
+                Box(
+                    Modifier
+                        .width(Hairline)
+                        .height(SegmentDividerHeight)
+                        .background(MeasureColours.Line),
+                )
+            }
+            val selected = index == selectedIndex
+            Box(
+                Modifier
+                    .weight(1f)
+                    .background(if (selected) MeasureColours.Accent else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .touchTarget()
+                    .padding(horizontal = MeasureSpace.Tight, vertical = MeasureSpace.Snug),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label.uppercase(),
+                    color = if (selected) MeasureColours.OnAccent else MeasureColours.OnScrimMuted,
+                    style = MeasureType.Label.copy(letterSpacing = MeasureType.Tag.letterSpacing),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+private val SegmentDividerHeight = 28.dp
 
 /**
  * A text field that looks like one.

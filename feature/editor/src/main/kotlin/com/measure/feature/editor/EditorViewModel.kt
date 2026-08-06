@@ -12,7 +12,11 @@ import com.measure.core.data.SavedOpening
 import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.geometry.CapturedCorner
+import com.measure.core.geometry.Flooring
 import com.measure.core.geometry.LengthConstraint
+import com.measure.core.geometry.Painting
+import com.measure.core.geometry.RoomQuantity
+import com.measure.core.geometry.Takeoff
 import com.measure.core.geometry.Opening
 import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
@@ -29,7 +33,10 @@ import com.measure.core.geometry.plan.SnapKind
 import com.measure.core.geometry.plan.PlanMeasurement
 import com.measure.core.geometry.plan.PlanSnapper
 import com.measure.core.geometry.plan.ResolvedPoint
+import com.measure.core.units.Area
 import com.measure.core.units.AreaFormatter
+import com.measure.core.units.Capacity
+import com.measure.core.units.CapacityFormatter
 import com.measure.core.units.Length
 import com.measure.core.units.LengthFormatter
 import com.measure.core.units.LengthParser
@@ -55,14 +62,24 @@ sealed interface Selection {
 }
 
 /**
- * What a tap on the plan does.
+ * What the editor is for, right now.
  *
  * A mode rather than a long-press or a modifier, because a tap that sometimes selects and
  * sometimes places a point is the kind of ambiguity that produces the "I added the same
- * door seven times" class of bug. The mode is stated on screen while it is on, and the
- * only way into it is a button that stays lit.
+ * door seven times" class of bug.
+ *
+ * Three of them rather than a toggle, and stated as a segmented control rather than a
+ * button that lights up. A toggle can only say "on", so a whole view had nowhere to live:
+ * [QUANTITIES] answers two of the six use cases in `docs/PRODUCT_PLAN.md` §3 and could not
+ * be reached at all while the mode switch was a button labelled "Measure".
+ *
+ * The order is the order of the work: draw the plan, read it, buy from it.
  */
-enum class EditorMode { SELECT, MEASURE }
+enum class EditorMode(val label: String) {
+    PLAN("Plan"),
+    MEASURE("Measure"),
+    QUANTITIES("Quantities"),
+}
 
 /**
  * The one thing being read in the measure view.
@@ -449,7 +466,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     // --- measuring on the plan — docs/PRODUCT_PLAN.md M12 -------------------------------
 
-    var mode by mutableStateOf(EditorMode.SELECT)
+    var mode by mutableStateOf(EditorMode.PLAN)
         private set
 
     /** What is being read right now. Exactly one thing, or nothing. */
@@ -741,6 +758,65 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         return (xs.max() - xs.min()) to (ys.max() - ys.min())
     }
 
+    // --- quantities — docs/PRODUCT_PLAN.md §3, use cases 3 and 4 ------------------------
+
+    /**
+     * How much of the floor gets cut off and thrown away, as a percentage.
+     *
+     * Held here rather than stored with the project. It is a fact about how a floor is being
+     * laid rather than about the room, it is changed while looking at the answer, and a
+     * persisted copy would be one more thing to migrate for no gain. If it turns out people
+     * set it once and expect it to stick, it becomes a preference in M10c.
+     */
+    var wastePercent by mutableStateOf(Flooring.DEFAULT_WASTE)
+        private set
+
+    var coats by mutableStateOf(Painting.DEFAULT_COATS)
+        private set
+
+    /** Ceilings are painted about as often as they are not, so this is a choice, not a rule. */
+    var paintCeilings by mutableStateOf(false)
+        private set
+
+    /** Named like [selectMode] and for the same reason: `setWaste` would clash on the JVM. */
+    fun selectWaste(percent: Int) {
+        wastePercent = percent
+    }
+
+    fun selectCoats(count: Int) {
+        coats = count
+    }
+
+    fun togglePaintCeilings() {
+        paintCeilings = !paintCeilings
+    }
+
+    /**
+     * The whole plan added up, room by room.
+     *
+     * Computed on every read rather than cached. It is a sum over a handful of rooms, and a
+     * cache would be a second copy of the model that could disagree with the first — which
+     * is the fault this view model was rewritten to remove.
+     */
+    fun takeoff(): Takeoff = Takeoff(
+        current?.rooms.orEmpty().map { room ->
+            RoomQuantity(
+                name = room.name,
+                floorArea = room.area,
+                perimeter = room.perimeter,
+                surfaces = room.surfaces,
+            )
+        },
+    )
+
+    /** Wall area, plus the ceilings when they are being painted too. */
+    fun paintableArea(takeoff: Takeoff): Area =
+        if (paintCeilings) takeoff.netWallArea + takeoff.ceilingArea else takeoff.netWallArea
+
+    fun flooringRequired(takeoff: Takeoff): Area = Flooring.required(takeoff.floorArea, wastePercent)
+
+    fun paintRequired(takeoff: Takeoff): Capacity = Painting.required(paintableArea(takeoff), coats)
+
     // --- openings and heights ---------------------------------------------------------
 
     fun addOpening(roomId: Long, wallIndex: Int, kind: OpeningKind) {
@@ -929,6 +1005,17 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         LengthFormatter.format(Length(metres), unitSystem())
 
     fun formatArea(room: SavedRoom): String = AreaFormatter.format(room.area, unitSystem())
+
+    fun formatArea(area: Area): String = AreaFormatter.format(area, unitSystem())
+
+    /** The number on its own, for a reading that sets the unit separately. */
+    fun areaValue(area: Area): String = AreaFormatter.value(area, unitSystem())
+
+    fun areaUnit(): String = AreaFormatter.unit(unitSystem())
+
+    fun capacityValue(capacity: Capacity): String = CapacityFormatter.value(capacity, unitSystem())
+
+    fun capacityUnit(): String = CapacityFormatter.unit(unitSystem())
 
     fun roomById(roomId: Long): SavedRoom? = current?.rooms?.firstOrNull { it.id == roomId }
 

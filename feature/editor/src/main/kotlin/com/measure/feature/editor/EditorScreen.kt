@@ -10,15 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,22 +26,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
-import com.measure.core.designsystem.MeasureType
 import com.measure.core.designsystem.MeasureField
+import com.measure.core.designsystem.MeasureReading
+import com.measure.core.designsystem.MeasureRule
+import com.measure.core.designsystem.MeasureSegmented
+import com.measure.core.designsystem.MeasureShape
+import com.measure.core.designsystem.MeasureSheet
+import com.measure.core.designsystem.MeasureSpace
+import com.measure.core.designsystem.MeasureTag
+import com.measure.core.designsystem.MeasureType
 import com.measure.core.designsystem.touchTarget
+import com.measure.core.geometry.Flooring
 import com.measure.core.geometry.OpeningKind
+import com.measure.core.geometry.Painting
 import com.measure.feature.export.ExportSheet
 import com.measure.feature.export.PlanExporter
 import kotlinx.coroutines.delay
@@ -79,6 +81,23 @@ fun EditorScreen(
     val context = LocalContext.current
     var exporting by remember { mutableStateOf(false) }
 
+    val mode = viewModel.mode
+    // Only the plan view reshapes anything. In the measure view PlanCanvas already refuses
+    // drags; the quantities view is new and would otherwise let a room be dragged across
+    // the floor while the user was reading how much paint to buy.
+    val editable = mode == EditorMode.PLAN
+
+    var sheetExpanded by remember { mutableStateOf(false) }
+    val sheetScroll = rememberScrollState()
+
+    // Anything selected has a panel with controls in it, and a keyboard over a peeked sheet
+    // covers the field it opened for. The quantities view is a reading rather than a
+    // control, and it is all of it worth seeing, so it opens expanded.
+    LaunchedEffect(viewModel.selection) {
+        if (viewModel.selection != Selection.None) sheetExpanded = true
+    }
+    LaunchedEffect(mode) { sheetExpanded = mode == EditorMode.QUANTITIES }
+
     Box(modifier.fillMaxSize().background(MeasureColours.Surface)) {
         PlanCanvas(
             rooms = rooms,
@@ -87,25 +106,35 @@ fun EditorScreen(
             selection = viewModel.selection,
             dragging = viewModel.dragging,
             movingRoom = viewModel.movingRoom,
-            measuring = viewModel.mode == EditorMode.MEASURE,
+            measuring = mode == EditorMode.MEASURE,
             drawing = viewModel.drawing,
             focus = viewModel.focus,
             pendingEnd = viewModel.pendingEnd,
-            dimensionChains = if (viewModel.mode == EditorMode.MEASURE) {
+            dimensionChains = if (mode == EditorMode.MEASURE) {
                 viewModel.dimensionChains()
             } else {
                 emptyList()
             },
             formatLength = viewModel::formatLength,
-            onSelect = viewModel::select,
+            onSelect = { picked ->
+                // In the quantities view the plan is a reference rather than a workbench:
+                // a tap picks out a whole room, so the breakdown below can mark which line
+                // belongs to the shape under the finger. Selecting a single wall there
+                // would offer an edit the view has no controls for.
+                if (mode == EditorMode.QUANTITIES) {
+                    roomIdOf(picked)?.let { viewModel.select(Selection.Room(it)) }
+                } else {
+                    viewModel.select(picked)
+                }
+            },
             onFocus = viewModel::focusOn,
             onMeasureTap = viewModel::tapWhileMeasuring,
-            onBeginDrag = viewModel::beginDrag,
-            onDrag = viewModel::updateDrag,
-            onEndDrag = viewModel::endDrag,
-            onBeginRoomMove = viewModel::beginRoomMove,
-            onRoomMove = viewModel::updateRoomMove,
-            onEndRoomMove = viewModel::endRoomMove,
+            onBeginDrag = { roomId, index, at -> if (editable) viewModel.beginDrag(roomId, index, at) },
+            onDrag = { at -> if (editable) viewModel.updateDrag(at) },
+            onEndDrag = { if (editable) viewModel.endDrag() },
+            onBeginRoomMove = { roomId, at -> if (editable) viewModel.beginRoomMove(roomId, at) },
+            onRoomMove = { at -> if (editable) viewModel.updateRoomMove(at) },
+            onEndRoomMove = { if (editable) viewModel.endRoomMove() },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -115,36 +144,31 @@ fun EditorScreen(
                     title = project?.name ?: "",
                     subtitle = summarise(rooms, measurements, viewModel),
                     onBack = onBack,
-                    onAddRoom = onAddRoom,
                     canUndo = viewModel.canUndo,
                     onUndo = viewModel::undo,
-                    measuring = viewModel.mode == EditorMode.MEASURE,
-                    onToggleMeasure = {
-                        viewModel.selectMode(
-                            if (viewModel.mode == EditorMode.MEASURE) EditorMode.SELECT else EditorMode.MEASURE,
-                        )
-                    },
+                    mode = mode,
+                    onSelectMode = viewModel::selectMode,
                     // Nothing to send until something has been captured, and a share
                     // sheet offering an empty drawing is worse than no button.
                     canExport = rooms.isNotEmpty() || measurements.isNotEmpty(),
                     onExport = { exporting = true },
                 )
-                if (viewModel.mode == EditorMode.MEASURE) {
+                if (mode == EditorMode.MEASURE) {
                     MeasuringBanner(viewModel)
-                } else if (project?.hasUnrelatedCaptures == true) {
+                } else if (mode == EditorMode.PLAN && project?.hasUnrelatedCaptures == true) {
                     UnrelatedCapturesNote()
                 }
             }
 
             if (rooms.isEmpty() && measurements.isEmpty() && project != null) {
-                EmptyPlan(Modifier.align(Alignment.Center))
+                EmptyPlan(onAddRoom, Modifier.align(Alignment.Center))
             }
 
-            // The panel is the only thing that must clear the keyboard: the plan behind it
+            // The sheet is the only thing that must clear the keyboard: the plan behind it
             // should stay where it is rather than being squashed into a letterbox.
             val panelModifier = Modifier.align(Alignment.BottomCenter).imePadding()
-            when {
-                exporting -> ExportSheet(
+            if (exporting) {
+                ExportSheet(
                     onExport = { format ->
                         exporting = false
                         val detail = project ?: return@ExportSheet
@@ -162,9 +186,22 @@ fun EditorScreen(
                     onDismiss = { exporting = false },
                     modifier = panelModifier,
                 )
+            } else {
+                MeasureSheet(
+                    expanded = sheetExpanded,
+                    onExpandedChange = { sheetExpanded = it },
+                    modifier = panelModifier,
+                    scrollState = sheetScroll,
+                ) {
+                    when (mode) {
+                        EditorMode.PLAN -> PlanContent(viewModel, onAddRoom, sheetScroll) {
+                            sheetExpanded = true
+                        }
 
-                viewModel.mode == EditorMode.MEASURE -> MeasurePanel(viewModel, panelModifier)
-                else -> SelectionPanel(viewModel, panelModifier)
+                        EditorMode.MEASURE -> MeasureContent(viewModel)
+                        EditorMode.QUANTITIES -> QuantitiesContent(viewModel)
+                    }
+                }
             }
 
             viewModel.message?.let { text ->
@@ -216,46 +253,74 @@ private fun summarise(
     return if (parts.isEmpty()) "Nothing yet" else parts.joinToString(" · ")
 }
 
+/** Which room a tap landed in, whatever part of it was hit. */
+private fun roomIdOf(selection: Selection): Long? = when (selection) {
+    is Selection.Room -> selection.roomId
+    is Selection.Wall -> selection.roomId
+    is Selection.Corner -> selection.roomId
+    else -> null
+}
+
+/**
+ * The plan's identity, its two actions, and the mode switch.
+ *
+ * One row of controls rather than two. The second row existed because Measure, Send and
+ * Undo had nowhere else to go — five buttons across a phone leaves each too narrow to read,
+ * which is how the capture screen's controls once became unreadable. The segmented control
+ * takes Measure out of the row and gives the other two the space, and Add moved into the
+ * plan view's own panel where it belongs: adding a room is something you do to a plan, not
+ * something you do to the editor.
+ */
 @Composable
 private fun TopBar(
     title: String,
     subtitle: String,
     onBack: () -> Unit,
-    onAddRoom: () -> Unit,
     canUndo: Boolean,
     onUndo: () -> Unit,
-    measuring: Boolean,
-    onToggleMeasure: () -> Unit,
+    mode: EditorMode,
+    onSelectMode: (EditorMode) -> Unit,
     canExport: Boolean,
     onExport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        modifier.fillMaxWidth().padding(MeasureSpace.Base),
+        verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
+    ) {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Pill("Back", onClick = onBack)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, color = MeasureColours.OnScrim, fontSize = MeasureType.Title.fontSize, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Small.fontSize)
+            Pill("←", onClick = onBack)
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = MeasureColours.OnScrim,
+                    style = MeasureType.Title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = subtitle,
+                    color = MeasureColours.OnScrimMuted,
+                    style = MeasureType.Small,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Pill("Add", onClick = onAddRoom)
-        }
-        // On its own row rather than crowded into the first. Five pills across a phone
-        // leaves each one too narrow to read, which is how the capture screen's buttons
-        // ended up unreadable at the top edge.
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            // Lit while active. A mode that changes what a tap does has to be visible
-            // from the control that turned it on, or the plan simply stops behaving.
-            Pill("Measure", highlighted = measuring, onClick = onToggleMeasure)
-            Pill("Send", enabled = canExport, onClick = onExport)
+            // Disabled rather than absent. A control that comes and goes makes the row
+            // reflow under the finger, and "where did Undo go" is a worse question than
+            // "why is Undo grey".
             Pill("Undo", enabled = canUndo, onClick = onUndo)
+            Pill("Send", enabled = canExport, onClick = onExport)
         }
+        MeasureSegmented(
+            options = EditorMode.entries.map { it.label },
+            selectedIndex = mode.ordinal,
+            onSelect = { onSelectMode(EditorMode.entries[it]) },
+        )
     }
 }
 
@@ -366,15 +431,22 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
 }
 
 @Composable
-private fun EmptyPlan(modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Nothing to edit yet", color = MeasureColours.OnScrim, fontSize = MeasureType.Title.fontSize, fontWeight = FontWeight.SemiBold)
+private fun EmptyPlan(onAddRoom: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
+    ) {
+        Text("Nothing to edit yet", color = MeasureColours.OnScrim, style = MeasureType.Title)
         Text(
             "Capture a room and it appears here",
             color = MeasureColours.OnScrimMuted,
-            fontSize = MeasureType.Label.fontSize,
-            modifier = Modifier.padding(top = 4.dp),
+            style = MeasureType.Label,
         )
+        // The way out of the empty state, on the empty state. An empty screen whose only
+        // route forward is a control somewhere else is a dead end for as long as it takes
+        // to find that control.
+        Pill("+ Room", highlighted = true, onClick = onAddRoom)
     }
 }
 
@@ -385,59 +457,49 @@ private fun EmptyPlan(modifier: Modifier = Modifier) {
  * a plan people assume is read-only, and long-press-to-drag is not discoverable.
  */
 @Composable
-private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
+private fun PlanContent(
+    viewModel: EditorViewModel,
+    onAddRoom: () -> Unit,
+    scroll: ScrollState,
+    onNeedRoom: () -> Unit,
+) {
     val selection = viewModel.selection
     val measurements = viewModel.current?.measurements.orEmpty()
 
-    val scroll = rememberScrollState()
-
-    // Scroll the row confirming a new opening into view.
+    // Bring the row confirming a new opening into view, and open the sheet far enough that
+    // there is a view to bring it into.
     //
-    // The panel is capped and scrolls, so a door added to a wall that already had two
-    // landed below the fold — and the note on `heightIn` below records what that did last
-    // time: the user could not see the confirmation, assumed the button had missed, and
-    // added the same door four times. Making the panel update was only half the fix; the
-    // update has to be somewhere it can be seen.
+    // What happened without this: a door added to a wall that already had two landed below
+    // the fold, the user could not see the confirmation, assumed the button had missed, and
+    // added the same door four times. Making the panel update was only the first half of
+    // the fix, scrolling to the new row was the second, and the sheet — which can now be
+    // made taller rather than being capped at 340 dp — is the third.
     LaunchedEffect(viewModel.lastAddedOpening) {
         if (viewModel.lastAddedOpening == null) return@LaunchedEffect
+        onNeedRoom()
         // One frame, so the new row has been measured and `maxValue` includes it.
         withFrameNanos { }
         scroll.animateScrollTo(scroll.maxValue)
     }
 
-    Column(
-        modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(16.dp))
-            // Opaque, not the camera scrim. There is no camera behind this screen, and a
-            // translucent panel let the plan's own lines and labels bleed through the
-            // text, which read as a rendering fault.
-            .background(MeasureColours.Panel)
-            // Capped and scrollable. Adding four doors made the panel taller than the
-            // screen, so the rows confirming each one were off the bottom — which is why
-            // the same door got added again and again.
-            .heightIn(max = PANEL_MAX_HEIGHT)
-            .verticalScroll(scroll)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        when (selection) {
-            Selection.None -> {
-                MeasurementList(viewModel, measurements)
-                Text(
-                    text = "Pinch to zoom · tap a wall to set its true length · " +
-                        "long-press a corner to move it · Measure for sizes and distances",
-                    color = MeasureColours.OnScrimMuted,
-                    fontSize = MeasureType.Label.fontSize,
-                )
-            }
-
-            is Selection.Corner -> CornerPanel(viewModel, selection)
-            is Selection.Wall -> WallPanel(viewModel, selection)
-            is Selection.Measurement -> MeasurementPanel(viewModel, selection)
-            is Selection.Room -> RoomPanel(viewModel, selection)
+    when (selection) {
+        Selection.None -> {
+            // Adding a room is the plan view's own action, which is why it is here rather
+            // than in the top bar: it belongs to the plan, not to the editor's chrome.
+            Pill("+ Room", highlighted = true, onClick = onAddRoom)
+            MeasurementList(viewModel, measurements)
+            Text(
+                text = "Pinch to zoom · tap a wall to set its true length · " +
+                    "long-press a corner to move it · Measure for sizes and distances",
+                color = MeasureColours.OnScrimMuted,
+                style = MeasureType.Label,
+            )
         }
+
+        is Selection.Corner -> CornerPanel(viewModel, selection)
+        is Selection.Wall -> WallPanel(viewModel, selection)
+        is Selection.Measurement -> MeasurementPanel(viewModel, selection)
+        is Selection.Room -> RoomPanel(viewModel, selection)
     }
 }
 
@@ -615,29 +677,225 @@ private fun MeasurementList(
  * two are different jobs and the screen says which one it is doing.
  */
 @Composable
-private fun MeasurePanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MeasureColours.Panel)
-            .heightIn(max = PANEL_MAX_HEIGHT)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        when (val focus = viewModel.focus) {
-            MeasureFocus.None -> Text(
-                text = "Tap any dimension line for its size · " +
-                    "+ Distance measures between two points you choose",
-                color = MeasureColours.OnScrimMuted,
-                fontSize = MeasureType.Label.fontSize,
-            )
+private fun MeasureContent(viewModel: EditorViewModel) {
+    when (val focus = viewModel.focus) {
+        MeasureFocus.None -> Text(
+            text = "Tap any dimension line for its size · " +
+                "+ Distance measures between two points you choose",
+            color = MeasureColours.OnScrimMuted,
+            style = MeasureType.Label,
+        )
 
-            is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
-            is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+        is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
+        is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+    }
+}
+
+/**
+ * How much flooring and how much paint — docs/PRODUCT_PLAN.md §3, use cases 3 and 4.
+ *
+ * Two of the six reasons this app exists, and until now they had no surface. The numbers
+ * were all present — a room's panel has shown its floor area and its net wall area since
+ * M5 — but only one room at a time, behind a tap on that room, with the addition left to
+ * the user. Nobody buys flooring for one room of three, so the arithmetic that mattered was
+ * the arithmetic the app did not do.
+ *
+ * The answer is a single figure per material, set at reading size, with the inputs that
+ * produced it as controls beside it rather than buried in a settings screen. Waste
+ * percentage and coat count are not preferences; they are part of the question being asked,
+ * and the answer has to move while they are changed.
+ */
+@Composable
+private fun QuantitiesContent(viewModel: EditorViewModel) {
+    val takeoff = viewModel.takeoff()
+
+    if (takeoff.isEmpty) {
+        Text(
+            text = "Capture a room and its quantities appear here",
+            color = MeasureColours.OnScrimMuted,
+            style = MeasureType.Label,
+        )
+        return
+    }
+
+    val areaUnit = viewModel.areaUnit()
+
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Base)) {
+        MeasureReading(
+            label = "Floor",
+            value = viewModel.areaValue(takeoff.floorArea),
+            modifier = Modifier.weight(1f),
+            unit = areaUnit,
+        )
+        MeasureReading(
+            label = "Walls, net",
+            value = viewModel.areaValue(takeoff.netWallArea),
+            modifier = Modifier.weight(1f),
+            unit = areaUnit,
+            // Amber when a room was left out, so the number is not read as a total when it
+            // is only a subtotal. The sentence saying which rooms is below; the colour is
+            // what stops the figure being copied down before the sentence is reached.
+            colour = if (takeoff.wallsAreIncomplete) MeasureColours.Warning else MeasureColours.OnScrim,
+        )
+    }
+
+    // Supporting figures rather than readings. This view has two answers — how much floor
+    // to order and how much paint to buy — and giving perimeter and volume the same weight
+    // as those would leave five numbers of equal size and no way to tell which is the one
+    // that was asked for. They stay because skirting is bought by the metre and heating is
+    // sized by the cubic one.
+    Text(
+        text = "Perimeter ${viewModel.formatLength(takeoff.perimeter.metres)} · " +
+            "volume ${com.measure.core.units.VolumeFormatter.format(takeoff.volume, viewModel.unitSystem())}",
+        color = MeasureColours.OnScrimMuted,
+        style = MeasureType.Small,
+    )
+
+    if (takeoff.wallsAreIncomplete) {
+        Text(
+            text = "No ceiling height for ${takeoff.roomsWithoutHeight.joinToString(", ")} — " +
+                "walls and volume not counted for " +
+                "${if (takeoff.roomsWithoutHeight.size == 1) "it" else "them"}. " +
+                "Tap the room in Plan and set one.",
+            color = MeasureColours.Warning,
+            style = MeasureType.Small,
+        )
+    }
+
+    MeasureRule()
+
+    // --- flooring ---------------------------------------------------------------------
+
+    MeasureTag("Flooring")
+    Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
+        Flooring.WASTE_OPTIONS.forEach { percent ->
+            Pill(
+                label = "$percent%",
+                highlighted = percent == viewModel.wastePercent,
+                onClick = { viewModel.selectWaste(percent) },
+            )
         }
+    }
+    MeasureReading(
+        label = "Order",
+        value = viewModel.areaValue(viewModel.flooringRequired(takeoff)),
+        unit = areaUnit,
+        large = true,
+    )
+    Text(
+        text = "${viewModel.formatArea(takeoff.floorArea)} of floor plus " +
+            "${viewModel.wastePercent}% for offcuts. Raise it for a diagonal or " +
+            "herringbone lay, or for rooms that are not rectangles.",
+        color = MeasureColours.OnScrimMuted,
+        style = MeasureType.Small,
+    )
+
+    MeasureRule()
+
+    // --- paint ------------------------------------------------------------------------
+
+    MeasureTag("Paint")
+    Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
+        Painting.COAT_OPTIONS.forEach { count ->
+            Pill(
+                label = if (count == 1) "1 coat" else "$count coats",
+                highlighted = count == viewModel.coats,
+                onClick = { viewModel.selectCoats(count) },
+            )
+        }
+    }
+    Pill(
+        label = "Ceilings too",
+        highlighted = viewModel.paintCeilings,
+        onClick = viewModel::togglePaintCeilings,
+    )
+    MeasureReading(
+        label = "Buy",
+        value = viewModel.capacityValue(viewModel.paintRequired(takeoff)),
+        unit = viewModel.capacityUnit(),
+        large = true,
+    )
+    Text(
+        text = "${viewModel.formatArea(viewModel.paintableArea(takeoff))} at " +
+            "${viewModel.coats} ${if (viewModel.coats == 1) "coat" else "coats"}, " +
+            "${Painting.TYPICAL_COVERAGE.toInt()} m² per litre. Check the tin — coverage " +
+            "varies, and a wall changing colour drinks more.",
+        color = MeasureColours.OnScrimMuted,
+        style = MeasureType.Small,
+    )
+    if (takeoff.openingArea.squareMetres > 0.0) {
+        Text(
+            text = "Doors and windows already taken out: " +
+                viewModel.formatArea(takeoff.openingArea),
+            color = MeasureColours.OnScrimMuted,
+            style = MeasureType.Small,
+        )
+    }
+
+    MeasureRule()
+
+    // --- by room ----------------------------------------------------------------------
+
+    MeasureTag("By room")
+    // Driven from the rooms rather than from `takeoff.rooms`, even though the two hold the
+    // same values in the same order. A row needs the room's id to select it, and pairing a
+    // list of quantities back up with a list of rooms by position is the kind of implicit
+    // coupling that survives until someone sorts one of them.
+    viewModel.current?.rooms.orEmpty().forEach { room ->
+        RoomQuantityRow(
+            viewModel = viewModel,
+            room = room,
+            selected = viewModel.selection == Selection.Room(room.id),
+            onClick = { viewModel.select(Selection.Room(room.id)) },
+        )
+    }
+}
+
+/**
+ * One room's line, and the link between the list and the drawing.
+ *
+ * Tapping a line selects the room on the plan, and a tap on the plan marks the line. Without
+ * that the breakdown is a table of names, and "which one is the 12 m² one" is a question the
+ * user has to answer by remembering what they called things.
+ */
+@Composable
+private fun RoomQuantityRow(
+    viewModel: EditorViewModel,
+    room: SavedRoom,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val surfaces = room.surfaces
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(MeasureShape.Edge))
+            .background(if (selected) MeasureColours.Surface else Color.Transparent)
+            .clickable(onClick = onClick)
+            .touchTarget()
+            .padding(horizontal = MeasureSpace.Tight, vertical = MeasureSpace.Hair),
+        horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = room.name,
+            color = if (selected) MeasureColours.Accent else MeasureColours.OnScrim,
+            style = MeasureType.Label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = viewModel.formatArea(room.area),
+            color = MeasureColours.OnScrim,
+            style = MeasureType.ValueSmall,
+        )
+        Text(
+            text = surfaces?.let { viewModel.formatArea(it.netWallArea) } ?: "no height",
+            color = if (surfaces != null) MeasureColours.OnScrimMuted else MeasureColours.Warning,
+            style = if (surfaces != null) MeasureType.ValueSmall else MeasureType.Small,
+        )
     }
 }
 
@@ -1007,6 +1265,3 @@ private fun Pill(
 ) = MeasureButton(label, onClick, modifier, primary = highlighted, enabled = enabled)
 
 private const val MESSAGE_DURATION_MS = 3000L
-
-/** Enough for a wall with a few openings, little enough to leave the plan visible. */
-private val PANEL_MAX_HEIGHT = 340.dp
