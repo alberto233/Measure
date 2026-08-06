@@ -60,8 +60,21 @@ class EditorPanelTest {
     @Before
     fun setUp() {
         val application = ApplicationProvider.getApplicationContext<Application>()
+        // Room's queries and its invalidation tracker run inline, on whichever thread asks.
+        //
+        // Load-bearing, and the reason two attempts at this failed. Compose's test rule
+        // drives a **virtual** clock, so `waitUntil` can spin through its whole timeout in
+        // a few milliseconds of real time — which is why raising that timeout to a minute
+        // made things worse rather than better. Left on its own executor, Room delivers the
+        // project from a real background thread on real time the test never spends, and
+        // whether the flow arrives before the clock runs out is a race.
+        //
+        // Inline, there is no other thread to wait for and no race to lose.
+        val inline = java.util.concurrent.Executor { it.run() }
         database = Room.inMemoryDatabaseBuilder(application, MeasureDatabase::class.java)
             .allowMainThreadQueries()
+            .setQueryExecutor(inline)
+            .setTransactionExecutor(inline)
             .build()
         repository = MeasureRepository(database)
         MeasureData.useForTesting(repository)
@@ -73,15 +86,15 @@ class EditorPanelTest {
         // The database is deliberately **not** closed.
         //
         // A JUnit rule wraps @Before/@Test/@After, so the Compose rule tears the
-        // composition down *after* this runs — closing here pulled the database out from
-        // under a live `EditorViewModel`, whose init block collects the project for the
-        // whole life of the view model. The collector then threw on the main dispatcher,
-        // and once that dispatcher is damaged nothing in a later test dispatches at all:
-        // the first two tests passed and the third timed out waiting for a project that
-        // was never going to arrive.
+        // composition down *after* this runs — closing here would pull the database out
+        // from under a live `EditorViewModel`, whose init block collects the project for
+        // the whole life of the view model.
         //
-        // Nothing needs closing. Each test builds its own in-memory database, and an
-        // in-memory database is gone when the process is.
+        // Hygiene rather than a diagnosis: an earlier version of this comment claimed the
+        // close was what made a test time out, and that was wrong — removing it moved
+        // which test failed instead of fixing anything. The real cause was the executor,
+        // above. Nothing needs closing either way: each test builds its own in-memory
+        // database, and an in-memory database is gone when the process is.
     }
 
     /** A four-corner room, five by four, saved into a fresh project. Returns both ids. */
@@ -118,13 +131,9 @@ class EditorPanelTest {
         // The project arrives from the database asynchronously; nothing below means
         // anything until it has.
         //
-        // A much longer wait than the assertions use, because this one also absorbs cold
-        // start. Whichever test happens to run first pays for Robolectric standing up an
-        // Android runtime, Room opening a database and Compose loading — and it was that
-        // test, not a particular test, that kept timing out here: the failure moved
-        // between runs while always landing on this line, which a logic fault would not
-        // do. The assertions keep a short timeout, because by then everything is warm and
-        // a slow answer there would be a real fault.
+        // Longer than the assertions use, to absorb class loading on the first test of a
+        // run. It is not there to wait for the database — see the executor in setUp; a
+        // timeout cannot fix a race against a clock that is not real.
         compose.waitUntil(LOAD_TIMEOUT_MS) { viewModel.current?.rooms?.isNotEmpty() == true }
         return viewModel
     }
@@ -201,7 +210,7 @@ class EditorPanelTest {
         /** Once the screen is up, an answer is either quick or wrong. */
         const val TIMEOUT_MS = 5_000L
 
-        /** Cold start on a CI runner: the whole Android runtime, Room and Compose. */
-        const val LOAD_TIMEOUT_MS = 60_000L
+        /** Class loading on the first test of a run — Robolectric, Room and Compose. */
+        const val LOAD_TIMEOUT_MS = 20_000L
     }
 }
