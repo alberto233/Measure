@@ -73,6 +73,14 @@ jobs:
       - name: Test the data layer
         run: ./gradlew :core:data:testDebugUnitTest --stacktrace
 
+      # The editor's interface tests. Robolectric, so they run on the JVM — but they are
+      # an Android library's tests and need the SDK, which only this job has. They cover
+      # the one class of fault the 247 geometry tests are blind to: a screen that stops
+      # reflecting the model. That reached the user three times before anything could
+      # catch it.
+      - name: Test the editor's interface
+        run: ./gradlew :feature:editor:testDebugUnitTest --stacktrace
+
       - name: Upload data test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,6 +89,8 @@ jobs:
           path: |
             core/data/build/reports/tests/
             core/data/build/test-results/
+            feature/editor/build/reports/tests/
+            feature/editor/build/test-results/
           retention-days: 7
 
       # Kotlin prints diagnostics before the failure marker, and a long Gradle stack

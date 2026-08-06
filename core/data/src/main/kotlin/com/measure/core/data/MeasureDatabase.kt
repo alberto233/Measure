@@ -220,4 +220,22 @@ object MeasureData {
         repository ?: synchronized(this) {
             repository ?: MeasureRepository(MeasureDatabase.get(context)).also { repository = it }
         }
+
+    /**
+     * Substitutes the repository, for tests. Pass null to go back to the real one.
+     *
+     * The seam that "no dependency injection until there is a graph worth wiring" had been
+     * deferring. It came due for a specific reason: a whole class of interface fault —
+     * panels that silently stop reflecting the model — is invisible to every test this
+     * project can currently run, and it has reached the user three times. Catching it needs
+     * the editor rendered against a database somebody can seed, and every view model here
+     * builds its own repository from this object.
+     *
+     * A settable instance rather than Hilt, because one substitution point is not a graph
+     * either. `TECHNICAL_DESIGN.md` still names Hilt as the eventual answer, and this is the
+     * same seam it would slot into.
+     */
+    fun useForTesting(repository: MeasureRepository?) {
+        synchronized(this) { this.repository = repository }
+    }
 }

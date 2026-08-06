@@ -18,6 +18,12 @@ kotlin = "2.3.21"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerialization = "1.9.0"
 junit5 = "5.11.4"
+# JUnit 4 as well, and only for the editor's UI tests. Robolectric and Compose's
+# `createComposeRule` are both JUnit 4 rules, and the Vintage engine would be a third
+# moving part in a harness that already has several.
+junit4 = "4.13.2"
+robolectric = "4.16"
+androidxTest = "1.7.0"
 androidxCore = "1.16.0"
 
 [libraries]
@@ -46,6 +52,13 @@ room-compiler = { group = "androidx.room", name = "room-compiler", version.ref =
 
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version = "1.11.4" }
+
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTest" }
+# Versioned by the Compose BOM, like the rest of Compose.
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
