@@ -121,6 +121,16 @@ fun ProjectsScreen(
                     )
                 }
             }
+
+            item {
+                MeasureButton(
+                    label = "Device check",
+                    onClick = onDeviceCheck,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = MeasureSpace.Base),
+                )
+            }
         }
 
         MeasureButton(
@@ -201,16 +211,6 @@ private fun Header(count: Int, onDeviceCheck: () -> Unit) {
                     style = MeasureType.Display.copy(fontFamily = MeasureType.Value.fontFamily),
                 )
             }
-        }
-        Box(
-            Modifier
-                .clip(RoundedCornerShape(MeasureShape.Edge))
-                .clickable(onClick = onDeviceCheck)
-                .touchTarget()
-                .padding(vertical = MeasureSpace.Tight),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            MeasureTag("device check", colour = MeasureColours.OnScrimMuted)
         }
         MeasureRule()
     }

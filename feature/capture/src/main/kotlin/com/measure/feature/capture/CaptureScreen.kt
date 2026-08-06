@@ -46,6 +46,7 @@ import com.measure.ar.MeasureArController
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.delay
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureShape
 import com.measure.core.designsystem.MeasureType
 
 /**
@@ -237,7 +238,7 @@ private fun TopBar(
                     )
                 }
                 PillButton(
-                    label = if (viewModel.unitSystem == UnitSystem.METRIC) "m" else "ft",
+                    label = if (viewModel.unitSystem == UnitSystem.METRIC) "Metres" else "Feet",
                     onClick = viewModel::toggleUnits,
                 )
             }
@@ -326,7 +327,7 @@ private fun RoomReadout(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(MeasureColours.Scrim)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -402,7 +403,7 @@ private fun LatestMeasurement(viewModel: CaptureViewModel, modifier: Modifier = 
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(MeasureColours.Scrim)
             .padding(horizontal = 18.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -494,7 +495,7 @@ private fun Notice(viewModel: CaptureViewModel, modifier: Modifier = Modifier) {
     Text(
         text = notice.text,
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(MeasureColours.Scrim)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         color = when (notice) {

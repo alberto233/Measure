@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureShape
 import com.measure.core.designsystem.MeasureType
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.RangeAdvice
@@ -50,7 +51,7 @@ internal fun TrackingChip(
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(MeasureColours.Scrim)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -99,7 +100,7 @@ internal fun AimAdvice(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(MeasureColours.ScrimSoft)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -121,7 +122,7 @@ internal fun MeasurementLabel(
     Text(
         text = text,
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(MeasureShape.Panel))
             .background(if (emphasised) MeasureColours.Scrim else MeasureColours.ScrimSoft)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         color = if (emphasised) MeasureColours.Ready else MeasureColours.OnScrim,
