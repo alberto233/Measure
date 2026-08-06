@@ -31,6 +31,13 @@ jobs:
       - name: Test the geometry and units core
         run: ./gradlew :core:units:test :core:geometry:test :core:export:test --stacktrace
 
+      - name: Surface test failures
+        if: failure()
+        run: |
+          echo "════════ TEST FAILURES ════════"
+          python3 .github/scripts/print-test-failures.py
+          echo "════════ END TEST FAILURES ════════"
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
@@ -92,6 +99,16 @@ jobs:
             feature/editor/build/reports/tests/
             feature/editor/build/test-results/
           retention-days: 7
+
+      # Gradle puts the reason a test failed into an HTML report, which on CI is a file
+      # nobody can open without downloading an artifact. Reading it cost two full round
+      # trips through this pipeline to learn one sentence, so the sentence is printed.
+      - name: Surface test failures
+        if: failure()
+        run: |
+          echo "════════ TEST FAILURES ════════"
+          python3 .github/scripts/print-test-failures.py
+          echo "════════ END TEST FAILURES ════════"
 
       # Kotlin prints diagnostics before the failure marker, and a long Gradle stack
       # trace then buries them. Anyone reading only the end of the log — including
