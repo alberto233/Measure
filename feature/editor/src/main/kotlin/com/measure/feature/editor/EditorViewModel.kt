@@ -122,6 +122,34 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         .flatMapLatest { id -> if (id == 0L) flowOf(null) else repository.observeProject(id) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), null)
 
+    /**
+     * The same project again, as Compose state. **Every read below goes through this.**
+     *
+     * `project.value` is an ordinary field read. Compose cannot see it, so a composable
+     * that calls `roomById()` records no dependency on the project — and with strong
+     * skipping on, a panel whose parameters have not changed is then skipped outright.
+     * `WallPanel(viewModel, selection)` takes the same view model and the same selection
+     * before and after a door is added, so it was skipped, and it went on rendering the
+     * wall as it was before the write. The interface looked like the button had done
+     * nothing; deselecting and reselecting changed `selection`, which forced the
+     * recomposition that made the door appear.
+     *
+     * That is a whole class of fault rather than one bug — it applies to every accessor
+     * on this view model — so it is fixed at the source. Reading this instead of
+     * `project.value` makes each call a tracked Compose read, and any panel that renders
+     * from the model recomposes when the model changes, whatever its parameters say.
+     *
+     * Collected for the view model's whole life rather than while subscribed: the editor
+     * is on screen for as long as this exists, and a mirror that stops updating five
+     * seconds after the last collector would be a subtler version of the same bug.
+     */
+    var current by mutableStateOf<ProjectDetail?>(null)
+        private set
+
+    init {
+        viewModelScope.launch { project.collect { current = it } }
+    }
+
     var selection by mutableStateOf<Selection>(Selection.None)
         private set
 
@@ -322,7 +350,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun squareRoomToPlan(roomId: Long) {
         val room = roomById(roomId) ?: return
-        val others = project.value?.rooms.orEmpty().filter { it.id != roomId }
+        val others = current?.rooms.orEmpty().filter { it.id != roomId }
 
         // The grid of everything else, or the world axes when this is the only room and
         // there is no plan for it to agree with yet.
@@ -417,7 +445,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         selection = Selection.None
     }
 
-    fun measurementById(id: Long) = project.value?.measurements?.firstOrNull { it.id == id }
+    fun measurementById(id: Long) = current?.measurements?.firstOrNull { it.id == id }
 
     // --- measuring on the plan — docs/PRODUCT_PLAN.md M12 -------------------------------
 
@@ -538,7 +566,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun tapWhileMeasuring(point: Vec2, reach: Double) {
         if (!drawing) return
-        val rooms = project.value?.snapRooms.orEmpty()
+        val rooms = current?.snapRooms.orEmpty()
 
         val first = pendingEnd
         if (first == null) {
@@ -624,7 +652,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     private fun squareAcross(from: ResolvedPoint, to: ResolvedPoint): ResolvedPoint? {
         val anchor = to.anchor as? PlanAnchor.Wall ?: return null
-        val room = project.value?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
+        val room = current?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
         val outline = room.outline
         if (outline.size < 3 || anchor.index !in outline.indices) return null
 
@@ -641,7 +669,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         ) ?: return null
 
         val squared = PlanSnapper.resolve(
-            project.value?.snapRooms.orEmpty(),
+            current?.snapRooms.orEmpty(),
             anchor.copy(t = t),
         ) ?: return null
 
@@ -651,7 +679,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private fun wallDirectionOf(point: ResolvedPoint): Vec2? {
         val anchor = point.anchor as? PlanAnchor.Wall ?: return null
-        val room = project.value?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
+        val room = current?.rooms?.firstOrNull { it.id == anchor.roomId } ?: return null
         val outline = room.outline
         if (outline.size < 3 || anchor.index !in outline.indices) return null
         val from = outline[anchor.index]
@@ -660,7 +688,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun dominantDirection(): Vec2 =
-        DimensionChains.dominantDirection(project.value?.rooms.orEmpty().map { it.outline })
+        DimensionChains.dominantDirection(current?.rooms.orEmpty().map { it.outline })
 
     /**
      * The dimension strings, **one set per room** — how wide, how deep, where it steps.
@@ -684,7 +712,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      * share a wall the app knows about rather than one it drew them next to.
      */
     fun dimensionChains(): List<DimensionChain> =
-        project.value?.rooms.orEmpty().flatMap { DimensionChains.chains(listOf(it.outline)) }
+        current?.rooms.orEmpty().flatMap { DimensionChains.chains(listOf(it.outline)) }
 
     /** The length the focused dimension is reporting, if one is focused. */
     fun focusedDimensionLength(): Double? {
@@ -694,7 +722,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun planMeasurementById(id: Long): SavedPlanMeasurement? =
-        project.value?.planMeasurements?.firstOrNull { it.id == id }
+        current?.planMeasurements?.firstOrNull { it.id == id }
 
     fun deletePlanMeasurement(id: Long) {
         viewModelScope.launch { repository.deletePlanMeasurement(id) }
@@ -739,10 +767,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             } else {
                 candidate.copy(offset = (used + GAP_BETWEEN_OPENINGS).coerceAtMost(wallLength - candidate.width))
             }
-            repository.addOpening(roomId, wallIndex, placed)
+            lastAddedOpening = repository.addOpening(roomId, wallIndex, placed)
             confirm("${kind.label} added to wall ${wallIndex + 1}")
         }
     }
+
+    /**
+     * The opening added most recently, so the panel can scroll its row into view.
+     *
+     * Held rather than signalled once, because the panel reads it from a `LaunchedEffect`
+     * keyed on it and a value that cleared itself would race that read.
+     */
+    var lastAddedOpening by mutableStateOf<Long?>(null)
+        private set
 
     fun resizeOpening(
         roomId: Long,
@@ -882,7 +919,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     // --- formatting -----------------------------------------------------------------
 
-    fun unitSystem(): UnitSystem = project.value?.unitSystem ?: UnitSystem.METRIC
+    fun unitSystem(): UnitSystem = current?.unitSystem ?: UnitSystem.METRIC
 
     /** Parses a typed length in the project's units, or null if it is not one. */
     fun parseLength(text: String): Double? =
@@ -893,7 +930,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun formatArea(room: SavedRoom): String = AreaFormatter.format(room.area, unitSystem())
 
-    fun roomById(roomId: Long): SavedRoom? = project.value?.rooms?.firstOrNull { it.id == roomId }
+    fun roomById(roomId: Long): SavedRoom? = current?.rooms?.firstOrNull { it.id == roomId }
 
     fun polygonOf(room: SavedRoom): Polygon? =
         if (room.outline.size >= 3) Polygon(room.outline) else null

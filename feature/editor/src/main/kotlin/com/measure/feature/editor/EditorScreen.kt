@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,7 +39,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
@@ -68,7 +68,9 @@ fun EditorScreen(
 ) {
     LaunchedEffect(projectId) { viewModel.load(projectId) }
 
-    val project by viewModel.project.collectAsStateWithLifecycle()
+    // The view model's Compose mirror rather than the flow, so this screen and every
+    // panel under it read the model the same way — see EditorViewModel.current.
+    val project = viewModel.current
     val rooms = project?.rooms.orEmpty()
     val measurements = project?.measurements.orEmpty()
 
@@ -383,8 +385,23 @@ private fun EmptyPlan(modifier: Modifier = Modifier) {
 @Composable
 private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modifier) {
     val selection = viewModel.selection
-    val project by viewModel.project.collectAsStateWithLifecycle()
-    val measurements = project?.measurements.orEmpty()
+    val measurements = viewModel.current?.measurements.orEmpty()
+
+    val scroll = rememberScrollState()
+
+    // Scroll the row confirming a new opening into view.
+    //
+    // The panel is capped and scrolls, so a door added to a wall that already had two
+    // landed below the fold — and the note on `heightIn` below records what that did last
+    // time: the user could not see the confirmation, assumed the button had missed, and
+    // added the same door four times. Making the panel update was only half the fix; the
+    // update has to be somewhere it can be seen.
+    LaunchedEffect(viewModel.lastAddedOpening) {
+        if (viewModel.lastAddedOpening == null) return@LaunchedEffect
+        // One frame, so the new row has been measured and `maxValue` includes it.
+        withFrameNanos { }
+        scroll.animateScrollTo(scroll.maxValue)
+    }
 
     Column(
         modifier
@@ -399,7 +416,7 @@ private fun SelectionPanel(viewModel: EditorViewModel, modifier: Modifier = Modi
             // screen, so the rows confirming each one were off the bottom — which is why
             // the same door got added again and again.
             .heightIn(max = PANEL_MAX_HEIGHT)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
