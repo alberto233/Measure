@@ -29,6 +29,21 @@ kotlin {
     }
 }
 
+// Print why a test failed, into the log.
+//
+// Gradle's default is to name the failing test and put the reason in an HTML report — which
+// on CI is a file nobody can open without downloading an artifact. The first run of these
+// tests failed with "There were failing tests" and nothing else, which cost a round trip.
+// Same reasoning as the "Surface compiler errors" step in the workflow.
+tasks.withType<Test> {
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
+}
+
 dependencies {
     api(project(":core:data"))
     implementation(project(":core:designsystem"))

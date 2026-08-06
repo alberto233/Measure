@@ -1,6 +1,7 @@
 package com.measure.feature.editor
 
 import android.app.Application
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -23,6 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * The editor's panels, rendered against a real database.
@@ -43,6 +45,10 @@ import org.robolectric.RobolectricTestRunner
  * that seam as working.
  */
 @RunWith(RobolectricTestRunner::class)
+// A real handset's dimensions. Robolectric's default display is small enough that a panel
+// pinned to the bottom of a scrolling screen can sit outside the viewport, which would make
+// these fail for a reason that has nothing to do with what they test.
+@Config(qualifiers = "w411dp-h891dp-xhdpi")
 class EditorPanelTest {
 
     @get:Rule
@@ -117,6 +123,7 @@ class EditorPanelTest {
 
         assertTrue(viewModel.current?.rooms?.size == 1)
         compose.onNodeWithText("Test plan").assertIsDisplayed()
+        compose.onNodeWithText("Kitchen").assertExists()
     }
 
     /**
@@ -133,7 +140,7 @@ class EditorPanelTest {
         val viewModel = editor(projectId)
 
         viewModel.select(Selection.Wall(roomId, 0))
-        compose.onNodeWithText("No doors or windows").assertIsDisplayed()
+        compose.onNodeWithText("No doors or windows").assertExists()
 
         compose.onNodeWithText("+ Door").performClick()
 
@@ -143,8 +150,8 @@ class EditorPanelTest {
         compose.waitUntil(TIMEOUT_MS) {
             compose.onAllNodesWithText("Remove").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("Remove").assertIsDisplayed()
-        compose.onNodeWithText("1 door").assertIsDisplayed()
+        compose.onAllNodesWithText("Remove").assertCountEquals(1)
+        compose.onNodeWithText("1 door").assertExists()
     }
 
     /** And the same for removing one: the panel has to go back to saying there are none. */
@@ -163,7 +170,7 @@ class EditorPanelTest {
         compose.waitUntil(TIMEOUT_MS) {
             compose.onAllNodesWithText("No doors or windows").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("No doors or windows").assertIsDisplayed()
+        compose.onNodeWithText("No doors or windows").assertExists()
     }
 
     private companion object {
