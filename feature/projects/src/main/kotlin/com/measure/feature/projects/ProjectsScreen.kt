@@ -43,6 +43,7 @@ import com.measure.core.data.ProjectSummary
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.PlanStyle
 import com.measure.core.designsystem.PlanView
+import com.measure.core.designsystem.touchTarget
 import com.measure.core.units.AreaFormatter
 import com.measure.core.units.LengthFormatter
 import java.text.DateFormat
@@ -166,15 +167,20 @@ private fun Header(onDeviceCheck: () -> Unit) {
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold,
         )
-        Text(
-            text = "Device check",
-            modifier = Modifier
+        Box(
+            Modifier
                 .clip(RoundedCornerShape(50))
                 .clickable(onClick = onDeviceCheck)
+                .touchTarget()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            color = MeasureColours.OnScrimMuted,
-            fontSize = 13.sp,
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "Device check",
+                color = MeasureColours.OnScrimMuted,
+                fontSize = 13.sp,
+            )
+        }
     }
 }
 
@@ -223,15 +229,16 @@ private fun FindBar(
                 }
             }
             if (query.isNotEmpty()) {
-                Text(
-                    text = "Clear",
-                    modifier = Modifier
+                Box(
+                    Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable { onQuery("") }
+                        .touchTarget()
                         .padding(horizontal = 8.dp, vertical = 2.dp),
-                    color = MeasureColours.Ready,
-                    fontSize = 13.sp,
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(text = "Clear", color = MeasureColours.Ready, fontSize = 13.sp)
+                }
             }
         }
 
@@ -249,17 +256,22 @@ private fun FindBar(
 
 @Composable
 private fun SortChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        modifier = Modifier
+    Box(
+        Modifier
             .clip(RoundedCornerShape(50))
             .background(if (selected) MeasureColours.Ready else MeasureColours.Scrim)
             .clickable(onClick = onClick)
+            .touchTarget()
             .padding(horizontal = 14.dp, vertical = 7.dp),
-        color = if (selected) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
-        fontSize = 13.sp,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
+            fontSize = 13.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+    }
 }
 
 /**
@@ -413,16 +425,17 @@ private fun ProjectSummary.describeContents(): String {
 
 @Composable
 private fun CardAction(label: String, onClick: () -> Unit) {
-    Text(
-        text = label,
-        modifier = Modifier
+    Box(
+        Modifier
             .clip(RoundedCornerShape(50))
             .background(MeasureColours.ScrimSoft)
             .clickable(onClick = onClick)
+            .touchTarget()
             .padding(horizontal = 12.dp, vertical = 6.dp),
-        color = MeasureColours.OnScrimMuted,
-        fontSize = 12.sp,
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text = label, color = MeasureColours.OnScrimMuted, fontSize = 12.sp)
+    }
 }
 
 @Composable
@@ -433,6 +446,7 @@ private fun NewMeasurementButton(onClick: () -> Unit, modifier: Modifier = Modif
             .clip(CircleShape)
             .background(MeasureColours.Ready)
             .clickable(onClick = onClick)
+            .touchTarget()
             .padding(horizontal = 28.dp, vertical = 16.dp),
         color = Color(0xFF06231F),
         fontSize = 16.sp,
@@ -496,7 +510,9 @@ private fun DialogField(value: String, onValueChange: (String) -> Unit, hint: St
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(MeasureColours.ScrimSoft)
+            .touchTarget()
             .padding(horizontal = 12.dp, vertical = 10.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
         if (value.isEmpty()) {
             Text(

@@ -627,6 +627,33 @@ SDK and could not run in the JVM job — which meant `ProjectNamingTest` and
 `SavedMeasurementTest` had been in the tree for weeks without CI ever executing them. They
 run in the Android job now, where the SDK is.
 
+## Touch targets
+
+Every tappable control in the app was under the 48 dp minimum: pills at 37, the capture
+mode buttons at 33, the sort chips at 32, the project card's actions at 29. `touchTarget()`
+in `:core:designsystem` is the one definition, applied at every `clickable` site.
+
+**It grows the controls visibly rather than hiding a larger invisible target behind a small
+button.** Compose clips pointer input to a node's bounds, so a genuinely larger touch area
+means a genuinely larger node either way — and given that, a control that looks the size it
+responds to is the better of the two. An invisible margin would also steal taps from
+whatever sits beside it.
+
+The mechanism is `sizeIn` placed between `clickable` and `padding`, so the click and the
+background both take the grown size, with the content in a `Box` that centres it — padding
+places its content at the top-left of whatever space it is given, so a bare `Text` would
+sit at the top of the grown control rather than in the middle. That `Box` is the only
+fiddly part and the reason each site changed shape rather than gaining one line.
+
+Two visible consequences, both accepted: the project cards are about 24 dp taller, because
+two stacked 29 dp actions become two 48 dp ones and that column is now taller than the
+thumbnail beside it; and the editor panels have more in them, which they absorb by
+scrolling — they were already capped at `PANEL_MAX_HEIGHT` with `verticalScroll`.
+
+Not covered here, and left for M10: `Role.Button` semantics on the clickable `Text`s. Every
+control in this app is a text label, so TalkBack does read them — the gap is that it
+announces them as text rather than as buttons.
+
 ## 8. Open decisions
 
 - **App name.** `Measure` is a working title and too generic for the Play Store.

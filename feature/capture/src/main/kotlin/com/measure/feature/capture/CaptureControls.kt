@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.measure.ar.CaptureMode
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.touchTarget
 
 /** Free / Level / Plumb. Three states, so a segmented control beats a dropdown. */
 @Composable
@@ -43,17 +44,22 @@ internal fun ModeSelector(
     ) {
         MeasurementMode.entries.forEach { mode ->
             val active = mode == selected
-            Text(
-                text = mode.label,
-                modifier = Modifier
+            Box(
+                Modifier
                     .clip(RoundedCornerShape(50))
                     .background(if (active) MeasureColours.Ready else Color.Transparent)
                     .clickable { onSelect(mode) }
+                    .touchTarget()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                color = if (active) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = mode.label,
+                    color = if (active) Color(0xFF06231F) else MeasureColours.OnScrimMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
@@ -74,17 +80,22 @@ internal fun CaptureModeSelector(
     ) {
         CaptureMode.entries.forEach { mode ->
             val active = mode == selected
-            Text(
-                text = if (mode == CaptureMode.DISTANCE) "Distance" else "Room",
-                modifier = Modifier
+            Box(
+                Modifier
                     .clip(RoundedCornerShape(50))
                     .background(if (active) MeasureColours.OnScrim else Color.Transparent)
                     .clickable { onSelect(mode) }
+                    .touchTarget()
                     .padding(horizontal = 18.dp, vertical = 8.dp),
-                color = if (active) Color(0xFF14181C) else MeasureColours.OnScrimMuted,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (mode == CaptureMode.DISTANCE) "Distance" else "Room",
+                    color = if (active) Color(0xFF14181C) else MeasureColours.OnScrimMuted,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
         }
     }
 }
@@ -137,16 +148,21 @@ internal fun PillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = label,
+    Box(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.4f)
             .clip(RoundedCornerShape(50))
             .background(if (highlighted) MeasureColours.Sampling else MeasureColours.Scrim)
             .clickable(enabled = enabled, onClick = onClick)
+            .touchTarget()
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        color = if (highlighted) Color(0xFF2A1F00) else MeasureColours.OnScrim,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (highlighted) Color(0xFF2A1F00) else MeasureColours.OnScrim,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
 }

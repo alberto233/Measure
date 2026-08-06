@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.touchTarget
 import com.measure.core.geometry.OpeningKind
 import com.measure.feature.export.ExportSheet
 import com.measure.feature.export.PlanExporter
@@ -563,6 +564,7 @@ private fun MeasurementList(
                 .clip(RoundedCornerShape(10.dp))
                 .background(MeasureColours.ScrimSoft)
                 .clickable { viewModel.select(Selection.Measurement(measurement.id)) }
+                .touchTarget()
                 .padding(horizontal = 12.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
@@ -988,6 +990,8 @@ private fun Field(
                 shape = RoundedCornerShape(8.dp),
             )
             .onFocusChanged { focused = it.isFocused }
+            // A field is a target too, and a shallow one is hard to put a cursor in.
+            .touchTarget()
             .padding(horizontal = 10.dp, vertical = 10.dp),
         decorationBox = { field ->
             Box(contentAlignment = Alignment.CenterStart) {
@@ -1008,8 +1012,7 @@ private fun Pill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = label,
+    Box(
         modifier = modifier
             .clip(CircleShape)
             .background(
@@ -1020,15 +1023,21 @@ private fun Pill(
                 },
             )
             .clickable(enabled = enabled, onClick = onClick)
+            .touchTarget()
             .padding(horizontal = 16.dp, vertical = 10.dp),
-        color = when {
-            !enabled -> MeasureColours.OnScrimMuted
-            highlighted -> Color(0xFF06231F)
-            else -> MeasureColours.OnScrim
-        },
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = when {
+                !enabled -> MeasureColours.OnScrimMuted
+                highlighted -> Color(0xFF06231F)
+                else -> MeasureColours.OnScrim
+            },
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+        )
+    }
 }
 
 private const val MESSAGE_DURATION_MS = 3000L

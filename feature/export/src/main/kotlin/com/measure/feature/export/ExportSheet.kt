@@ -3,6 +3,7 @@ package com.measure.feature.export
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.touchTarget
 import com.measure.core.export.ExportFormat
 
 /**
@@ -52,16 +54,17 @@ fun ExportSheet(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text(
-                text = "Cancel",
-                modifier = Modifier
+            Box(
+                Modifier
                     .clip(RoundedCornerShape(50))
                     .background(MeasureColours.ScrimSoft)
                     .clickable(onClick = onDismiss)
+                    .touchTarget()
                     .padding(horizontal = 14.dp, vertical = 8.dp),
-                color = MeasureColours.OnScrim,
-                fontSize = 13.sp,
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(text = "Cancel", color = MeasureColours.OnScrim, fontSize = 13.sp)
+            }
         }
 
         ExportFormat.entries.forEach { format ->
@@ -70,6 +73,7 @@ fun ExportSheet(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .clickable { onExport(format) }
+                    .touchTarget()
                     .padding(vertical = 10.dp, horizontal = 4.dp),
             ) {
                 Text(
