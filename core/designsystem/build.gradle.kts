@@ -25,5 +25,8 @@ dependencies {
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
+    // Text and its typography plumbing. The controls live here now, so the design system
+    // is the module that depends on Material rather than every feature doing it separately.
+    implementation(libs.compose.material3)
     implementation(libs.compose.ui)
 }
