@@ -18,7 +18,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
-| `:feature:onboarding` | M10c: the accuracy guidance, shown on first run and reopenable from the home screen. 6 tests, 2 screenshots |
+| `:feature:onboarding` | M10c: a five-card guidance deck with drawn illustrations, skippable, shown on first run and reopenable from the home screen. 9 tests, 6 screenshots |
 | `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
 | Next | **Field test the corner assist and the light direction.** M10c is under way: crash reporting and the accuracy guidance are done; onboarding polish, device calibration, localisation and the store listing remain |
@@ -570,6 +570,12 @@ Three things hold it honest, and each has a test:
   snapped point to `x/y`. Turning the assist off — or reverting it out of the app — makes
   every room captured while it was on re-solve to exactly what the camera saw. The burst
   aggregator is fed the raw aim for this reason, never the snapped one.
+- **The toggle never reaches backwards.** Each corner records whether the assist was on
+  when it was captured, and that is never re-read. The first version derived the whole room
+  from the toggle's *current* value, so turning the assist off to capture a bay and back on
+  for the next wall straightened the bay retroactively — destroying the one thing the toggle
+  exists to let somebody say. A room that is half squared and half not is therefore a state
+  that does exist, and it is the correct one.
 - **The intersection snap is offered only for a fourth corner.** It is the one snap that
   moves a point *along* a wall, changing a measured length, so it is restricted to the case
   where the answer is determined. On an L-shaped room an unrestricted version computes a

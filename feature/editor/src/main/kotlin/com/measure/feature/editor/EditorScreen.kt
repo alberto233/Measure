@@ -188,9 +188,7 @@ fun EditorScreen(
                     canExport = rooms.isNotEmpty() || measurements.isNotEmpty(),
                     onExport = { exporting = true },
                 )
-                if (mode == EditorMode.MEASURE) {
-                    MeasuringBanner(viewModel)
-                } else if (mode == EditorMode.PLAN && project?.hasUnrelatedCaptures == true) {
+                if (mode == EditorMode.PLAN && project?.hasUnrelatedCaptures == true) {
                     UnrelatedCapturesNote()
                 }
             }
@@ -398,72 +396,6 @@ private fun UnrelatedCapturesNote() {
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
-    }
-}
-
-/**
- * What the measure view is doing, and the one control that changes it.
- *
- * Reading and drawing are separate states with separate affordances, so a tap on the plan
- * never has to be guessed at: while reading it selects something to read, while drawing it
- * places a point, and the banner says which. The alternative — one tap meaning two things
- * depending on invisible state — is the shape of every interaction fault this app has hit.
- */
-@Composable
-private fun MeasuringBanner(viewModel: EditorViewModel) {
-    val pending = viewModel.pendingEnd
-    val drawing = viewModel.drawing
-
-    MeasureCard(Modifier.fillMaxWidth().padding(horizontal = MeasureSpace.Base)) {
-      Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = when {
-                    drawing && pending == null -> "Tap the first point"
-                    drawing -> "Tap the second point"
-                    else -> "Tap a dimension to read it"
-                },
-                color = MeasureColours.Ink,
-                fontSize = MeasureType.Label.fontSize,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = when {
-                    pending != null -> "From ${pending.description}"
-                    drawing -> "Corners and walls pull the point onto them"
-                    else -> "Sizes are marked around the plan"
-                },
-                color = if (pending == null) MeasureColours.InkMuted else MeasureColours.Accent,
-                fontSize = MeasureType.Small.fontSize,
-            )
-            viewModel.lastStraightening?.let { straightened ->
-                Text("Pulled $straightened", color = MeasureColours.Accent, fontSize = MeasureType.Small.fontSize)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            when {
-                pending != null -> {
-                    Pill("Redo point", onClick = viewModel::clearPendingEnd)
-                    Pill("Cancel", onClick = viewModel::cancelDrawing)
-                }
-
-                drawing -> Pill("Cancel", onClick = viewModel::cancelDrawing)
-
-                // Refused rather than hidden while a measurement is unconfirmed, so the
-                // reason is visible instead of the control merely being absent.
-                else -> Pill(
-                    label = "+ Distance",
-                    enabled = viewModel.unconfirmed == null,
-                    highlighted = true,
-                    onClick = viewModel::beginDrawing,
-                )
-            }
-        }
-      }
     }
 }
 
@@ -707,24 +639,92 @@ private fun MeasurementList(
 }
 
 /**
- * The measure view's panel: whatever one thing is being read, or nothing.
+ * The measure view's panel: what is being read, what a tap will do, and the one control
+ * that changes it.
  *
- * Deliberately not the editing panel. This view exists to answer a question, and mixing
- * in controls that reshape the room would invite an edit while the user is reading — the
- * two are different jobs and the screen says which one it is doing.
+ * All three were split across two places until a field test pointed out the obvious: a
+ * banner at the top of the screen said "tap a dimension to read it" and carried the
+ * `+ Distance` button, while this panel at the bottom said much the same thing in
+ * different words. Two statements of one fact, and the only action on the view sitting at
+ * the far end of the screen from the thumb holding it.
+ *
+ * Merged here, with the action **last** so it falls under the thumb — this is a phone
+ * held one-handed in somebody else's hallway, which is the posture the touch-target rules
+ * in `docs/DESIGN.md` came from too.
+ *
+ * Still deliberately not the editing panel. This view answers a question, and controls
+ * that reshape the room would invite an edit while the user is reading.
  */
 @Composable
 private fun MeasureContent(viewModel: EditorViewModel) {
-    when (val focus = viewModel.focus) {
-        MeasureFocus.None -> Text(
-            text = "Tap any dimension line for its size · " +
-                "+ Distance measures between two points you choose",
-            color = MeasureColours.InkMuted,
-            style = MeasureType.Label,
-        )
+    val pending = viewModel.pendingEnd
+    val drawing = viewModel.drawing
 
-        is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
-        is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+    Column(
+        Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
+    ) {
+        when (val focus = viewModel.focus) {
+            // No placeholder prose. The status row below already says what a tap does, and
+            // saying it twice was the duplication this panel was merged to remove.
+            MeasureFocus.None -> Unit
+            is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
+            is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = when {
+                        drawing && pending == null -> "Tap the first point"
+                        drawing -> "Tap the second point"
+                        else -> "Tap a dimension to read it"
+                    },
+                    color = MeasureColours.Ink,
+                    fontSize = MeasureType.Label.fontSize,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    text = when {
+                        pending != null -> "From ${pending.description}"
+                        drawing -> "Corners and walls pull the point onto them"
+                        else -> "Sizes are marked around the plan"
+                    },
+                    color = if (pending == null) MeasureColours.InkMuted else MeasureColours.Accent,
+                    fontSize = MeasureType.Small.fontSize,
+                )
+                viewModel.lastStraightening?.let { straightened ->
+                    Text(
+                        text = "Pulled $straightened",
+                        color = MeasureColours.Accent,
+                        fontSize = MeasureType.Small.fontSize,
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    pending != null -> {
+                        Pill("Redo point", onClick = viewModel::clearPendingEnd)
+                        Pill("Cancel", onClick = viewModel::cancelDrawing)
+                    }
+
+                    drawing -> Pill("Cancel", onClick = viewModel::cancelDrawing)
+
+                    // Refused rather than hidden while a measurement is unconfirmed, so the
+                    // reason is visible instead of the control merely being absent.
+                    else -> Pill(
+                        label = "+ Distance",
+                        enabled = viewModel.unconfirmed == null,
+                        highlighted = true,
+                        onClick = viewModel::beginDrawing,
+                    )
+                }
+            }
+        }
     }
 }
 

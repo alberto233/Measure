@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,24 +52,21 @@ class OnboardingTest {
         assertTrue(OnboardingStore(context).hasSeenGuidance)
     }
 
+    /**
+     * The accuracy figure is the first card, not merely present somewhere in the deck.
+     *
+     * The one sentence this screen exists to deliver, and the only one a user who skips
+     * immediately is guaranteed to have read. If it ever moves down the deck the mitigation
+     * for "users expect LiDAR precision" is gone while the screen still looks fine.
+     */
     @Test
     fun `the accuracy figure is stated before anything else`() {
         compose.setContent { OnboardingScreen(onDone = {}) }
 
-        // The one sentence the screen exists to deliver. If this ever quietly stops being
-        // shown, the whole mitigation for "users expect LiDAR precision" is gone while
-        // the screen still looks fine.
         compose.onNodeWithText("Expect about ±2–3 cm").assertIsDisplayed()
     }
 
-    /**
-     * Scrolls to each point, because on a 411×891 screen only the first two fit.
-     *
-     * That is by design — the page scrolls and the button stays pinned below it — but it
-     * is worth being explicit that the later points are reachable rather than merely
-     * present in the tree. "Move slowly" failed this test before the scroll was added,
-     * which is exactly the distinction being drawn.
-     */
+    /** Every card is reachable by pressing Next, and in the order the deck declares. */
     @Test
     fun `every guidance point can be reached`() {
         compose.setContent { OnboardingScreen(onDone = {}) }
@@ -81,26 +77,70 @@ class OnboardingTest {
             "Move slowly",
             "Aim where the wall meets the floor",
         )) {
-            compose.onNodeWithText(title).performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Next").performClick()
+            compose.onNodeWithText(title).assertIsDisplayed()
         }
     }
 
+    /**
+     * Skip is on every card except the last, and it finishes.
+     *
+     * A tutorial nobody can escape earns its own one-star reviews. The last card has no
+     * Skip because its primary button already ends the deck, and two controls that do the
+     * same thing side by side is a choice nobody needs to make.
+     */
     @Test
-    fun `finishing the first run reports done`() {
+    fun `skip finishes from the first card`() {
         var done = false
         compose.setContent { OnboardingScreen(onDone = { done = true }) }
 
+        compose.onNodeWithText("Skip").performClick()
+
+        assertTrue("Skip must actually finish, not merely advance.", done)
+    }
+
+    @Test
+    fun `back returns to the previous card`() {
+        compose.setContent { OnboardingScreen(onDone = {}) }
+
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Walk the room").assertIsDisplayed()
+        compose.onNodeWithText("Back").performClick()
+
+        compose.onNodeWithText("Expect about ±2–3 cm").assertIsDisplayed()
+    }
+
+    /** There is nothing to go back to from the first card, so nothing offers it. */
+    @Test
+    fun `the first card has no back`() {
+        compose.setContent { OnboardingScreen(onDone = {}) }
+
+        compose.onNodeWithText("Back").assertDoesNotExist()
+    }
+
+    @Test
+    fun `finishing the last card reports done`() {
+        var done = false
+        compose.setContent { OnboardingScreen(onDone = { done = true }) }
+
+        repeat(STEP_COUNT - 1) { compose.onNodeWithText("Next").performClick() }
         compose.onNodeWithText("Start measuring").performClick()
 
-        assertTrue("The only way off this screen must actually fire.", done)
+        assertTrue("The end of the deck must actually finish.", done)
     }
 
     @Test
     fun `reopened later it does not pretend to be a first run`() {
         compose.setContent { OnboardingScreen(onDone = {}, firstRun = false) }
 
+        repeat(STEP_COUNT - 1) { compose.onNodeWithText("Next").performClick() }
         // "Start measuring" would be wrong here: the user opened this from a home screen
         // they were already using, most likely mid-way through fixing a bad capture.
         compose.onNodeWithText("Done").assertIsDisplayed()
+    }
+
+    private companion object {
+        /** Accuracy, then the four things that decide a capture. */
+        const val STEP_COUNT = 5
     }
 }

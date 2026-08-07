@@ -266,6 +266,49 @@ class CornerSnapperTest {
         assertEquals(withSplay, snapper.snapChain(withSplay))
     }
 
+    /**
+     * A corner captured with the assist off stays where it was put.
+     *
+     * The behaviour a field test rejected, and rightly. The first version re-derived the
+     * whole room from the toggle's *current* value, so turning the assist off to capture a
+     * bay and back on for the next wall straightened the bay retroactively — destroying the
+     * one thing the user had used the toggle to say.
+     */
+    @Test
+    @DisplayName("turning the assist back on does not reach backwards")
+    fun `unassisted corners are left alone`() {
+        val observed = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(5.0, 0.0),
+            // Captured with the assist off: a deliberate splay, 3 degrees off square, that
+            // an assisted capture would have pulled straight.
+            Vec2(5.21, 4.0),
+            // Captured with it back on.
+            Vec2(0.08, 4.06),
+        )
+        val assisted = listOf(true, true, false, true)
+
+        val chain = snapper.snapChain(observed, assisted)
+
+        assertEquals(observed[2], chain[2], "The deliberate corner must be untouched.")
+        // The later corner still snaps, and to a frame that counts the splayed wall as the
+        // real wall it is.
+        assertTrue(chain[3] != observed[3], "The assisted corner should still be squared.")
+    }
+
+    @Test
+    @DisplayName("with the assist off throughout, the walk is the observations")
+    fun `nothing assisted changes nothing`() {
+        val observed = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(5.0, 0.0),
+            Vec2(5.08, 4.0),
+            Vec2(0.06, 4.05),
+        )
+
+        assertEquals(observed, snapper.snapChain(observed, List(4) { false }))
+    }
+
     private fun assertClose(expected: Vec2, actual: Vec2, tolerance: Double = 1e-6) {
         assertTrue(
             hypot(expected.x - actual.x, expected.y - actual.y) <= tolerance,

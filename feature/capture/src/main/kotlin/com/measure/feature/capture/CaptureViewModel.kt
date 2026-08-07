@@ -114,7 +114,22 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      * is idempotent and the rectilinear assist can be switched off — or reverted out of
      * the app entirely — without any room captured while it was on being stuck with it.
      */
-    val roomCorners = mutableStateListOf<SampledPoint>()
+    val roomCorners = mutableStateListOf<RoomCorner>()
+
+    /**
+     * A captured corner, together with how it was captured.
+     *
+     * The flag lives beside the sample rather than in a list of its own. Two lists kept in
+     * step is two lists that can fall out of step, and here the failure would be silent —
+     * an undo popping one and not the other would shift every later corner's flag by one,
+     * squaring corners the user had asked to be left alone.
+     */
+    data class RoomCorner(
+        /** What the camera reported. Never modified — this is the observation. */
+        val sample: SampledPoint,
+        /** Whether the rectilinear assist was switched on when this corner was taken. */
+        val assisted: Boolean,
+    )
 
     /**
      * The same corners with the assist applied, which is what gets drawn and solved.
@@ -124,8 +139,10 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      * showing one room while the database held another.
      */
     val snappedCorners: List<Vec2>
-        get() = roomCorners.map { it.position.toFloorPlane() }
-            .let { if (snapEnabled) snapper.snapChain(it) else it }
+        get() = snapper.snapChain(
+            observed = roomCorners.map { it.sample.position.toFloorPlane() },
+            assisted = roomCorners.map { it.assisted },
+        )
 
     private val snapper = CornerSnapper()
 
@@ -243,7 +260,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun distanceToStart(point: com.measure.core.geometry.Vec3?): Double? {
-        val start = roomCorners.firstOrNull()?.position ?: return null
+        val start = roomCorners.firstOrNull()?.sample?.position ?: return null
         return point?.let { start.horizontalDistanceTo(it) }
     }
 
@@ -270,18 +287,24 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Turning the assist off takes effect on the corners already walked, not just the next
-     * one.
+     * Applies to corners captured **from now on**, and never reaches backwards.
      *
-     * [snappedCorners] is derived rather than stored, so the plan redraws from the raw
-     * observations the moment this flips — which is the honest behaviour. Storing the
-     * snapped points instead would leave a room half squared and half not, with no way to
-     * tell which corners had been moved.
+     * The first version re-derived the whole room from the toggle's current value, which a
+     * field test caught immediately: turning the assist off to capture a bay and back on
+     * for the next wall straightened the bay retroactively. That destroys the one thing the
+     * toggle exists to let somebody say.
+     *
+     * A room that is half squared and half not is therefore a state that does exist, and it
+     * is the correct one — it is a record of what the user asked for at each corner.
      */
     fun toggleSnap() {
         snapEnabled = !snapEnabled
         notice = CaptureNotice.Advice(
-            if (snapEnabled) "Square corners on" else "Square corners off — corners land where you aim",
+            if (snapEnabled) {
+                "Square corners on — from the next corner"
+            } else {
+                "Square corners off — corners land where you aim"
+            },
         )
         pushScene()
     }
@@ -388,7 +411,10 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        roomCorners += point
+        // The toggle's value is recorded here and never re-read. Deriving it later from
+        // whatever the toggle happens to say would mean flipping it back on retroactively
+        // squares a bay somebody deliberately captured with it off.
+        roomCorners += RoomCorner(point, assisted = snapEnabled)
         notice = when {
             // Near the start but not on it. This used to close the room, and half a metre
             // of slack is wide enough to swallow a real corner — an alcove, a chimney
@@ -413,8 +439,8 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val measured = roomCorners.map { it.position.toFloorPlane() }
-        val sigmas = roomCorners.map { it.sigma }
+        val measured = roomCorners.map { it.sample.position.toFloorPlane() }
+        val sigmas = roomCorners.map { it.sample.sigma }
         // What the solver starts from: the walk as the user watched it square up. The
         // observations go through untouched as `measured`, which is what the repository
         // stores and what every later re-solve begins from.
@@ -484,7 +510,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     /** Plan-view corners for the minimap: solved if we have a solution, raw if not. */
     fun planOutline(): List<Vec2> =
-        roomSolution?.polygon?.vertices ?: roomCorners.map { it.position.toFloorPlane() }
+        roomSolution?.polygon?.vertices ?: snappedCorners
 
     fun percent(fraction: Double): String =
         String.format(java.util.Locale.getDefault(), "%.1f%%", fraction * 100)
@@ -542,7 +568,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 // The squared chain, so the live plan and the minimap show the room that
                 // will actually be saved. Lifted back to each corner's own height.
                 roomCorners = snappedCorners.mapIndexed { index, flat ->
-                    Vec3(flat.x, roomCorners[index].position.y, -flat.y)
+                    Vec3(flat.x, roomCorners[index].sample.position.y, -flat.y)
                 },
                 snapEnabled = snapEnabled,
                 roomClosed = isRoomClosed,

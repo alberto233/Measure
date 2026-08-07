@@ -140,15 +140,31 @@ class CornerSnapper(
      * the end would produce a different room from the one on screen, and the live plan
      * would have been a lie.
      *
+     * [assisted] says, per corner, whether the assist was switched on when it was captured.
+     * A corner taken with it off is passed through exactly as observed **and stays that
+     * way** — switching the assist back on later must not reach backwards and square it.
+     * Somebody who turned the assist off to capture a bay did so deliberately, and having
+     * that bay silently straightened when they turned it on again for the next wall
+     * destroys the very intent the toggle exists to express. Corners taken with it off
+     * still inform the frame the later ones snap to, because they are real walls.
+     *
      * Returns positions only. The caller keeps the observations — see [CornerHint].
      */
-    fun snapChain(observed: List<Vec2>): List<Vec2> {
+    fun snapChain(observed: List<Vec2>, assisted: List<Boolean>): List<Vec2> {
         val snapped = ArrayList<Vec2>(observed.size)
-        for (point in observed) {
-            snapped += hint(snapped, point).position
+        observed.forEachIndexed { index, point ->
+            snapped += if (assisted.getOrElse(index) { false }) {
+                hint(snapped, point).position
+            } else {
+                point
+            }
         }
         return snapped
     }
+
+    /** The whole walk captured with the assist on. */
+    fun snapChain(observed: List<Vec2>): List<Vec2> =
+        snapChain(observed, List(observed.size) { true })
 
     /** The frame bearing nearest [bearing], or null if the aim is too far off it to be square. */
     private fun snapBearing(axis: Double, bearing: Double): Double? {
