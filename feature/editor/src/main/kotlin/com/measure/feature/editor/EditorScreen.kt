@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
@@ -26,6 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -90,6 +94,14 @@ fun EditorScreen(
     var sheetExpanded by remember { mutableStateOf(false) }
     val sheetScroll = rememberScrollState()
 
+    // What the chrome covers, measured rather than guessed, so the opening fit puts the
+    // plan in the part of the canvas that can actually be seen. Guessing would go stale
+    // the moment a banner appeared or the top bar gained a row — which is exactly what
+    // happened: the canvas is full-screen, the fit used all of it, and on a two-room plan
+    // the second room opened underneath the sheet.
+    var topChromePx by remember { mutableIntStateOf(0) }
+    var bottomChromePx by remember { mutableIntStateOf(0) }
+
     // Anything selected has a panel with controls in it, and a keyboard over a peeked sheet
     // covers the field it opened for. The quantities view is a reading rather than a
     // control, and it is all of it worth seeing, so it opens expanded.
@@ -97,6 +109,13 @@ fun EditorScreen(
         if (viewModel.selection != Selection.None) sheetExpanded = true
     }
     LaunchedEffect(mode) { sheetExpanded = mode == EditorMode.QUANTITIES }
+    // Tapping a dimension in the measure view fills the sheet with a readout and three
+    // lines explaining it, and at peek height the last line was cut off mid-sentence —
+    // "part of this distance is" and then nothing. The answer arriving is exactly when
+    // the sheet needs to be big enough to hold it.
+    LaunchedEffect(viewModel.focus) {
+        if (viewModel.focus != MeasureFocus.None) sheetExpanded = true
+    }
 
     Box(modifier.fillMaxSize().background(MeasureColours.Surface)) {
         PlanCanvas(
@@ -106,6 +125,8 @@ fun EditorScreen(
             selection = viewModel.selection,
             dragging = viewModel.dragging,
             movingRoom = viewModel.movingRoom,
+            topInsetPx = topChromePx,
+            bottomInsetPx = bottomChromePx,
             measuring = mode == EditorMode.MEASURE,
             drawing = viewModel.drawing,
             focus = viewModel.focus,
@@ -139,7 +160,11 @@ fun EditorScreen(
         )
 
         Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Column(Modifier.align(Alignment.TopCenter)) {
+            Column(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .onGloballyPositioned { topChromePx = it.boundsInRoot().bottom.toInt() },
+            ) {
                 TopBar(
                     title = project?.name ?: "",
                     subtitle = summarise(rooms, measurements, viewModel),
@@ -190,7 +215,13 @@ fun EditorScreen(
                 MeasureSheet(
                     expanded = sheetExpanded,
                     onExpandedChange = { sheetExpanded = it },
-                    modifier = panelModifier,
+                    // Its top edge in the canvas's own coordinates, which is what the fit
+                    // needs. Taken while peeked — the first fit happens before anything
+                    // can have expanded it, and the fit deliberately runs only once.
+                    modifier = panelModifier.onGloballyPositioned { placed ->
+                        val root = placed.findRootCoordinates().size.height
+                        bottomChromePx = (root - placed.boundsInRoot().top).toInt()
+                    },
                     scrollState = sheetScroll,
                 ) {
                     when (mode) {

@@ -58,14 +58,28 @@ data class PlanCamera(
     )
 
     companion object {
-        /** Fits [outlines] into [size] with a margin, for the initial view. */
         /**
+         * Fits [outlines] into the part of [size] that is not covered by chrome.
+         *
+         * The canvas runs the full height of the screen and the top bar and the sheet are
+         * drawn over it, so fitting to the canvas fits to a rectangle a third of which
+         * cannot be seen. On hardware that put the second room of a two-room plan behind
+         * the sheet — measured, saved, drawn, and invisible until the user thought to pan.
+         *
+         * @param topInsetPx what the top bar and any banner cover.
+         * @param bottomInsetPx what the sheet covers at its peek height.
          * @param marginPx enough clear space for the dimension strings, whose overall
          *   line stands 92 px off the plan with a label above it. Fitting tighter than
          *   that puts the overall dimension off the edge of the screen the moment
          *   measuring is switched on, and the fit deliberately happens only once.
          */
-        fun fitting(outlines: List<Vec2>, size: IntSize, marginPx: Int = 132): PlanCamera {
+        fun fitting(
+            outlines: List<Vec2>,
+            size: IntSize,
+            topInsetPx: Int = 0,
+            bottomInsetPx: Int = 0,
+            marginPx: Int = 132,
+        ): PlanCamera {
             if (outlines.isEmpty() || size.width == 0 || size.height == 0) return PlanCamera()
 
             val minX = outlines.minOf { it.x }
@@ -76,14 +90,28 @@ data class PlanCamera(
             val spanX = (maxX - minX).coerceAtLeast(MINIMUM_SPAN)
             val spanY = (maxY - minY).coerceAtLeast(MINIMUM_SPAN)
             val usableWidth = (size.width - 2 * marginPx).coerceAtLeast(1)
-            val usableHeight = (size.height - 2 * marginPx).coerceAtLeast(1)
+            // Never less than a quarter of the canvas: a phone in landscape with the sheet
+            // expanded could otherwise leave a visible band of a few pixels and a fit that
+            // zooms the plan down to nothing.
+            val usableHeight = (size.height - topInsetPx - bottomInsetPx - 2 * marginPx)
+                .coerceAtLeast(size.height / 4)
 
-            return PlanCamera(
+            val metresPerPixel = maxOf(spanX / usableWidth, spanY / usableHeight)
                 // Clamped to the same range pinching allows, so the view never opens at a
                 // zoom the user cannot get back to.
-                metresPerPixel = maxOf(spanX / usableWidth, spanY / usableHeight)
-                    .coerceIn(FINEST, COARSEST),
-                centre = Vec2((minX + maxX) / 2.0, (minY + maxY) / 2.0),
+                .coerceIn(FINEST, COARSEST)
+
+            // Half the difference between the two insets, which is how far the middle of
+            // the visible band sits below the middle of the canvas. Positive shifts the
+            // plan down the screen, which is what a tall top bar and a short sheet want.
+            val shiftPx = (topInsetPx - bottomInsetPx) / 2.0
+
+            return PlanCamera(
+                metresPerPixel = metresPerPixel,
+                centre = Vec2(
+                    (minX + maxX) / 2.0,
+                    (minY + maxY) / 2.0 + shiftPx * metresPerPixel,
+                ),
             )
         }
 
@@ -112,6 +140,15 @@ internal fun PlanCanvas(
     selection: Selection,
     dragging: EditorViewModel.DragState?,
     movingRoom: EditorViewModel.RoomMove?,
+    /**
+     * What the chrome over this canvas covers, top and bottom, in pixels.
+     *
+     * Used only for the opening fit — see [PlanCamera.fitting]. The canvas itself stays
+     * full-screen so that panning and pinching reach the whole plan, including the parts
+     * currently under the sheet.
+     */
+    topInsetPx: Int,
+    bottomInsetPx: Int,
     /** Non-null while measuring: the mode, and the first end if one is down. */
     measuring: Boolean,
     drawing: Boolean,
@@ -145,7 +182,7 @@ internal fun PlanCanvas(
     // Fit once, when there is both something to show and somewhere to show it. Re-fitting
     // on every change would yank the view out from under someone who has zoomed in.
     if (!fitted && size != IntSize.Zero && allPoints.isNotEmpty()) {
-        camera = PlanCamera.fitting(allPoints, size)
+        camera = PlanCamera.fitting(allPoints, size, topInsetPx, bottomInsetPx)
         fitted = true
     }
 
