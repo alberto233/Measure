@@ -86,16 +86,32 @@ fun MeasureSheet(
         // reading it about. A sheet that is bigger than its contents is not a neutral
         // choice on this screen — the plan is what it is hiding.
         var contentPx by remember { mutableIntStateOf(0) }
-        var headerPx by remember { mutableIntStateOf(0) }
-        val wantedPx = (contentPx + headerPx).toFloat()
+
+        // The header's height is a **constant**, not a measurement, and that is a fix
+        // rather than a simplification.
+        //
+        // It used to be measured with `onSizeChanged`, like the content. But the header is
+        // a direct child of this Column, which has an explicit height — so measuring it
+        // there measured what the sheet was *giving* it, not what it wanted. Collapsing
+        // then fed back on itself: the sheet shrank towards the header's height, which
+        // squeezed the header, which lowered the target, which shrank the sheet. It
+        // converged on one pixel over a second or so — the sheet visibly dissolving into
+        // the bottom edge and leaving nothing to grab.
+        //
+        // The content escapes this because it sits inside a `verticalScroll`, which
+        // measures its child with unbounded height. The header does not, so it gets a
+        // number that cannot depend on the answer it is used to compute.
+        val headerPx = with(density) { (HandleRowHeight + HairlineHeight).toPx() }
+        val wantedPx = contentPx + headerPx
 
         val ceilingPx = with(density) { (available * expandedFraction).toPx() }
 
         // Open is what the content needs, capped so the sheet can never take the whole
         // screen. Closed is the header alone — the rule and the handle — so pushing it down
         // leaves a grip on the bottom edge and gives the drawing everything else.
-        val expandedPx = wantedPx.coerceIn(MINIMUM_PX, ceilingPx)
-        val peekPx = minOf(headerPx.toFloat().coerceAtLeast(MINIMUM_PX), expandedPx)
+        // Never below the header: a sheet shorter than its own grip cannot be reopened.
+        val expandedPx = wantedPx.coerceIn(headerPx, maxOf(ceilingPx, headerPx))
+        val peekPx = headerPx
 
         val height = remember { Animatable(if (expanded) expandedPx else peekPx) }
         val scope = rememberCoroutineScope()
@@ -132,7 +148,7 @@ fun MeasureSheet(
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .onSizeChanged { headerPx = it.height }
+                    .height(HandleRowHeight)
                     .draggable(
                         state = drag,
                         orientation = Orientation.Vertical,
@@ -152,8 +168,7 @@ fun MeasureSheet(
                     )
                     // Tappable as well as draggable. The handle is the only affordance and a
                     // tap is what people try first.
-                    .clickable { onExpandedChange(!expanded) }
-                    .padding(vertical = MeasureSpace.Snug),
+                    .clickable { onExpandedChange(!expanded) },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -207,5 +222,12 @@ private const val ExpandedFraction = 0.62f
 private val HandleWidth = 36.dp
 private val HandleHeight = 4.dp
 
-/** Enough for the handle and one line, before anything has been measured. */
-private const val MINIMUM_PX = 1f
+/**
+ * The grip row, at a fixed height so the collapsed size cannot depend on the measurement
+ * it determines. Comfortably over the 48dp touch minimum once the surrounding sheet edge
+ * is included, and the whole row is clickable rather than just the bar inside it.
+ */
+private val HandleRowHeight = 28.dp
+
+/** [MeasureRule]'s thickness, counted so the collapsed sheet clears its own top edge. */
+private val HairlineHeight = 1.dp
