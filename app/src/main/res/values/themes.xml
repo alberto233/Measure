@@ -11,4 +11,25 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
+
+    <!--
+      Everything that is not the camera.
+
+      A white window background, and light status bar icons, because the app is light now —
+      see docs/DESIGN.md. Without this the window paints black for the frame or two before
+      Compose draws, which on a white app is a black flash on every launch and on every
+      transition between screens.
+
+      `windowLightStatusBar` is the one that is easy to forget: it makes the clock and the
+      battery icon *dark*, which is what they have to be on a white ground. Left alone they
+      stay white on white and the status bar appears empty.
+    -->
+    <style name="Theme.Measure.Light" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>

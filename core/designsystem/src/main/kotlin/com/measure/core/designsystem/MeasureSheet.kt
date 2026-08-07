@@ -100,6 +100,13 @@ fun MeasureSheet(
                 // and a translucent panel let the plan's own lines bleed through the text.
                 .background(MeasureColours.Panel),
         ) {
+            // A genuine top edge.
+            //
+            // Panel and Surface are the same white in this direction, so without a hairline
+            // the sheet has no boundary at all against the drawing behind it — which is
+            // precisely what "the cards don't work" was about.
+            MeasureRule()
+
             Box(
                 Modifier
                     .fillMaxWidth()
@@ -147,8 +154,20 @@ fun MeasureSheet(
     }
 }
 
-/** Enough for a heading and one row of controls, which is what a peeked panel is for. */
-private val PeekHeight = 132.dp
+/**
+ * Defaults a caller may need to reason about without measuring the sheet.
+ *
+ * [PeekHeight] is public because the editor fits its plan to the space the sheet leaves,
+ * and measuring the live sheet to find that out is a race: the sheet expands the moment
+ * something is selected, so a fit that happens during the animation reads a height the
+ * sheet is only passing through and squashes the drawing into a sliver.
+ */
+object MeasureSheetDefaults {
+    /** Enough for a heading and one row of controls, which is what a peeked panel is for. */
+    val PeekHeight: Dp = 132.dp
+}
+
+private val PeekHeight = MeasureSheetDefaults.PeekHeight
 
 /** Expanded, but never the whole screen: the plan has to stay visible behind it. */
 private const val ExpandedFraction = 0.62f

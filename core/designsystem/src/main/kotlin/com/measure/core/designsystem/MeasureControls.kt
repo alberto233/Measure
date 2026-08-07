@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,27 +31,35 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 /**
- * The controls, defined once — docs/PRODUCT_PLAN.md M10a.
+ * The controls, defined once — see `docs/DESIGN.md` §7.
  *
- * Before this there were two text fields and three chips, each with its own padding and its
- * own colour logic, and each written because the one next door was in another module. That
- * is what made restyling an 87-site edit rather than a one-file edit, and it is what this
- * set exists to end. Every control here meets the 48 dp minimum through [touchTarget].
+ * **There are three buttons here, and that is the point.** Until this file had them, the app
+ * contained exactly one button component at one height with one type size, which meant the
+ * main action on a screen and a sort filter were the same object. No amount of arranging
+ * fixes that, and it was the first thing a user said about the built app: "the hierarchy in
+ * the buttons is way off, the new measurement CTA and the filters have the same size in font
+ * and button height."
+ *
+ * - [MeasurePrimaryButton] — 52dp, 17sp. The one thing a screen is for. One per screen.
+ * - [MeasureButton] — 38dp, 14.5sp. Lock, Share, Set, Remove.
+ * - [MeasureChip] — 29dp visible, 48dp to the finger. Filters, options, units.
  */
 private val Hairline = 1.dp
 
 /**
- * The micro-label that introduces a value.
+ * The micro-eyebrow that introduces a value.
  *
- * The signature of this direction, and a component rather than a bare text style because
- * the uppercasing happens here, once — so no call site has to remember it, and a translated
- * string is uppercased by the same rule as an English one.
+ * The only place the uppercase transform survives, and a component rather than a bare text
+ * style so that stays true: the transform happens here, once, where it can be argued with.
+ * A blanket `uppercase()` on every label produced two shipped bugs on its own — a units
+ * toggle labelled `"m"` that became a lone capital letter in a box, and the Turkish `i`,
+ * which `String.uppercase()` turns into `İ` under the default locale.
  */
 @Composable
 fun MeasureTag(
     text: String,
     modifier: Modifier = Modifier,
-    colour: Color = MeasureColours.OnScrimMuted,
+    colour: Color = MeasureColours.InkFaint,
 ) {
     Text(text.uppercase(), modifier, color = colour, style = MeasureType.Tag)
 }
@@ -69,7 +78,7 @@ fun MeasureReading(
     modifier: Modifier = Modifier,
     unit: String? = null,
     large: Boolean = false,
-    colour: Color = MeasureColours.OnScrim,
+    colour: Color = MeasureColours.Ink,
 ) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair)) {
         MeasureTag(label)
@@ -85,7 +94,7 @@ fun MeasureReading(
             if (unit != null) {
                 Text(
                     text = unit,
-                    color = MeasureColours.OnScrimMuted,
+                    color = MeasureColours.InkFaint,
                     style = MeasureType.ValueSmall,
                     modifier = Modifier.padding(bottom = if (large) MeasureSpace.Tight else 1.dp),
                 )
@@ -95,60 +104,142 @@ fun MeasureReading(
 }
 
 /**
- * A button.
+ * The one thing this screen is for.
  *
- * Filled with the accent when it is the primary action or a selected mode; a bordered box
- * otherwise. Hard-edged, because the difference between an instrument and a consumer app is
- * largely whether the controls look machined or moulded.
+ * Full width and black by default. One per screen — a second competes with the first and
+ * neither reads as the answer.
+ */
+@Composable
+fun MeasurePrimaryButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val shape = RoundedCornerShape(MeasureShape.Edge)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(PrimaryHeight)
+            .clip(shape)
+            .background(if (enabled) MeasureColours.Primary else MeasureColours.Sunk)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = MeasureSpace.Wide),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (enabled) MeasureColours.OnPrimary else MeasureColours.InkFaint,
+            style = MeasureType.Title,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * Everything that is an action but not *the* action.
  *
- * The unselected fill is [MeasureColours.Panel] and not transparent, which matters in
- * exactly one place and matters a lot there. On the capture screen these sit over a live
- * camera image, and a transparent box with near-white text is invisible against a sunlit
- * wall — "DISTANCE" and "FREE" simply were not there. It was shipping that way, and it took
- * rendering the overlays over a bright background to see it. On a panel the fill is the same
- * colour as what is behind it, so nothing else changes.
+ * A recessed fill rather than an outline, because on a white ground an outlined button and a
+ * text field look identical — which is a fault this app has already had, in reverse, when
+ * fields on a dark panel read as gaps.
+ *
+ * @param filled promotes it to the black fill without promoting it to primary size. For the
+ *   one action in a sheet that the sheet exists for.
  */
 @Composable
 fun MeasureButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    primary: Boolean = false,
+    filled: Boolean = false,
     enabled: Boolean = true,
-    selected: Boolean = false,
 ) {
-    val filled = (primary || selected) && enabled
     val shape = RoundedCornerShape(MeasureShape.Edge)
+    val solid = filled && enabled
 
     Box(
         modifier
+            .height(SecondaryHeight)
             .clip(shape)
-            .background(if (filled) MeasureColours.Accent else MeasureColours.Panel)
-            .border(Hairline, if (filled) MeasureColours.Accent else MeasureColours.Line, shape)
+            .background(if (solid) MeasureColours.Primary else MeasureColours.Sunk)
             .clickable(enabled = enabled, onClick = onClick)
-            .touchTarget()
-            .padding(horizontal = MeasureSpace.Base, vertical = MeasureSpace.Snug),
+            .padding(horizontal = MeasureSpace.Base),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = label.uppercase(),
+            text = label,
             color = when {
-                !enabled -> MeasureColours.OnScrimMuted
-                filled -> MeasureColours.OnAccent
-                else -> MeasureColours.OnScrim
+                !enabled -> MeasureColours.InkFaint
+                solid -> MeasureColours.OnPrimary
+                else -> MeasureColours.Ink
             },
-            style = MeasureType.Label.copy(letterSpacing = MeasureType.Tag.letterSpacing),
+            style = MeasureType.Label,
+            maxLines = 1,
         )
     }
 }
 
 /**
- * One choice from a short, fixed set — the mode switch, and anything else shaped like it.
+ * One option among several: a filter, a waste percentage, a coat count, a unit.
  *
- * A segmented control rather than a toggle button, because a toggle can only say "on" and
- * the editor has three modes. It also states the whole set: the editor's Quantities view was
- * unreachable and effectively invisible while mode was a button labelled "Measure", since a
- * button that is off tells you nothing about what else exists.
+ * **29dp to the eye, 48dp to the finger.** The visible pill shrinks so the hierarchy is
+ * real; the touch target does not, because the 48dp minimum here was never a generic
+ * accessibility rule. It came from watching this app used standing up, one-handed, in
+ * someone else's hallway with a tape in the other hand — the least accurate a person's aim
+ * ever gets. Hierarchy and target size are not in conflict; only hierarchy and *visible*
+ * size are, and this is how iOS resolves the same tension.
+ */
+@Composable
+fun MeasureChip(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    enabled: Boolean = true,
+) {
+    val shape = RoundedCornerShape(MeasureShape.Pill)
+
+    Box(
+        // The hit area. Transparent, taller than the pill, and outside the clip so the
+        // padding genuinely takes taps rather than merely reserving space.
+        modifier
+            .defaultMinSize(minHeight = MinimumTouchTarget)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .height(ChipHeight)
+                .clip(shape)
+                .background(if (selected) MeasureColours.AccentWash else Color.Transparent)
+                .border(
+                    Hairline,
+                    if (selected) Color.Transparent else MeasureColours.Line,
+                    shape,
+                )
+                .padding(horizontal = MeasureSpace.Snug),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                color = when {
+                    !enabled -> MeasureColours.InkFaint
+                    selected -> MeasureColours.Accent
+                    else -> MeasureColours.InkMuted
+                },
+                style = MeasureType.Small,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * One choice from a short, fixed set — the editor's mode switch.
+ *
+ * A track with a sliding white knob rather than a row of hard-edged cells: the segmented
+ * control is the one place where "which of these am I in" has to be legible at a glance from
+ * arm's length, and a raised knob reads faster than a colour change.
  *
  * Sized by weight rather than by content so the segments do not shuffle when a translation
  * is longer — Spanish runs 20–30% longer, which is one of M10a's five constraints.
@@ -160,41 +251,31 @@ fun MeasureSegmented(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(MeasureShape.Edge)
+    val track = RoundedCornerShape(MeasureShape.Pill)
 
     Row(
         modifier
             .fillMaxWidth()
-            .clip(shape)
-            .background(MeasureColours.Panel)
-            .border(Hairline, MeasureColours.Line, shape),
+            .clip(track)
+            .background(MeasureColours.Sunk)
+            .padding(SegmentInset),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         options.forEachIndexed { index, label ->
-            // A hairline between segments rather than a gap, so the control reads as one
-            // object with divisions instead of as several buttons that happen to touch.
-            if (index > 0) {
-                Box(
-                    Modifier
-                        .width(Hairline)
-                        .height(SegmentDividerHeight)
-                        .background(MeasureColours.Line),
-                )
-            }
             val selected = index == selectedIndex
             Box(
                 Modifier
                     .weight(1f)
-                    .background(if (selected) MeasureColours.Accent else Color.Transparent)
-                    .clickable { onSelect(index) }
-                    .touchTarget()
-                    .padding(horizontal = MeasureSpace.Tight, vertical = MeasureSpace.Snug),
+                    .height(SegmentHeight)
+                    .clip(track)
+                    .background(if (selected) MeasureColours.Surface else Color.Transparent)
+                    .clickable { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = label.uppercase(),
-                    color = if (selected) MeasureColours.OnAccent else MeasureColours.OnScrimMuted,
-                    style = MeasureType.Label.copy(letterSpacing = MeasureType.Tag.letterSpacing),
+                    text = label,
+                    color = if (selected) MeasureColours.Ink else MeasureColours.InkMuted,
+                    style = MeasureType.Small,
                     maxLines = 1,
                 )
             }
@@ -202,15 +283,92 @@ fun MeasureSegmented(
     }
 }
 
-private val SegmentDividerHeight = 28.dp
+/**
+ * The same control, over the camera.
+ *
+ * A separate composable rather than a flag on [MeasureSegmented], because it is not a
+ * variant — it is the same idea rendered in the overlay palette, and the two have no colour
+ * in common. Keeping them apart is what stops a light token being reached for over a live
+ * camera image, which is the fault `docs/DESIGN.md` §3 exists to prevent.
+ */
+@Composable
+fun MeasureScrimSegmented(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val track = RoundedCornerShape(MeasureShape.Pill)
+
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(track)
+            .background(MeasureColours.ScrimSoft)
+            .padding(SegmentInset),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        options.forEachIndexed { index, label ->
+            val selected = index == selectedIndex
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(SegmentHeight)
+                    .clip(track)
+                    .background(if (selected) MeasureColours.OnScrim else Color.Transparent)
+                    .clickable { onSelect(index) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    color = if (selected) MeasureColours.Ink else MeasureColours.OnScrimMuted,
+                    style = MeasureType.Small,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * An action over the camera.
+ *
+ * The overlay's own secondary button: a dark slab with light text, because a `Sunk` grey
+ * fill and near-black label would be invisible against a bright wall.
+ */
+@Composable
+fun MeasureScrimButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val shape = RoundedCornerShape(MeasureShape.Edge)
+    Box(
+        modifier
+            .height(SecondaryHeight)
+            .clip(shape)
+            .background(MeasureColours.Scrim)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = MeasureSpace.Base),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (enabled) MeasureColours.OnScrim else MeasureColours.OnScrimMuted,
+            style = MeasureType.Label,
+            maxLines = 1,
+        )
+    }
+}
 
 /**
  * A text field that looks like one.
  *
- * The border is not styling. An earlier version shipped fields a shade off the panel behind
- * them, and on hardware they read as gaps rather than inputs — nobody could tell there was
- * anywhere to type. A visible edge, a hint, and a focus state that changes the edge are the
- * minimum for a control that invites typing.
+ * A recessed fill, and a focus state that swaps the fill for a hairline in the accent. The
+ * border is not styling: an earlier version shipped fields a shade off the panel behind them
+ * and on hardware they read as gaps rather than inputs — nobody could tell there was
+ * anywhere to type.
  */
 @Composable
 fun MeasureField(
@@ -227,7 +385,7 @@ fun MeasureField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
-        textStyle = MeasureType.Body.copy(color = MeasureColours.OnScrim),
+        textStyle = MeasureType.Body.copy(color = MeasureColours.Ink),
         cursorBrush = SolidColor(MeasureColours.Accent),
         keyboardOptions = if (numeric) {
             KeyboardOptions(keyboardType = KeyboardType.Decimal)
@@ -235,16 +393,20 @@ fun MeasureField(
             KeyboardOptions.Default
         },
         modifier = modifier
+            .height(SecondaryHeight)
             .clip(shape)
-            .background(MeasureColours.Surface)
-            .border(Hairline, if (focused) MeasureColours.Accent else MeasureColours.Line, shape)
+            .background(MeasureColours.Sunk)
+            .border(
+                if (focused) Hairline + Hairline else Hairline,
+                if (focused) MeasureColours.Accent else Color.Transparent,
+                shape,
+            )
             .onFocusChanged { focused = it.isFocused }
-            .touchTarget()
-            .padding(horizontal = MeasureSpace.Snug, vertical = MeasureSpace.Snug),
+            .padding(horizontal = MeasureSpace.Snug),
         decorationBox = { field ->
             Box(contentAlignment = Alignment.CenterStart) {
                 if (value.isEmpty()) {
-                    Text(hint, color = MeasureColours.OnScrimMuted, style = MeasureType.Body)
+                    Text(hint, color = MeasureColours.InkFaint, style = MeasureType.Body)
                 }
                 field()
             }
@@ -262,3 +424,15 @@ fun MeasureRule(modifier: Modifier = Modifier) {
             .background(MeasureColours.Line),
     )
 }
+
+/** The one thing a screen is for. */
+private val PrimaryHeight = 52.dp
+
+/** An action, but not *the* action. */
+private val SecondaryHeight = 38.dp
+
+/** One option among several — see the note on [MeasureChip] about the hit area. */
+private val ChipHeight = 29.dp
+
+private val SegmentHeight = 30.dp
+private val SegmentInset = 3.dp

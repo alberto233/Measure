@@ -1,7 +1,6 @@
 package com.measure.core.designsystem
 
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -9,75 +8,84 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 /**
- * The type scale — docs/PRODUCT_PLAN.md M10a, direction A.
+ * The type scale — see `docs/DESIGN.md`, direction 01.
  *
- * Seven sizes, replacing the twelve bare literals that were spread across 87 usages. Every
- * one earns its place by doing a job no neighbour does; anything that wanted an eighth is
- * an argument for changing one of these rather than adding to them.
+ * Nine roles, each earning its place by doing a job no neighbour does. Anything that wants a
+ * tenth is an argument for changing one of these rather than adding to them.
  *
- * Numbers are monospaced. That is not decoration in a measuring app: `4.20` and `11.85`
- * have to occupy the same width or a column of them shivers as they update, and this app
- * updates them live while somebody walks a room. Tabular figures come free with a
- * monospaced face, and the face itself is what makes a reading look like an instrument's
- * rather than a paragraph's.
+ * **The system face, deliberately.** For a direction that is explicitly Apple-like, the
+ * platform's own face is the correct answer rather than a compromise, and it costs nothing
+ * in APK size. The previous direction bundled nothing either but *specified* JetBrains Mono
+ * and never shipped it, which is the worst of both.
  *
- * [Mono] is the system monospace for now. Bundling JetBrains Mono, which is what the design
- * direction actually specifies, adds a font file to the APK and belongs in the polish pass
- * rather than in a change this wide.
+ * **Numbers are tabular, not monospaced.** `4.20` and `11.85` still have to occupy the same
+ * width — this app updates figures live while somebody walks a room, and a column that
+ * shivers is unreadable. But a monospaced *face* was the technical direction's signature.
+ * The `tnum` feature gives the alignment without the typewriter.
  */
 object MeasureType {
 
-    private val Mono = FontFamily.Monospace
+    /** Lining, fixed-width digits in a proportional face. */
+    private const val TABULAR = "tnum"
 
-    /** Screen titles. One per screen, at the top, and nowhere else. */
-    val Display = TextStyle(fontSize = 30.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.01).em)
+    /** One screen title, at the top, and nowhere else. */
+    val Display = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.028).em)
 
-    /** Section and panel headings. */
-    val Title = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+    /** Section and sheet headings. */
+    val Title = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.02).em)
 
     /** Anything read as a sentence. */
     val Body = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
 
-    /** Controls, list entries, the things that are read as objects rather than prose. */
-    val Label = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    /** Secondary controls and list entries — things read as objects rather than prose. */
+    val Label = TextStyle(fontSize = 14.5.sp, fontWeight = FontWeight.Medium)
 
-    /** Secondary detail. Below this, text stops being readable at arm's length. */
-    val Small = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal)
+    /** Supporting detail. Below this, text stops being readable at arm's length. */
+    val Small = TextStyle(fontSize = 12.5.sp, fontWeight = FontWeight.Normal)
 
     /**
-     * The micro-label: uppercase, letterspaced, quiet.
+     * The micro-eyebrow over a value. The one place uppercase survives.
      *
-     * The signature of this direction. Every value on screen is introduced by one of these,
-     * which is what makes a screen read as an instrument rather than as a form — the label
-     * recedes, the number does the talking.
+     * Uppercasing a small semibold letterspaced label is a typographic device; uppercasing
+     * every button label is a voice, and it was the wrong one. See [MeasureTag], which is
+     * the only thing that applies the transform.
      */
     val Tag = TextStyle(
-        fontSize = 9.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = 0.12.em,
+        fontSize = 10.5.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 0.1.em,
     )
 
-    /** A measurement, at the size a measurement deserves. */
+    /** The measurement being taken, at the size a measurement deserves. */
     val Reading = TextStyle(
-        fontFamily = Mono,
-        fontSize = 44.sp,
-        fontWeight = FontWeight.Medium,
-        letterSpacing = (-0.01).em,
+        fontSize = 34.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.035).em,
+        fontFeatureSettings = TABULAR,
     )
 
     /** A measurement in a list or a panel, rather than the one being taken. */
-    val Value = TextStyle(fontFamily = Mono, fontSize = 20.sp, fontWeight = FontWeight.Medium)
+    val Value = TextStyle(
+        fontSize = 17.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = (-0.02).em,
+        fontFeatureSettings = TABULAR,
+    )
 
     /** A measurement small enough to sit inline. */
-    val ValueSmall = TextStyle(fontFamily = Mono, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    val ValueSmall = TextStyle(
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        fontFeatureSettings = TABULAR,
+    )
 }
 
 /**
  * The spacing scale.
  *
- * Six steps. The point of a scale is not that these particular numbers are correct — it is
- * that a layout built from six values reads as deliberate and one built from every even
- * number between 4 and 24 reads as accreted, which is what this app had.
+ * Six steps. The point is not that these particular numbers are correct — it is that a
+ * layout built from six values reads as deliberate and one built from every even number
+ * between 4 and 24 reads as accreted, which is what this app had.
  */
 object MeasureSpace {
     val Hair: Dp = 4.dp
@@ -91,12 +99,16 @@ object MeasureSpace {
 /**
  * Corner radii.
  *
- * Nearly square, deliberately. Direction A is hard-edged: a 2 dp radius reads as a cut
- * corner rather than a rounded one, which is the difference between an instrument and a
- * consumer app. [Pill] exists only for controls that are genuinely capsule-shaped.
+ * Properly rounded, where the previous direction was hard-edged at 2dp. The 2dp radius read
+ * as a cut corner, which is exactly the machined look that was rejected.
  */
 object MeasureShape {
-    val Edge: Dp = 2.dp
-    val Panel: Dp = 4.dp
-    val Pill: Dp = 100.dp
+    /** Buttons, fields, thumbnails. */
+    val Edge: Dp = 10.dp
+
+    /** Cards, sheets, banners. */
+    val Panel: Dp = 14.dp
+
+    /** Chips and segmented controls, which are genuinely capsule-shaped. */
+    val Pill: Dp = 999.dp
 }

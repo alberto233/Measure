@@ -88,12 +88,12 @@ fun PlanView(
                 if (style.filled && closed && !isPolyline) {
                     drawPath(path, MeasureColours.Ready.copy(alpha = 0.22f))
                 }
-                drawPath(path, MeasureColours.OnScrim, style = Stroke(width = style.strokeWidth))
+                drawPath(path, MeasureColours.Ink, style = Stroke(width = style.strokeWidth))
             }
 
             if (isPolyline) {
                 screen.forEach {
-                    drawCircle(MeasureColours.OnScrim, radius = style.strokeWidth * 1.6f, center = it)
+                    drawCircle(MeasureColours.Ink, radius = style.strokeWidth * 1.6f, center = it)
                 }
             }
 
@@ -116,7 +116,7 @@ fun PlanView(
             }
 
             if (style.showVertices) {
-                screen.forEach { drawCircle(MeasureColours.OnScrim, radius = 3.5f, center = it) }
+                screen.forEach { drawCircle(MeasureColours.Ink, radius = 3.5f, center = it) }
             }
             if (style.markStart && isLast) {
                 screen.firstOrNull()?.let { drawCircle(MeasureColours.Blocked, radius = 5.5f, center = it) }

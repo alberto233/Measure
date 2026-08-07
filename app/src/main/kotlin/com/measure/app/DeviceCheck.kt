@@ -78,7 +78,7 @@ object DeviceCheck {
         stamp = stamp,
         verdictHeadline = "Checking",
         verdictDetail = "Asking Google Play what this phone supports.",
-        verdictColour = MeasureColours.Idle,
+        verdictColour = MeasureColours.InkMuted,
         checks = emptyList(),
         device = deviceLines(),
         core = emptyList(),
@@ -206,7 +206,7 @@ object DeviceCheck {
                     CheckLine(
                         label = "Raw depth",
                         value = yesNo(depth.raw),
-                        colour = if (depth.raw) MeasureColours.Ready else MeasureColours.OnScrimMuted,
+                        colour = if (depth.raw) MeasureColours.Ready else MeasureColours.InkMuted,
                     ),
                 )
             }
@@ -246,7 +246,7 @@ object DeviceCheck {
                     CheckLine(
                         label = "Wall ${index + 1}",
                         value = LengthFormatter.formatMetric(Length(edge.length)),
-                        colour = MeasureColours.OnScrim,
+                        colour = MeasureColours.Ink,
                     ),
                 )
             }
@@ -254,7 +254,7 @@ object DeviceCheck {
                 CheckLine(
                     label = "Area, true 20 m²",
                     value = AreaFormatter.format(solution.area, UnitSystem.METRIC),
-                    colour = MeasureColours.OnScrim,
+                    colour = MeasureColours.Ink,
                 ),
             )
             add(
@@ -263,7 +263,7 @@ object DeviceCheck {
                     value = String.format(
                         Locale.getDefault(), "%.1f%%", solution.closure.relativeError * 100,
                     ),
-                    colour = MeasureColours.OnScrimMuted,
+                    colour = MeasureColours.InkMuted,
                 ),
             )
             add(

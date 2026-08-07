@@ -58,7 +58,7 @@ fun ExportSheet(
                 MeasureTag("send as")
                 Text(
                     text = "Choose a format",
-                    color = MeasureColours.OnScrim,
+                    color = MeasureColours.Ink,
                     style = MeasureType.Title,
                 )
             }
@@ -76,10 +76,10 @@ fun ExportSheet(
                     .padding(vertical = MeasureSpace.Snug),
                 verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair),
             ) {
-                Text(format.label, color = MeasureColours.OnScrim, style = MeasureType.Label)
+                Text(format.label, color = MeasureColours.Ink, style = MeasureType.Label)
                 Text(
                     text = format.description,
-                    color = MeasureColours.OnScrimMuted,
+                    color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
             }

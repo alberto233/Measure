@@ -33,6 +33,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.ProjectSort
 import com.measure.core.data.ProjectSummary
 import com.measure.core.designsystem.MeasureButton
+import com.measure.core.designsystem.MeasureChip
+import com.measure.core.designsystem.MeasurePrimaryButton
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.MeasureField
 import com.measure.core.designsystem.MeasureRule
@@ -150,13 +152,12 @@ fun ProjectsScreen(
                 .background(MeasureColours.Surface),
         ) {
             MeasureRule()
-            MeasureButton(
+            // The one thing this screen is for, at the size that says so. It used to be
+            // the same height and type size as a sort filter.
+            MeasurePrimaryButton(
                 label = "New measurement",
                 onClick = onNewMeasurement,
-                primary = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(MeasureSpace.Wide),
+                modifier = Modifier.padding(MeasureSpace.Wide),
             )
         }
     }
@@ -178,11 +179,11 @@ fun ProjectsScreen(
         AlertDialog(
             onDismissRequest = { deleting = null },
             containerColor = MeasureColours.Panel,
-            title = { Text("Delete ${project.name}?", color = MeasureColours.OnScrim, style = MeasureType.Title) },
+            title = { Text("Delete ${project.name}?", color = MeasureColours.Ink, style = MeasureType.Title) },
             text = {
                 Text(
                     "Its rooms and measurements go with it. This cannot be undone.",
-                    color = MeasureColours.OnScrimMuted,
+                    color = MeasureColours.InkMuted,
                     style = MeasureType.Body,
                 )
             },
@@ -194,7 +195,7 @@ fun ProjectsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { deleting = null }) {
-                    Text("Keep", color = MeasureColours.OnScrimMuted)
+                    Text("Keep", color = MeasureColours.InkMuted)
                 }
             },
         )
@@ -217,7 +218,7 @@ private fun Header(count: Int, onDeviceCheck: () -> Unit) {
         ) {
             Column {
                 MeasureTag("measure")
-                Text("Plans", color = MeasureColours.OnScrim, style = MeasureType.Display)
+                Text("Plans", color = MeasureColours.Ink, style = MeasureType.Display)
             }
             Column(horizontalAlignment = Alignment.End) {
                 MeasureTag("saved")
@@ -249,11 +250,10 @@ private fun FindBar(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
             ProjectSort.entries.forEach { option ->
-                MeasureButton(
+                MeasureChip(
                     label = option.label,
                     onClick = { onSort(option) },
                     selected = option == sort,
-                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -303,18 +303,18 @@ private fun PlanEntry(
                 Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair),
             ) {
-                Text(project.name, color = MeasureColours.OnScrim, style = MeasureType.Label)
+                Text(project.name, color = MeasureColours.Ink, style = MeasureType.Label)
                 // The reference under the name, because when somebody has bothered to
                 // write "14 Ash Road" that is what they are scanning the list for.
                 MeasureTag(
                     text = project.reference.ifBlank { "no reference" },
-                    colour = MeasureColours.OnScrimMuted,
+                    colour = MeasureColours.InkMuted,
                 )
             }
 
             project.headline()?.let { (value, unit) ->
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(value, color = MeasureColours.OnScrim, style = MeasureType.Value)
+                    Text(value, color = MeasureColours.Ink, style = MeasureType.Value)
                     MeasureTag(unit)
                 }
             }
@@ -326,7 +326,7 @@ private fun PlanEntry(
                     .touchTarget(),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("⋯", color = MeasureColours.OnScrimMuted, style = MeasureType.Title)
+                Text("⋯", color = MeasureColours.InkMuted, style = MeasureType.Title)
             }
         }
         MeasureRule()
@@ -336,12 +336,12 @@ private fun PlanEntry(
         AlertDialog(
             onDismissRequest = { menu = false },
             containerColor = MeasureColours.Panel,
-            title = { Text(project.name, color = MeasureColours.OnScrim, style = MeasureType.Title) },
+            title = { Text(project.name, color = MeasureColours.Ink, style = MeasureType.Title) },
             text = {
                 Text(
                     text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                         .format(Date(project.updatedAt)) + " · " + project.describeContents(),
-                    color = MeasureColours.OnScrimMuted,
+                    color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
             },
@@ -393,10 +393,10 @@ private fun NoMatches(query: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
     ) {
-        Text("No plans match “$query”", color = MeasureColours.OnScrim, style = MeasureType.Title)
+        Text("No plans match “$query”", color = MeasureColours.Ink, style = MeasureType.Title)
         Text(
             text = "Your plans are all still here — only this search is empty.",
-            color = MeasureColours.OnScrimMuted,
+            color = MeasureColours.InkMuted,
             style = MeasureType.Small,
             textAlign = TextAlign.Center,
         )
@@ -411,10 +411,10 @@ private fun EmptyState() {
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
     ) {
         MeasureTag("no plans yet")
-        Text("Nothing measured", color = MeasureColours.OnScrim, style = MeasureType.Title)
+        Text("Nothing measured", color = MeasureColours.Ink, style = MeasureType.Title)
         Text(
             text = "Point the camera at a room and walk the corners.\nEverything saves as you go.",
-            color = MeasureColours.OnScrimMuted,
+            color = MeasureColours.InkMuted,
             style = MeasureType.Body,
             textAlign = TextAlign.Center,
         )
@@ -441,7 +441,7 @@ private fun DetailsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MeasureColours.Panel,
-        title = { Text("Plan details", color = MeasureColours.OnScrim, style = MeasureType.Title) },
+        title = { Text("Plan details", color = MeasureColours.Ink, style = MeasureType.Title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug)) {
                 MeasureField(name, { name = it }, hint = "Name", modifier = Modifier.fillMaxWidth())
@@ -454,7 +454,7 @@ private fun DetailsDialog(
                 Text(
                     text = "The reference is searched along with the name, and appears on " +
                         "exports — so a plan sent to someone says whose it is.",
-                    color = MeasureColours.OnScrimMuted,
+                    color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
             }
@@ -465,7 +465,7 @@ private fun DetailsDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = MeasureColours.OnScrimMuted) }
+            TextButton(onClick = onDismiss) { Text("Cancel", color = MeasureColours.InkMuted) }
         },
     )
 }

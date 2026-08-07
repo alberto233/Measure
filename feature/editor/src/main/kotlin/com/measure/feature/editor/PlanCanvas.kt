@@ -270,7 +270,7 @@ internal fun PlanCanvas(
             val from = camera.toScreen(measurement.from.toFloorPlane(), size)
             val to = camera.toScreen(measurement.to.toFloorPlane(), size)
             val selected = selection == Selection.Measurement(measurement.id)
-            val colour = if (selected) MeasureColours.Sampling else MeasureColours.Idle
+            val colour = if (selected) MeasureColours.Sampling else MeasureColours.InkMuted
 
             if (measurement.isVerticalOnPlan) {
                 // A plumb measurement is almost all height, and a floor plan discards
@@ -312,7 +312,7 @@ internal fun PlanCanvas(
                 screen.drop(1).forEach { lineTo(it.x, it.y) }
                 close()
             }
-            drawPath(path, MeasureColours.OnScrim.copy(alpha = if (isSelected) 0.14f else 0.06f))
+            drawPath(path, MeasureColours.Ink.copy(alpha = if (isSelected) 0.14f else 0.06f))
 
             val polygon = Polygon(outline)
 
@@ -327,7 +327,7 @@ internal fun PlanCanvas(
                     color = when {
                         selected -> MeasureColours.Accent
                         locked -> MeasureColours.Ready
-                        else -> MeasureColours.OnScrim
+                        else -> MeasureColours.Ink
                     },
                     start = from,
                     end = to,
@@ -363,7 +363,7 @@ internal fun PlanCanvas(
             screen.forEachIndexed { index, point ->
                 val selected = selection == Selection.Corner(room.id, index)
                 drawCircle(
-                    color = if (selected) MeasureColours.Sampling else MeasureColours.OnScrim,
+                    color = if (selected) MeasureColours.Sampling else MeasureColours.Ink,
                     radius = if (selected) 11f else 7f,
                     center = point,
                 )
@@ -465,7 +465,7 @@ private fun DrawScope.drawOpening(
     // of missing wall.
     listOf(jambA, jambB).forEach { jamb ->
         drawLine(
-            color = MeasureColours.OnScrim,
+            color = MeasureColours.Ink,
             start = jamb - inward * JAMB_HALF_PX,
             end = jamb + inward * JAMB_HALF_PX,
             strokeWidth = 3f,
@@ -478,9 +478,9 @@ private fun DrawScope.drawOpening(
             // leaf is hinged at the near jamb because that is where the opening's offset
             // is measured from, so the symbol and the number agree.
             val leaf = jambA + inward * width
-            drawLine(MeasureColours.OnScrimMuted, jambA, leaf, strokeWidth = 4f)
+            drawLine(MeasureColours.InkMuted, jambA, leaf, strokeWidth = 4f)
             drawArc(
-                color = MeasureColours.OnScrimMuted.copy(alpha = 0.75f),
+                color = MeasureColours.InkMuted.copy(alpha = 0.75f),
                 startAngle = screenAngle(inward),
                 sweepAngle = quarterTurn(inward, along),
                 useCenter = false,
@@ -494,7 +494,7 @@ private fun DrawScope.drawOpening(
             // The frame seen from above: two lines spanning the gap, inside the jambs.
             listOf(-GLAZING_HALF_PX, GLAZING_HALF_PX).forEach { offset ->
                 drawLine(
-                    color = MeasureColours.Idle,
+                    color = MeasureColours.InkMuted,
                     start = jambA + inward * offset,
                     end = jambB + inward * offset,
                     strokeWidth = 2.5f,
@@ -534,7 +534,7 @@ private fun DrawScope.drawDimensionChain(
     // tick is visibly the corner it came from and not an unexplained mark.
     ends.forEach { anchor ->
         drawLine(
-            color = MeasureColours.OnScrimMuted.copy(alpha = 0.45f),
+            color = MeasureColours.InkMuted.copy(alpha = 0.45f),
             start = anchor + outward * DIMENSION_WITNESS_GAP_PX,
             end = anchor + overallLine + outward * DIMENSION_WITNESS_OVERRUN_PX,
             strokeWidth = 1.5f,
@@ -545,7 +545,7 @@ private fun DrawScope.drawDimensionChain(
         // The 45-degree slash of a drawing, rather than an arrowhead: it stays legible at
         // any size and does not fill in when two ticks are close together.
         val slash = Offset(along.x + outward.x, along.y + outward.y) * DIMENSION_TICK_PX
-        drawLine(MeasureColours.OnScrim, at - slash, at + slash, strokeWidth = 2f)
+        drawLine(MeasureColours.Ink, at - slash, at + slash, strokeWidth = 2f)
     }
 
     val direction = (ends.last() - ends.first()).let {
@@ -558,7 +558,7 @@ private fun DrawScope.drawDimensionChain(
     chain.segments.forEachIndexed { index, _ ->
         val active = activeRun == index
         drawLine(
-            color = if (active) MeasureColours.Sampling else MeasureColours.OnScrimMuted,
+            color = if (active) MeasureColours.Sampling else MeasureColours.InkMuted,
             start = ends[index] + runLine,
             end = ends[index + 1] + runLine,
             strokeWidth = if (active) 3f else 1.5f,
@@ -570,7 +570,7 @@ private fun DrawScope.drawDimensionChain(
     if (chain.segments.size > 1) {
         val active = activeRun == MeasureFocus.Dimension.OVERALL
         drawLine(
-            color = if (active) MeasureColours.Sampling else MeasureColours.OnScrimMuted,
+            color = if (active) MeasureColours.Sampling else MeasureColours.InkMuted,
             start = ends.first() + overallLine,
             end = ends.last() + overallLine,
             strokeWidth = if (active) 3f else 1.5f,

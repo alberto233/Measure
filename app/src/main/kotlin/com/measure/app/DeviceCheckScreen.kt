@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasurePrimaryButton
 import com.measure.core.designsystem.MeasureRule
 import com.measure.core.designsystem.MeasureShape
 import com.measure.core.designsystem.MeasureSpace
@@ -75,7 +76,7 @@ fun DeviceCheckScreen(
             verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
         ) {
             MeasureTag("Device capability")
-            Text("What this phone can do", color = MeasureColours.OnScrim, style = MeasureType.Display)
+            Text("What this phone can do", color = MeasureColours.Ink, style = MeasureType.Display)
 
             report.crash?.let { CrashReport(it) }
 
@@ -90,7 +91,7 @@ fun DeviceCheckScreen(
 
             MeasureTag("Device")
             report.device.forEach {
-                Text(it, color = MeasureColours.OnScrimMuted, style = MeasureType.Body)
+                Text(it, color = MeasureColours.InkMuted, style = MeasureType.Body)
             }
 
             MeasureRule()
@@ -101,14 +102,14 @@ fun DeviceCheckScreen(
             MeasureTag("Measurement core")
             Text(
                 text = "A synthetic 5.00 × 4.00 m room, solved here rather than in CI",
-                color = MeasureColours.OnScrimMuted,
+                color = MeasureColours.InkMuted,
                 style = MeasureType.Small,
             )
             report.core.forEach { CheckRow(it) }
 
             Text(
                 text = "Check ${report.runCount} at ${report.stamp}",
-                color = MeasureColours.OnScrimMuted,
+                color = MeasureColours.InkMuted,
                 style = MeasureType.Small,
             )
         }
@@ -124,11 +125,9 @@ fun DeviceCheckScreen(
             Modifier.fillMaxWidth().padding(MeasureSpace.Loose),
             verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
         ) {
-            MeasureButton(
+            MeasurePrimaryButton(
                 label = if (report.canMeasure) "Start measuring" else "Measuring unavailable",
                 onClick = onStartMeasuring,
-                modifier = Modifier.fillMaxWidth(),
-                primary = true,
                 enabled = report.canMeasure,
             )
             MeasureButton(
@@ -161,7 +160,7 @@ private fun Verdict(report: DeviceReport) {
     ) {
         MeasureTag("Verdict", colour = report.verdictColour)
         Text(report.verdictHeadline, color = report.verdictColour, style = MeasureType.Title)
-        Text(report.verdictDetail, color = MeasureColours.OnScrimMuted, style = MeasureType.Body)
+        Text(report.verdictDetail, color = MeasureColours.InkMuted, style = MeasureType.Body)
     }
 }
 
@@ -181,7 +180,7 @@ private fun CheckRow(row: CheckLine) {
     ) {
         Text(
             text = row.label,
-            color = MeasureColours.OnScrimMuted,
+            color = MeasureColours.InkMuted,
             style = MeasureType.Label,
             modifier = Modifier.weight(1f),
         )
@@ -218,7 +217,7 @@ private fun CrashReport(crash: String) {
     ) {
         MeasureTag("Previous run crashed", colour = MeasureColours.Blocked)
         Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-            Text(crash.trimEnd(), color = MeasureColours.OnScrimMuted, style = MeasureType.ValueSmall)
+            Text(crash.trimEnd(), color = MeasureColours.InkMuted, style = MeasureType.ValueSmall)
         }
     }
 }

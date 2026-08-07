@@ -19,7 +19,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.measure.ar.CaptureMode
-import com.measure.core.designsystem.MeasureButton
+import com.measure.core.designsystem.MeasureScrimButton
+import com.measure.core.designsystem.MeasureScrimSegmented
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.MeasureSpace
 import com.measure.core.geometry.capture.MeasurementMode
@@ -46,16 +47,12 @@ internal fun ModeSelector(
     onSelect: (MeasurementMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
-        MeasurementMode.entries.forEach { mode ->
-            MeasureButton(
-                label = mode.label,
-                onClick = { onSelect(mode) },
-                selected = mode == selected,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
+    MeasureScrimSegmented(
+        options = MeasurementMode.entries.map { it.label },
+        selectedIndex = MeasurementMode.entries.indexOf(selected),
+        onSelect = { onSelect(MeasurementMode.entries[it]) },
+        modifier = modifier,
+    )
 }
 
 /** Distance versus room. The top-level choice about what is being captured. */
@@ -65,16 +62,12 @@ internal fun CaptureModeSelector(
     onSelect: (CaptureMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
-        CaptureMode.entries.forEach { mode ->
-            MeasureButton(
-                label = if (mode == CaptureMode.DISTANCE) "Distance" else "Room",
-                onClick = { onSelect(mode) },
-                selected = mode == selected,
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
+    MeasureScrimSegmented(
+        options = CaptureMode.entries.map { if (it == CaptureMode.DISTANCE) "Distance" else "Room" },
+        selectedIndex = CaptureMode.entries.indexOf(selected),
+        onSelect = { onSelect(CaptureMode.entries[it]) },
+        modifier = modifier,
+    )
 }
 
 /**
@@ -142,11 +135,7 @@ internal fun PillButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    MeasureButton(
-        label = label,
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        primary = highlighted,
-    )
+    // `highlighted` is gone: over the camera every control is already a dark slab, and a
+    // filled variant of a dark slab on a dark slab says nothing.
+    MeasureScrimButton(label = label, onClick = onClick, modifier = modifier, enabled = enabled)
 }

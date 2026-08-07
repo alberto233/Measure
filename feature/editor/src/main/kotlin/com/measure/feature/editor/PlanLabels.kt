@@ -68,7 +68,7 @@ internal fun PlanLabels(labels: List<PlanLabel>) {
                     text = label.text,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(MeasureColours.Scrim)
+                        .background(MeasureColours.Surface)
                         .padding(horizontal = 6.dp, vertical = 3.dp),
                     color = label.colour,
                     fontSize = MeasureType.Small.fontSize,
@@ -153,7 +153,7 @@ internal fun wallLabels(
                     colour = when {
                         selected -> MeasureColours.Sampling
                         locked -> MeasureColours.Ready
-                        else -> MeasureColours.OnScrim
+                        else -> MeasureColours.Ink
                     },
                     bold = locked,
                     priority = when {
@@ -201,7 +201,7 @@ internal fun measurementLabels(
                 x = (from.x + to.x) / 2f,
                 // Lifted clear of the symbol it belongs to rather than sitting on it.
                 y = (from.y + to.y) / 2f - if (vertical) VERTICAL_LABEL_LIFT_PX else 0f,
-                colour = if (selected) MeasureColours.Sampling else MeasureColours.Idle,
+                colour = if (selected) MeasureColours.Sampling else MeasureColours.InkMuted,
                 bold = selected,
                 priority = if (selected) SELECTED_PRIORITY else MEASUREMENT_PRIORITY,
             ),
