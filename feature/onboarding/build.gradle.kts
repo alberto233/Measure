@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.projects"
+    namespace = "com.measure.feature.onboarding"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }
@@ -30,23 +30,25 @@ kotlin {
     }
 }
 
+tasks.withType<Test> {
+    testLogging {
+        events("failed", "skipped")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStackTraces = true
+        showCauses = true
+    }
+}
+
 dependencies {
-    api(project(":core:data"))
+    // No :core:data. This screen stores one boolean and reads nothing the user has
+    // measured, so it has no business depending on the database.
     implementation(project(":core:designsystem"))
-    implementation(project(":core:units"))
-    // For the way back into the accuracy guidance from the home screen.
-    implementation(project(":feature:onboarding"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Pictures of the home screen. It is the first thing anyone sees and it had no
-    // coverage at all, which is how a units toggle labelled "m" — turned into a lone
-    // capital letter by the uppercase transform — reached a phone rather than CI.
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
@@ -55,10 +57,6 @@ dependencies {
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
     testImplementation(libs.roborazzi.junit.rule)
-    testImplementation(libs.room.runtime)
-    // Dispatchers.Main has no implementation on a bare JVM, and viewModelScope is built
-    // on it — without this every coroutine the screen launches fails to dispatch.
-    testImplementation(libs.kotlinx.coroutines.android)
 
     debugImplementation(libs.compose.ui.test.manifest)
 }

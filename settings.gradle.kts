@@ -46,4 +46,9 @@ include(":feature:projects")
 include(":feature:editor")
 include(":feature:export")
 
+// First run, and the accuracy guidance. Its own module rather than a corner of
+// :feature:projects because the capture screen needs to reopen it too, and a screen two
+// features share is not owned by either of them.
+include(":feature:onboarding")
+
 include(":app")

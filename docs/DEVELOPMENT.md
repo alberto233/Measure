@@ -11,16 +11,17 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database, repository, project search and sort. 32 tests, 9 of them the migration test that walks a seeded v1 database to v7 |
-| Interface tests | Robolectric-hosted Compose tests, 3, plus 19 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture` and `:app`. The first thing here that renders a screen and looks at it |
+| Interface tests | Robolectric-hosted Compose tests, plus 21 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
+| `:feature:onboarding` | M10c: the accuracy guidance, shown on first run and reopenable from the home screen. 6 tests, 2 screenshots |
 | `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test the light direction.** Then M10c. See below. The migration test that blocked it is done |
+| Next | **Field test the light direction.** M10c is under way: crash reporting and the accuracy guidance are done; onboarding polish, device calibration, localisation and the store listing remain |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds

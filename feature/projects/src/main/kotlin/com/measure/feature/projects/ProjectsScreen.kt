@@ -47,6 +47,7 @@ import com.measure.core.designsystem.PlanView
 import com.measure.core.designsystem.touchTarget
 import com.measure.core.units.AreaFormatter
 import com.measure.core.units.LengthFormatter
+import com.measure.feature.onboarding.GuidanceButton
 import java.text.DateFormat
 import java.util.Date
 
@@ -67,6 +68,7 @@ fun ProjectsScreen(
     onNewMeasurement: () -> Unit,
     onOpenProject: (Long) -> Unit,
     onDeviceCheck: () -> Unit,
+    onGuidance: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ProjectsViewModel = viewModel(),
 ) {
@@ -129,13 +131,22 @@ fun ProjectsScreen(
             }
 
             item {
-                MeasureButton(
-                    label = "Device check",
-                    onClick = onDeviceCheck,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = MeasureSpace.Base),
-                )
+                Column(
+                    Modifier.padding(top = MeasureSpace.Base),
+                    verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
+                ) {
+                    // Above the device check because it is the more useful of the two
+                    // after a capture has gone badly, which is when either gets opened.
+                    GuidanceButton(
+                        onOpen = onGuidance,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    MeasureButton(
+                        label = "Device check",
+                        onClick = onDeviceCheck,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         }
 

@@ -99,6 +99,7 @@ class ProjectsScreenshotTest {
                 onNewMeasurement = {},
                 onOpenProject = {},
                 onDeviceCheck = {},
+                onGuidance = {},
                 viewModel = viewModel,
             )
         }
