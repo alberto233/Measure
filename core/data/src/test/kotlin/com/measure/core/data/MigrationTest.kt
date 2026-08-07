@@ -319,8 +319,8 @@ class MigrationTest {
     /**
      * The new columns arrive empty rather than invented.
      *
-     * Both are cases where a confident-looking default would be a lie the interface then
-     * repeats. `captureSession` decides which rooms may be drawn on one plan — rooms from
+     * Every one of these is a case where a confident-looking default would be a lie the
+     * interface then repeats. `captureSession` decides which rooms may be drawn on one plan — rooms from
      * different AR sessions share no coordinate frame — so giving old rooms a shared
      * session would have the app assemble a floor plan out of rooms it has no reason to
      * believe line up. `reference` is the free-text field a plan is found by; the app has
@@ -342,6 +342,12 @@ class MigrationTest {
             assertEquals(
                 listOf(""),
                 db.textColumn("SELECT reference FROM projects"),
+            )
+            assertEquals(
+                "A door hung before doors could be hung reads as the default hanging, " +
+                    "which is exactly what the app drew for it before the upgrade.",
+                emptyList<String>(),
+                db.textColumn("SELECT swing FROM openings WHERE swing <> ''"),
             )
             assertEquals(0, db.count("SELECT COUNT(*) FROM walls"))
             assertEquals(0, db.count("SELECT COUNT(*) FROM openings"))
@@ -544,6 +550,6 @@ class MigrationTest {
          * against a freshly created database, so bumping the version without extending
          * this test fails here rather than quietly testing the wrong ceiling.
          */
-        const val CURRENT_VERSION = 7
+        const val CURRENT_VERSION = 8
     }
 }

@@ -181,6 +181,7 @@ class EditorPanelTest {
         assertTrue(viewModel.selectedLengths().isEmpty())
     }
 
+
     private fun editor(projectId: Long): EditorViewModel {
         val viewModel = EditorViewModel(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {

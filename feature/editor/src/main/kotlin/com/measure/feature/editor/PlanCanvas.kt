@@ -24,6 +24,7 @@ import com.measure.core.data.SavedMeasurement
 import com.measure.core.data.SavedPlanMeasurement
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.geometry.DoorSwing
 import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.Segments
@@ -351,6 +352,7 @@ internal fun PlanCanvas(
 
                     drawOpening(
                         kind = saved.opening.kind,
+                        swing = saved.opening.swing,
                         jambA = lerp(from, to, startFraction.toFloat()),
                         jambB = lerp(from, to, endFraction.toFloat()),
                         along = along,
@@ -449,6 +451,7 @@ private fun lerp(from: Offset, to: Offset, t: Float) = Offset(
  */
 private fun DrawScope.drawOpening(
     kind: OpeningKind,
+    swing: DoorSwing,
     jambA: Offset,
     jambB: Offset,
     /** Unit vector along the wall, from [jambA] towards [jambB]. */
@@ -477,17 +480,22 @@ private fun DrawScope.drawOpening(
 
     when (kind) {
         OpeningKind.DOOR -> {
-            // Leaf standing open at right angles, with the quarter-circle it sweeps. The
-            // leaf is hinged at the near jamb because that is where the opening's offset
-            // is measured from, so the symbol and the number agree.
-            val leaf = jambA + inward * width
-            drawLine(MeasureColours.InkMuted, jambA, leaf, strokeWidth = 4f)
+            // Leaf standing open at right angles, with the quarter-circle it sweeps.
+            //
+            // Both ends of the choice come from the stored swing. "Near" is the jamb the
+            // opening's offset is measured from, so the symbol and the number always agree
+            // about which end is which, and "out" is simply the inward normal reversed.
+            val hinge = if (swing.hingeAtFarJamb) jambB else jambA
+            val towardsOtherJamb = if (swing.hingeAtFarJamb) -along else along
+            val opens = if (swing.opensOut) -inward else inward
+
+            drawLine(MeasureColours.InkMuted, hinge, hinge + opens * width, strokeWidth = 4f)
             drawArc(
                 color = MeasureColours.InkMuted.copy(alpha = 0.75f),
-                startAngle = screenAngle(inward),
-                sweepAngle = quarterTurn(inward, along),
+                startAngle = screenAngle(opens),
+                sweepAngle = quarterTurn(opens, towardsOtherJamb),
                 useCenter = false,
-                topLeft = Offset(jambA.x - width, jambA.y - width),
+                topLeft = Offset(hinge.x - width, hinge.y - width),
                 size = Size(width * 2f, width * 2f),
                 style = Stroke(width = 2f),
             )

@@ -303,6 +303,10 @@ interface PlanMeasurementDao {
     @Query("DELETE FROM plan_measurements WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    /** Names a measurement after the fact. Both fields are nullable and stay that way. */
+    @Query("UPDATE plan_measurements SET label = :label, description = :description WHERE id = :id")
+    suspend fun describe(id: Long, label: String?, description: String?)
+
     /**
      * Removes measurements anchored to a room that is being deleted.
      *

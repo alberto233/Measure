@@ -22,6 +22,7 @@ import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolver
+import com.measure.core.geometry.DoorSwing
 import com.measure.core.geometry.Vec2
 import com.measure.core.geometry.plan.DimensionChain
 import com.measure.core.geometry.plan.DimensionChains
@@ -606,8 +607,22 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         lastStraightening = null
     }
 
-    fun keepMeasurement() {
+    /**
+     * Keeps the measurement, optionally with a name and a description.
+     *
+     * Both are optional and both are trimmed to null when blank: a measurement someone
+     * skipped past is not one named with a space. The distinction matters downstream —
+     * `label` being null is what stops the plan drawing an empty caption under a number.
+     */
+    fun keepMeasurement(name: String? = null, description: String? = null) {
+        val id = unconfirmed ?: return
         unconfirmed = null
+        val cleanName = name?.trim()?.ifBlank { null }
+        val cleanDescription = description?.trim()?.ifBlank { null }
+        if (cleanName == null && cleanDescription == null) return
+        viewModelScope.launch {
+            repository.describePlanMeasurement(id, cleanName, cleanDescription)
+        }
     }
 
     fun discardMeasurement() {
@@ -903,6 +918,20 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     var lastAddedOpening by mutableStateOf<Long?>(null)
         private set
+
+    /**
+     * Re-hangs a door: which end the hinge is on, and which way it opens.
+     *
+     * Separate from [resizeOpening] because it changes nothing about where the opening is
+     * or how big it is, and routing it through the resize path would put it through
+     * validation that has nothing to say about a hinge.
+     */
+    fun setDoorSwing(roomId: Long, saved: SavedOpening, swing: DoorSwing) {
+        val room = roomById(roomId) ?: return
+        viewModelScope.launch {
+            repository.updateOpening(saved.id, room.id, saved.wallIndex, saved.opening.copy(swing = swing))
+        }
+    }
 
     fun resizeOpening(
         roomId: Long,

@@ -10,7 +10,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
-| `:core:data` | Room database, repository, project search and sort. 32 tests, 9 of them the migration test that walks a seeded v1 database to v7 |
+| `:core:data` | Room database (v8), repository, project search and sort. Migration test walks a seeded v1 database to v8 |
 | Interface tests | Robolectric-hosted Compose tests, plus 23 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |

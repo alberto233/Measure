@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.measure.core.data.SavedOpening
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureCard
@@ -1057,14 +1060,86 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
         )
     }
 
+    var naming by remember(saved.id) { mutableStateOf(false) }
+
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (unconfirmed) {
-            Pill("Keep", highlighted = true, onClick = viewModel::keepMeasurement)
+            Pill("Keep", highlighted = true, onClick = { naming = true })
             Pill("Discard", onClick = viewModel::discardMeasurement)
         } else {
             Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
         }
     }
+
+    if (naming) {
+        NameMeasurementDialog(
+            onDismiss = {
+                // Dismissing keeps the measurement, unnamed. The alternative — losing a
+                // distance somebody just drew because they tapped outside a dialog they
+                // did not ask for — punishes them for the app's own prompt.
+                naming = false
+                viewModel.keepMeasurement()
+            },
+            onSave = { name, description ->
+                naming = false
+                viewModel.keepMeasurement(name, description)
+            },
+        )
+    }
+}
+
+/**
+ * What this distance was, in the user's own words.
+ *
+ * Offered on the way to keeping a measurement rather than afterwards, because that is the
+ * one moment the user still knows why they drew it. A plan with six unnamed distances on
+ * it a week later is six numbers whose purpose has to be reconstructed from where they
+ * happen to sit.
+ *
+ * Both fields optional, and skipping is a first-class outcome rather than a cancel: the
+ * measurement is kept either way. Requiring a name would make the fastest, most common
+ * use of this tool — check one distance, look at it, move on — slower than it was before
+ * the prompt existed.
+ */
+@Composable
+private fun NameMeasurementDialog(
+    onDismiss: () -> Unit,
+    onSave: (name: String, description: String) -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MeasureColours.Panel,
+        title = { Text("Name this measurement", color = MeasureColours.Ink, style = MeasureType.Title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug)) {
+                MeasureField(name, { name = it }, hint = "Name", modifier = Modifier.fillMaxWidth())
+                MeasureField(
+                    value = description,
+                    onValueChange = { description = it },
+                    hint = "What it is for, if it needs saying",
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "Both optional. Skip and the measurement is still kept.",
+                    color = MeasureColours.InkMuted,
+                    style = MeasureType.Small,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(name, description) }) {
+                Text("Save", color = MeasureColours.Accent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Skip", color = MeasureColours.InkMuted)
+            }
+        },
+    )
 }
 
 /**
@@ -1307,6 +1382,48 @@ private fun OpeningRow(
                 },
             )
         }
+
+        // Doors only: a window does not swing, and a passage has nothing in it to swing.
+        if (saved.opening.kind == OpeningKind.DOOR) {
+            DoorSwingControls(viewModel, room.id, saved)
+        }
+    }
+}
+
+/**
+ * Which end a door is hinged at, and which way it opens.
+ *
+ * Two independent toggles rather than one four-way picker. They are genuinely separate
+ * questions — a person looking at a door reads the hinge off the frame and the swing off
+ * the floor — and four combined labels ("Left in", "Right out"…) make the reader decode a
+ * pair every time they want to change one half of it.
+ *
+ * Left and right are the wall's own ends, measured from the same corner the offset is,
+ * so the labels agree with the number in the row above.
+ */
+@Composable
+private fun DoorSwingControls(viewModel: EditorViewModel, roomId: Long, saved: SavedOpening) {
+    val swing = saved.opening.swing
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("Hinge", color = MeasureColours.InkMuted, fontSize = MeasureType.Small.fontSize)
+        Pill(
+            label = if (swing.hingeAtFarJamb) "Right" else "Left",
+            onClick = {
+                viewModel.setDoorSwing(roomId, saved, swing.with(hingeAtFarJamb = !swing.hingeAtFarJamb))
+            },
+        )
+        Text("Opens", color = MeasureColours.InkMuted, fontSize = MeasureType.Small.fontSize)
+        Pill(
+            label = if (swing.opensOut) "Out" else "In",
+            onClick = {
+                viewModel.setDoorSwing(roomId, saved, swing.with(opensOut = !swing.opensOut))
+            },
+        )
     }
 }
 

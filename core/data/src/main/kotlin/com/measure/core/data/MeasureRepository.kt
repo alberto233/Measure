@@ -1,5 +1,6 @@
 package com.measure.core.data
 
+import com.measure.core.geometry.DoorSwing
 import com.measure.core.geometry.Opening
 import com.measure.core.geometry.OpeningKind
 import com.measure.core.geometry.Polygon
@@ -154,6 +155,7 @@ data class SavedPlanMeasurement(
     val id: Long,
     val measurement: PlanMeasurement?,
     val label: String?,
+    val description: String? = null,
     val createdAt: Long,
 )
 
@@ -508,6 +510,7 @@ class MeasureRepository(
                 width = opening.width,
                 height = opening.height,
                 sillHeight = opening.sillHeight,
+                swing = opening.swing.name,
             ),
         )
 
@@ -522,10 +525,14 @@ class MeasureRepository(
                 width = opening.width,
                 height = opening.height,
                 sillHeight = opening.sillHeight,
+                swing = opening.swing.name,
             ),
         )
 
     suspend fun deleteOpening(id: Long) = openings.delete(id)
+
+    suspend fun describePlanMeasurement(id: Long, label: String?, description: String?) =
+        planMeasurements.describe(id, label, description)
 
     suspend fun setCeilingHeight(roomId: Long, metres: Double?) =
         rooms.setCeilingHeight(roomId, metres)
@@ -699,6 +706,7 @@ internal fun OpeningEntity.toSavedOpening() = SavedOpening(
         width = width,
         height = height,
         sillHeight = sillHeight,
+        swing = DoorSwing.parse(swing),
     ),
 )
 
@@ -751,6 +759,7 @@ internal fun PlanMeasurementEntity.toSavedPlanMeasurement(rooms: List<SnapRoom>)
         id = id,
         measurement = if (from != null && to != null) PlanMeasurement(from, to) else null,
         label = label,
+        description = description,
         createdAt = createdAt,
     )
 }

@@ -14,6 +14,43 @@ enum class OpeningKind(val label: String, val sitsOnFloor: Boolean) {
 }
 
 /**
+ * Which way a door is hung, and which way it opens.
+ *
+ * Both halves are needed and neither is derivable. Where the hinge sits decides which way
+ * a door blocks a corner when it is open, and whether it swings into the room or out of it
+ * decides whether the floor behind it is usable at all — which is the whole reason a plan
+ * bothers to draw the arc rather than just the gap.
+ *
+ * "Near" and "far" are relative to the wall's starting corner, the same end the opening's
+ * `offset` is measured from, so the symbol and the number always agree about which end is
+ * which. "In" and "out" are relative to the room the wall belongs to.
+ *
+ * [HINGE_NEAR_OPENS_IN] is the default because it is what the app drew before doors could
+ * be hung at all: every existing door keeps its appearance across the upgrade rather than
+ * silently rotating when someone installs a new version.
+ */
+enum class DoorSwing(
+    val hingeAtFarJamb: Boolean,
+    val opensOut: Boolean,
+    val label: String,
+) {
+    HINGE_NEAR_OPENS_IN(false, false, "Left, in"),
+    HINGE_FAR_OPENS_IN(true, false, "Right, in"),
+    HINGE_NEAR_OPENS_OUT(false, true, "Left, out"),
+    HINGE_FAR_OPENS_OUT(true, true, "Right, out");
+
+    /** The same door with one of its two choices flipped. */
+    fun with(hingeAtFarJamb: Boolean = this.hingeAtFarJamb, opensOut: Boolean = this.opensOut) =
+        entries.first { it.hingeAtFarJamb == hingeAtFarJamb && it.opensOut == opensOut }
+
+    companion object {
+        /** Tolerant of a name that is no longer known, which is a stored string's risk. */
+        fun parse(name: String?): DoorSwing =
+            entries.firstOrNull { it.name == name } ?: HINGE_NEAR_OPENS_IN
+    }
+}
+
+/**
  * A door or window in a wall.
  *
  * Positioned along the wall rather than in room coordinates: a wall is a one-dimensional
@@ -30,6 +67,8 @@ data class Opening(
     val height: Double,
     /** Height of the sill above the floor. Zero for a door or a passage. */
     val sillHeight: Double = 0.0,
+    /** How the door is hung. Carried by every opening, but only drawn for a door. */
+    val swing: DoorSwing = DoorSwing.HINGE_NEAR_OPENS_IN,
 ) {
     val area: Area get() = Area(width * height)
 

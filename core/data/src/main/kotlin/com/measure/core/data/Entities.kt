@@ -226,6 +226,15 @@ data class OpeningEntity(
     val width: Double,
     val height: Double,
     val sillHeight: Double,
+    /**
+     * How the door is hung, stored as the enum name — the same convention as [kind], and
+     * for the same reason: adding a fifth way to hang a door must not renumber the four
+     * that already exist in somebody's database.
+     *
+     * Empty for openings saved before doors could be hung, which reads as "the default",
+     * and the default is what the app used to draw.
+     */
+    val swing: String = "",
 )
 
 /**
@@ -305,5 +314,13 @@ data class PlanMeasurementEntity(
     val toX: Double,
     val toY: Double,
     val label: String? = null,
+    /**
+     * Whatever the measurement needs saying about it beyond its name.
+     *
+     * Null rather than empty when absent, matching [label]: "not given" and "given as
+     * nothing" are different, and only one of them should make the interface show a blank
+     * line under the number.
+     */
+    val description: String? = null,
     val createdAt: Long,
 )

@@ -27,7 +27,7 @@ import androidx.sqlite.execSQL
         MeasurementEntity::class,
         PlanMeasurementEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -179,6 +179,26 @@ abstract class MeasureDatabase : RoomDatabase() {
         }
 
         /**
+         * Adds how a door is hung, and a description for a plan measurement.
+         *
+         * Two unrelated columns in one migration because they were wanted in the same
+         * change, and a version bump is not free: every extra version is another starting
+         * point every future migration has to be tested from.
+         *
+         * Both default to "absent" rather than to a guess. An existing door gets the empty
+         * string, which [DoorSwing.parse] reads as the default hanging — and the default is
+         * exactly what the app drew before doors could be hung, so no plan changes
+         * appearance on upgrade. An existing measurement gets a null description, which is
+         * distinct from an empty one: nobody wrote anything, as opposed to writing nothing.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL("ALTER TABLE `openings` ADD COLUMN `swing` TEXT NOT NULL DEFAULT ''")
+                connection.execSQL("ALTER TABLE `plan_measurements` ADD COLUMN `description` TEXT")
+            }
+        }
+
+        /**
          * Every migration, in order, as one list.
          *
          * A single list rather than six arguments spelled out at the call site, because the
@@ -193,6 +213,7 @@ abstract class MeasureDatabase : RoomDatabase() {
             MIGRATION_4_5,
             MIGRATION_5_6,
             MIGRATION_6_7,
+            MIGRATION_7_8,
         )
 
         @Volatile
