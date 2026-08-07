@@ -60,8 +60,8 @@ Non-negotiable, and the one place the light palette does not reach.
 
 | Token | Value | Job |
 | --- | --- | --- |
-| `Scrim` | `#B8101114` | The slab behind anything textual over the camera |
-| `ScrimSoft` | `#8C101114` | A lighter slab where the image should still read through |
+| `Scrim` | `#E6101114` | The slab behind anything textual over the camera |
+| `ScrimSoft` | `#C2101114` | A lighter slab where the image should still read through |
 | `OnScrim` | `#F4F5F7` | Text on that slab |
 | `OnScrimMuted` | `#B9BCC4` | Supporting text on that slab |
 
@@ -72,6 +72,11 @@ three field sessions walked past it because rooms get measured in the evening.
 
 Apple's own camera is dark in light mode for the same reason. Only the shutter carries the
 direction's accent.
+
+The slabs are nearly opaque, and that is load-bearing rather than cautious. At 72% over a
+sunlit wall the scrim composites to a mid grey, and amber advice text on mid grey is the
+same fault as amber on white. The slab is what makes the overlay legible, so it cannot be
+the thing that is subtle.
 
 `OnScrim` and `OnScrimMuted` are therefore **capture-only tokens**. Anything on a white
 surface uses `Ink` / `InkMuted`. Reaching for `OnScrim` on a light screen is the mistake this

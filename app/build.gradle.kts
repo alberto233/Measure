@@ -24,8 +24,8 @@ android {
         // Bumped whenever a build goes out for testing. Android will not install a
         // lower code over a higher one, and a version that never changes gives the user
         // no way to tell which build is on the phone.
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
     }
 
     // A debug keystore committed to the repository, so every build — CI, local, anyone's
