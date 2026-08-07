@@ -222,27 +222,31 @@ internal fun planMeasurementLabels(
     camera: PlanCamera,
     size: IntSize,
     measuring: Boolean,
-    focus: MeasureFocus,
+    focuses: Set<MeasureFocus>,
     formatLength: (Double) -> String,
 ): List<PlanLabel> = buildList {
     if (size == IntSize.Zero || !measuring) return@buildList
-    val active = focus as? MeasureFocus.Custom ?: return@buildList
 
-    val saved = planMeasurements.firstOrNull { it.id == active.id } ?: return@buildList
-    val measurement = saved.measurement ?: return@buildList
-    val screen = camera.toScreen((measurement.from.position + measurement.to.position) * 0.5, size)
+    // Every selected measurement, not just one. When several are being added together the
+    // individual numbers are what makes the total checkable — a sum with no visible parts
+    // is a number the user has to take on trust.
+    for (target in focuses.filterIsInstance<MeasureFocus.Custom>()) {
+        val saved = planMeasurements.firstOrNull { it.id == target.id } ?: continue
+        val measurement = saved.measurement ?: continue
+        val screen = camera.toScreen((measurement.from.position + measurement.to.position) * 0.5, size)
 
-    add(
-        PlanLabel(
-            text = "~ ${formatLength(measurement.length)}",
-            x = screen.x,
-            y = screen.y - PLAN_MEASUREMENT_LABEL_LIFT_PX,
-            colour = MeasureColours.Sampling,
-            bold = true,
-            // This is the one thing the measure view was opened to read. It cannot lose.
-            priority = SELECTED_PRIORITY,
-        ),
-    )
+        add(
+            PlanLabel(
+                text = "~ ${formatLength(measurement.length)}",
+                x = screen.x,
+                y = screen.y - PLAN_MEASUREMENT_LABEL_LIFT_PX,
+                colour = MeasureColours.Sampling,
+                bold = true,
+                // This is what the measure view was opened to read. It cannot lose.
+                priority = SELECTED_PRIORITY,
+            ),
+        )
+    }
 }
 
 /** Clear of the line itself, which the label would otherwise sit exactly on top of. */
@@ -260,11 +264,23 @@ internal fun dimensionLabels(
     chains: List<DimensionChain>,
     camera: PlanCamera,
     size: IntSize,
-    focus: MeasureFocus,
+    focuses: Set<MeasureFocus>,
     formatLength: (Double) -> String,
 ): List<PlanLabel> = buildList {
     if (size == IntSize.Zero) return@buildList
-    val target = focus as? MeasureFocus.Dimension ?: return@buildList
+    for (target in focuses.filterIsInstance<MeasureFocus.Dimension>()) {
+        addAll(dimensionLabel(chains, camera, size, target, formatLength))
+    }
+}
+
+/** The number on one selected run. */
+private fun dimensionLabel(
+    chains: List<DimensionChain>,
+    camera: PlanCamera,
+    size: IntSize,
+    target: MeasureFocus.Dimension,
+    formatLength: (Double) -> String,
+): List<PlanLabel> = buildList {
     val chain = chains.getOrNull(target.chain) ?: return@buildList
     if (chain.ticks.size < 2) return@buildList
 

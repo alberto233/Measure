@@ -139,7 +139,7 @@ fun EditorScreen(
             bottomInsetPx = bottomChromePx,
             measuring = mode == EditorMode.MEASURE,
             drawing = viewModel.drawing,
-            focus = viewModel.focus,
+            focuses = viewModel.focuses,
             pendingEnd = viewModel.pendingEnd,
             dimensionChains = if (mode == EditorMode.MEASURE) {
                 viewModel.dimensionChains()
@@ -664,12 +664,16 @@ private fun MeasureContent(viewModel: EditorViewModel) {
         Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
     ) {
-        when (val focus = viewModel.focus) {
-            // No placeholder prose. The status row below already says what a tap does, and
-            // saying it twice was the duplication this panel was merged to remove.
-            MeasureFocus.None -> Unit
-            is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
-            is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+        if (viewModel.focuses.size > 1) {
+            SelectionTotal(viewModel)
+        } else {
+            when (val focus = viewModel.focus) {
+                // No placeholder prose. The status row below already says what a tap does,
+                // and saying it twice was the duplication this panel was merged to remove.
+                MeasureFocus.None -> Unit
+                is MeasureFocus.Dimension -> DimensionReadout(viewModel, focus)
+                is MeasureFocus.Custom -> CustomDistanceReadout(viewModel, focus)
+            }
         }
 
         Row(
@@ -713,6 +717,10 @@ private fun MeasureContent(viewModel: EditorViewModel) {
                     }
 
                     drawing -> Pill("Cancel", onClick = viewModel::cancelDrawing)
+
+                    // Tapping each one again is the other way out, and it is tedious past
+                    // about three.
+                    viewModel.focuses.size > 1 -> Pill("Clear", onClick = viewModel::clearFocus)
 
                     // Refused rather than hidden while a measurement is unconfirmed, so the
                     // reason is visible instead of the control merely being absent.
@@ -956,6 +964,43 @@ private fun DimensionReadout(viewModel: EditorViewModel, focus: MeasureFocus.Dim
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
+}
+
+/**
+ * Several things added up.
+ *
+ * The question a single selection cannot answer. "How wide is that wall" is one number;
+ * "do these three runs come to the same as the wall opposite" is what people are actually
+ * asking when they tap a second dimension, and until now the second tap simply threw the
+ * first away.
+ *
+ * The parts are listed under the total rather than only summed. A sum with no visible
+ * terms is a number that has to be taken on trust, which is the opposite of what this view
+ * is for — and it is also how you notice you have selected the wrong run.
+ */
+@Composable
+private fun SelectionTotal(viewModel: EditorViewModel) {
+    val lengths = viewModel.selectedLengths()
+    if (lengths.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair)) {
+        Text(
+            text = viewModel.formatLength(lengths.sum()),
+            color = MeasureColours.Ink,
+            fontSize = MeasureType.Title.fontSize,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = lengths.size.toString() + " selected, added together",
+            color = MeasureColours.InkMuted,
+            fontSize = MeasureType.Small.fontSize,
+        )
+        Text(
+            text = lengths.joinToString("  +  ") { viewModel.formatLength(it) },
+            color = MeasureColours.InkMuted,
+            fontSize = MeasureType.Small.fontSize,
+        )
+    }
 }
 
 /**

@@ -469,9 +469,26 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     var mode by mutableStateOf(EditorMode.PLAN)
         private set
 
-    /** What is being read right now. Exactly one thing, or nothing. */
-    var focus by mutableStateOf<MeasureFocus>(MeasureFocus.None)
+    /**
+     * What is being read right now — a set, because reading is a *comparison* as often as
+     * it is a lookup.
+     *
+     * "How wide is that wall" is one number. "Do these three runs add up to the wall
+     * opposite" is the question a single selection cannot answer, and it is the one people
+     * are actually asking when they tap a second dimension. Tapping toggles, so a
+     * selection is built up and taken apart rather than replaced.
+     */
+    var focuses by mutableStateOf<Set<MeasureFocus>>(emptySet())
         private set
+
+    /**
+     * The single thing being read, when there is exactly one.
+     *
+     * Kept so the detailed readouts and the plan's guide line stay single-subject. A guide
+     * projected across the plan for five selected runs at once is five lines nobody can
+     * follow, and a readout describing "the marked corners" is only true of one of them.
+     */
+    val focus: MeasureFocus get() = focuses.singleOrNull() ?: MeasureFocus.None
 
     /** True while points are being placed for a new distance. */
     var drawing by mutableStateOf(false)
@@ -517,7 +534,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun resetMeasuring() {
-        focus = MeasureFocus.None
+        focuses = emptySet()
         drawing = false
         pendingEnd = null
         unconfirmed = null
@@ -534,7 +551,35 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             warn("Keep or discard this measurement first")
             return
         }
-        focus = next
+        // Toggle rather than replace. Tapping a selected run again is how a comparison is
+        // narrowed, and it is also the only way back to nothing without hunting for a
+        // clear button.
+        focuses = if (next in focuses) focuses - next else focuses + next
+    }
+
+    fun clearFocus() {
+        focuses = emptySet()
+    }
+
+    /**
+     * Every selected length, in the order the plan reads them.
+     *
+     * Only lengths. A dimension run and a custom distance are both distances and add up to
+     * something meaningful; nothing else in the measure view does, which is why rooms and
+     * areas are not selectable here.
+     */
+    fun selectedLengths(): List<Double> {
+        val chains = dimensionChains()
+        return focuses.mapNotNull { target ->
+            when (target) {
+                is MeasureFocus.Dimension -> chains.getOrNull(target.chain)?.let { chain ->
+                    if (target.isOverall) chain.overall else chain.segments.getOrNull(target.segment)?.length
+                }
+
+                is MeasureFocus.Custom -> planMeasurementById(target.id)?.measurement?.length
+                MeasureFocus.None -> null
+            }
+        }
     }
 
     /** Begin placing points. Refused until the last measurement has been accepted. */
@@ -546,7 +591,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         drawing = true
         pendingEnd = null
         lastStraightening = null
-        focus = MeasureFocus.None
+        focuses = emptySet()
     }
 
     fun cancelDrawing() {
@@ -568,7 +613,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun discardMeasurement() {
         val id = unconfirmed ?: return
         unconfirmed = null
-        focus = MeasureFocus.None
+        focuses = emptySet()
         viewModelScope.launch { repository.deletePlanMeasurement(id) }
     }
 
@@ -619,7 +664,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             val id = repository.savePlanMeasurement(projectId, first.anchor, placed.anchor)
             unconfirmed = id
-            focus = MeasureFocus.Custom(id)
+            // Replaces the selection rather than joining it: a brand new measurement
+            // awaiting confirmation is the only thing the panel can usefully be about.
+            focuses = setOf(MeasureFocus.Custom(id))
         }
     }
 
@@ -745,7 +792,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch { repository.deletePlanMeasurement(id) }
         // Clearing the *selection* was not enough: the measure view reads `focus`, so the
         // card went on showing a measurement that no longer existed.
-        if (focus == MeasureFocus.Custom(id)) focus = MeasureFocus.None
+        focuses = focuses - MeasureFocus.Custom(id)
         if (unconfirmed == id) unconfirmed = null
         selection = Selection.None
     }

@@ -18,6 +18,7 @@ import com.measure.core.geometry.RoomSolver
 import com.measure.core.geometry.Vec2
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -116,6 +117,68 @@ class EditorPanelTest {
             captureSession = "test-session",
         )
         projectId to roomId
+    }
+
+    /**
+     * Reading is a comparison as often as it is a lookup.
+     *
+     * A second tap used to throw the first selection away, so "do these runs add up to the
+     * wall opposite" — the question people are actually asking when they tap twice — could
+     * not be asked at all.
+     */
+    @Test
+    fun `selecting a second run adds to the first rather than replacing it`() {
+        val (projectId, _) = seedRoom()
+        val viewModel = editor(projectId)
+        val chains = viewModel.dimensionChains()
+        assertTrue("The fixture needs at least two dimension chains.", chains.size >= 2)
+
+        viewModel.focusOn(MeasureFocus.Dimension(0, 0))
+        viewModel.focusOn(MeasureFocus.Dimension(1, 0))
+
+        val lengths = viewModel.selectedLengths()
+        assertEquals(2, lengths.size)
+        assertEquals(
+            chains[0].segments[0].length + chains[1].segments[0].length,
+            lengths.sum(),
+            1e-9,
+        )
+    }
+
+    /** Tapping a selected run again is how a comparison is narrowed. */
+    @Test
+    fun `tapping a selected run again removes it`() {
+        val (projectId, _) = seedRoom()
+        val viewModel = editor(projectId)
+
+        viewModel.focusOn(MeasureFocus.Dimension(0, 0))
+        viewModel.focusOn(MeasureFocus.Dimension(1, 0))
+        viewModel.focusOn(MeasureFocus.Dimension(1, 0))
+
+        assertEquals(setOf(MeasureFocus.Dimension(0, 0)), viewModel.focuses)
+    }
+
+    /**
+     * With exactly one thing selected the detailed readout still applies.
+     *
+     * `focus` is derived from the set rather than stored, and a derivation that reported
+     * something while several were selected would put a readout describing "the marked
+     * corners" over a total covering five of them.
+     */
+    @Test
+    fun `the single-subject readout only applies to a single selection`() {
+        val (projectId, _) = seedRoom()
+        val viewModel = editor(projectId)
+
+        viewModel.focusOn(MeasureFocus.Dimension(0, 0))
+        assertEquals(MeasureFocus.Dimension(0, 0), viewModel.focus)
+
+        viewModel.focusOn(MeasureFocus.Dimension(1, 0))
+        assertEquals(MeasureFocus.None, viewModel.focus)
+
+        viewModel.clearFocus()
+        assertEquals(MeasureFocus.None, viewModel.focus)
+        assertTrue(viewModel.selectedLengths().isEmpty())
     }
 
     private fun editor(projectId: Long): EditorViewModel {

@@ -152,7 +152,7 @@ internal fun PlanCanvas(
     /** Non-null while measuring: the mode, and the first end if one is down. */
     measuring: Boolean,
     drawing: Boolean,
-    focus: MeasureFocus,
+    focuses: Set<MeasureFocus>,
     pendingEnd: ResolvedPoint?,
     /** Drawn only while measuring, which is when they are what was asked for. */
     dimensionChains: List<DimensionChain>,
@@ -378,7 +378,7 @@ internal fun PlanCanvas(
         if (measuring) {
             planMeasurements.forEach { saved ->
                 val measurement = saved.measurement ?: return@forEach
-                val active = focus == MeasureFocus.Custom(saved.id)
+                val active = MeasureFocus.Custom(saved.id) in focuses
                 val from = camera.toScreen(measurement.from.position, size)
                 val to = camera.toScreen(measurement.to.position, size)
                 val colour = if (active) MeasureColours.Sampling else MeasureColours.Warning
@@ -398,12 +398,15 @@ internal fun PlanCanvas(
         // overall span with the runs between corners beneath, on witness lines clear of
         // the geometry. Outside rather than over, so the plan stays readable.
         dimensionChains.forEachIndexed { index, chain ->
-            drawDimensionChain(chain, camera, size, focus.runIn(index))
+            drawDimensionChain(chain, camera, size, focuses.runsIn(index))
         }
         // The guide: the focused run projected back across the plan, so it is obvious
         // which stretch of building the number belongs to. This is what an architect does
         // with a straightedge when checking a dimension against the drawing.
-        (focus as? MeasureFocus.Dimension)?.let { target ->
+        // Only for a single selection. Five guides projected across the plan at once is
+        // five lines nobody can follow, and the point of the guide is to make one stretch
+        // of building unmistakable.
+        (focuses.singleOrNull() as? MeasureFocus.Dimension)?.let { target ->
             dimensionChains.getOrNull(target.chain)?.let { chain ->
                 drawDimensionGuide(chain, target, camera, size, planBounds)
             }
@@ -423,8 +426,8 @@ internal fun PlanCanvas(
     PlanLabels(
         wallLabels(rooms, camera, size, dragging, selection, formatLength) +
             measurementLabels(measurements, camera, size, selection, formatLength) +
-            planMeasurementLabels(planMeasurements, camera, size, measuring, focus, formatLength) +
-            dimensionLabels(dimensionChains, camera, size, focus, formatLength),
+            planMeasurementLabels(planMeasurements, camera, size, measuring, focuses, formatLength) +
+            dimensionLabels(dimensionChains, camera, size, focuses, formatLength),
     )
 }
 
@@ -518,8 +521,8 @@ private fun DrawScope.drawDimensionChain(
     chain: DimensionChain,
     camera: PlanCamera,
     size: IntSize,
-    /** The run of this chain being read, if any: null, a segment index, or OVERALL. */
-    activeRun: Int?,
+    /** The runs of this chain being read: segment indices, or OVERALL. Often empty. */
+    activeRuns: Set<Int>,
 ) {
     if (chain.ticks.size < 2) return
 
@@ -556,7 +559,7 @@ private fun DrawScope.drawDimensionChain(
     // The runs between corners, each drawn separately so the one being read can be picked
     // out. Unread runs are quiet: the lines are there to be aimed at, not to be studied.
     chain.segments.forEachIndexed { index, _ ->
-        val active = activeRun == index
+        val active = index in activeRuns
         drawLine(
             color = if (active) MeasureColours.Sampling else MeasureColours.InkMuted,
             start = ends[index] + runLine,
@@ -568,7 +571,7 @@ private fun DrawScope.drawDimensionChain(
 
     // And the overall, further out. Only when it says something the runs do not.
     if (chain.segments.size > 1) {
-        val active = activeRun == MeasureFocus.Dimension.OVERALL
+        val active = MeasureFocus.Dimension.OVERALL in activeRuns
         drawLine(
             color = if (active) MeasureColours.Sampling else MeasureColours.InkMuted,
             start = ends.first() + overallLine,
@@ -623,9 +626,9 @@ private fun DrawScope.drawDimensionGuide(
     }
 }
 
-/** Which run of chain [index] is being read, if this focus is on that chain at all. */
-internal fun MeasureFocus.runIn(index: Int): Int? =
-    (this as? MeasureFocus.Dimension)?.takeIf { it.chain == index }?.segment
+/** Which runs of chain [index] are being read. Empty when none of them are. */
+internal fun Set<MeasureFocus>.runsIn(index: Int): Set<Int> =
+    mapNotNullTo(mutableSetOf()) { (it as? MeasureFocus.Dimension)?.takeIf { d -> d.chain == index }?.segment }
 
 /**
  * Which dimension run a tap landed on, tested in pixels.
