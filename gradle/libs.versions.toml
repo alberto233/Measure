@@ -1,6 +1,16 @@
 [versions]
 agp = "9.3.0"
 arcore = "1.54.0"
+activity = "1.13.0"
+composeBom = "2026.06.01"
+# Must equal the Kotlin compiler AGP embeds (kotlin-compiler-embeddable 2.2.10 inside
+# AGP 9.3.0), not the `kotlin` version below. AGP 9 compiles Kotlin with its own
+# compiler, and a Compose compiler plugin from a different line refuses to load into it.
+composeCompiler = "2.2.10"
+lifecycle = "2.10.0"
+# Must match AGP's embedded Kotlin, for the same reason as composeCompiler.
+ksp = "2.2.10-2.0.2"
+room = "2.8.4"
 # Capped by AGP 9.3, whose built-in Kotlin compiler is on the 2.2 line and reads class
 # metadata up to version 2.3.0. Kotlin 2.4.x emits 2.4.0 metadata, which makes the core
 # modules unreadable from :app. 2.3.21 is the newest that stays within range.
@@ -8,18 +18,66 @@ kotlin = "2.3.21"
 kotlinxCoroutines = "1.10.2"
 kotlinxSerialization = "1.9.0"
 junit5 = "5.11.4"
+# JUnit 4 as well, and only for the editor's UI tests. Robolectric and Compose's
+# `createComposeRule` are both JUnit 4 rules, and the Vintage engine would be a third
+# moving part in a harness that already has several.
+junit4 = "4.13.2"
+robolectric = "4.16"
+roborazzi = "1.70.0"
+androidxTest = "1.7.0"
+androidxCore = "1.16.0"
 
 [libraries]
 arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
 
+# Brought in only for FileProvider, which is how an exported file is handed to another
+# app without making the app's storage world readable.
+androidx-core = { group = "androidx.core", name = "core", version.ref = "androidxCore" }
+
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity" }
+androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+# Supplies MigrationTestHelper, which builds an old database from the checked-in schema
+# JSON rather than from hand-written DDL. That distinction is the whole value: a test that
+# creates v1 by hand tests the transcription, not the schema users actually have.
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version = "1.11.4" }
 
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
+# Lets :core:data keep its JUnit 5 tests while running the migration test, which is
+# JUnit 4 because both Robolectric's runner and Room's MigrationTestHelper rule are.
+junit-vintage-engine = { group = "org.junit.vintage", name = "junit-vintage-engine", version.ref = "junit5" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTest" }
+# Versioned by the Compose BOM, like the rest of Compose.
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+
+roborazzi = { group = "io.github.takahirom.roborazzi", name = "roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { group = "io.github.takahirom.roborazzi", name = "roborazzi-compose", version.ref = "roborazzi" }
+roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "roborazzi-junit-rule", version.ref = "roborazzi" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "composeCompiler" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 # No kotlin-android entry: AGP 9 compiles Kotlin itself and rejects that plugin.
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

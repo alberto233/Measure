@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Measure</string>
+    <string name="capture_title">Measure</string>
+    <string name="device_check_title">Device check</string>
 </resources>

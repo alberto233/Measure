@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      AR is required in release, and optional everywhere else.
+
+      Play filters an app declaring `android.hardware.camera.ar` as required off devices
+      that cannot run it. That is the right trade for a shipped build: there is no non-AR
+      drawing mode, so on an unsupported handset this app installs and can do nothing —
+      which earns a one-star review rather than a user.
+
+      The argument the other way, and why this override is scoped to release rather than
+      moved into the main manifest:
+
+      - It forecloses the non-AR fallback in PRODUCT_PLAN.md §7. If manual plan drawing
+        ever lands, this has to come back out.
+      - It costs the diagnostic signal. A user whose phone is unsupported cannot install,
+        so they cannot tell us — and "which devices actually fail" is exactly what is not
+        known yet.
+      - Filtering is not perfect. Supported handsets do occasionally get filtered out by
+        the feature check, and losing a real user is worse than an unusable install.
+
+      Debug keeps `optional`, so a sideloaded build still installs on anything and still
+      reports the truth through the device check. That keeps the diagnostic value where it
+      is actually used — on test hardware — and spends the filter only where it protects
+      someone.
+
+      Note this does not remove any error handling. `com.google.ar.core` being *required*
+      makes Play install ARCore alongside the app, but ARCore is a separate package that
+      can still be missing, stale or refused, so CaptureActivity's failure paths stay
+      exactly as load-bearing as they were.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera.ar"
+        android:required="true"
+        tools:replace="android:required" />
+
+    <application>
+        <meta-data
+            android:name="com.google.ar.core"
+            android:value="required"
+            tools:replace="android:value" />
+    </application>
+</manifest>

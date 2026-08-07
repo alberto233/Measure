@@ -29,7 +29,14 @@ jobs:
       # The measurement logic lives in pure-Kotlin modules with no Android dependency,
       # so the tests that matter most run here in seconds, on every push.
       - name: Test the geometry and units core
-        run: ./gradlew :core:units:test :core:geometry:test --stacktrace
+        run: ./gradlew :core:units:test :core:geometry:test :core:export:test --stacktrace
+
+      - name: Surface test failures
+        if: failure()
+        run: |
+          echo "════════ TEST FAILURES ════════"
+          python3 .github/scripts/print-test-failures.py
+          echo "════════ END TEST FAILURES ════════"
 
       - name: Upload test reports
         if: failure()
@@ -66,6 +73,84 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug --console=plain 2>&1 | tee /tmp/build.log
 
+      # :core:data holds pure logic worth testing — project naming, plan-view collapse,
+      # search and sort — but it is an Android library, so its tests need the SDK and
+      # cannot run in the JVM job above. They were therefore never run anywhere at all.
+      # Run here, where the SDK is, rather than left as tests nobody executes.
+      #
+      # This step also carries MigrationTest, which upgrades a seeded v1 database all the
+      # way to the current version and reads it back. It is the only thing standing between
+      # a hand-written migration and somebody's saved plans, so a failure here should be
+      # read as "this release eats user data", not as a flaky test.
+      - name: Test the data layer
+        run: ./gradlew :core:data:testDebugUnitTest --stacktrace
+
+      # The editor's interface tests. Robolectric, so they run on the JVM — but they are
+      # an Android library's tests and need the SDK, which only this job has. They cover
+      # the one class of fault the 247 geometry tests are blind to: a screen that stops
+      # reflecting the model. That reached the user three times before anything could
+      # catch it.
+      - name: Test the interface
+        run: |
+          ./gradlew :feature:editor:testDebugUnitTest \
+                    :feature:projects:testDebugUnitTest \
+                    :feature:capture:testDebugUnitTest \
+                    :app:testDebugUnitTest --stacktrace
+
+      - name: Upload data test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-test-reports
+          path: |
+            core/data/build/reports/tests/
+            core/data/build/test-results/
+            feature/editor/build/reports/tests/
+            feature/editor/build/test-results/
+            feature/projects/build/reports/tests/
+            feature/projects/build/test-results/
+            feature/capture/build/reports/tests/
+            feature/capture/build/test-results/
+            app/build/reports/tests/
+            app/build/test-results/
+          retention-days: 7
+
+      # Renders the editor, the plan list, the capture overlays and the device check to PNG. Recording rather
+      # than verifying: locking the current appearance in as correct would be backwards
+      # while M10a is still changing it. The value now is that these screens have never
+      # been looked at — three interface faults reached a user because they were reasoned
+      # about instead, and a fourth (the plan list's bottom bar overlapping its own last
+      # entry) was found by the first picture ever taken of that screen.
+      - name: Render screenshots
+        run: |
+          ./gradlew :feature:editor:recordRoborazziDebug \
+                    :feature:projects:recordRoborazziDebug \
+                    :feature:capture:recordRoborazziDebug \
+                    :app:recordRoborazziDebug --stacktrace
+
+      - name: Publish the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: |
+            feature/editor/build/outputs/roborazzi/
+            feature/projects/build/outputs/roborazzi/
+            feature/capture/build/outputs/roborazzi/
+            app/build/outputs/roborazzi/
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Gradle puts the reason a test failed into an HTML report, which on CI is a file
+      # nobody can open without downloading an artifact. Reading it cost two full round
+      # trips through this pipeline to learn one sentence, so the sentence is printed.
+      - name: Surface test failures
+        if: failure()
+        run: |
+          echo "════════ TEST FAILURES ════════"
+          python3 .github/scripts/print-test-failures.py
+          echo "════════ END TEST FAILURES ════════"
+
       # Kotlin prints diagnostics before the failure marker, and a long Gradle stack
       # trace then buries them. Anyone reading only the end of the log — including
       # tooling that can fetch just the tail — would never see the actual error, so
@@ -76,6 +161,42 @@ jobs:
           echo "════════ COMPILER DIAGNOSTICS ════════"
           grep -E "^e: |^w: |error:" /tmp/build.log | head -80 || echo "(no diagnostics matched)"
           echo "════════ END DIAGNOSTICS ════════"
+
+      # The signature must not change between builds. If it does, every phone with the
+      # app installed gets "App not installed" on the next update, with no explanation
+      # and no recovery but uninstalling — which takes the user's saved plans with it.
+      # This is what happened before the debug keystore was committed: AGP was signing
+      # with a throwaway key from the runner image, and the key changed when the image
+      # rolled. Checked here rather than trusted, because the failure is silent at build
+      # time and only shows up on a device.
+      - name: Check the APK signature has not changed
+        env:
+          EXPECTED: a2e4157b87138855a12254197276fd8dbabf6c8234f73285755606ab31bbe7f8
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          APKSIGNER=$(find "$SDK/build-tools" -name apksigner -type f 2>/dev/null | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::apksigner not found under $SDK/build-tools - cannot verify signing."
+            exit 1
+          fi
+
+          # Kept whole rather than piped straight into a filter, so a mismatch can be
+          # diagnosed from the log instead of by re-running this by hand.
+          CERTS=$("$APKSIGNER" verify --print-certs app/build/outputs/apk/debug/app-debug.apk 2>&1)
+          # Matched loosely on purpose. Build-tools 36 prints "Signer #1 certificate
+          # SHA-256 digest:" and newer versions print "V2 Signer: certificate SHA-256
+          # digest:", so pinning either spelling ties this check to whichever build-tools
+          # the runner image happens to ship.
+          ACTUAL=$(printf '%s\n' "$CERTS" | awk '/certificate SHA-256 digest/ {print $NF; exit}')
+
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::APK signing key changed - installed builds could not update."
+            echo "expected: $EXPECTED"
+            echo "actual:   ${ACTUAL:-(could not be read)}"
+            printf '%s\n' "$CERTS"
+            exit 1
+          fi
+          echo "signer verified: $ACTUAL"
 
       - name: Stage the APK
         run: cp app/build/outputs/apk/debug/app-debug.apk measure-dev.apk
@@ -102,7 +223,8 @@ jobs:
           Install straight from your phone: tap the APK below. You will need to allow
           installs from unknown sources for your browser the first time.
 
-          Debug-signed, so this cannot be published to the Play Store as-is."
+          Debug-signed with the repository's fixed key, so updates install over each
+          other. Cannot be published to the Play Store as-is."
 
           if gh release view dev >/dev/null 2>&1; then
             gh release upload dev measure-dev.apk --clobber

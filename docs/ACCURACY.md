@@ -210,6 +210,14 @@ are synthetic and therefore optimistic about tracking behaviour; they establish 
 maths works, not that the phone does. Real-device numbers replace them once the
 recorded-session corpus exists.
 
+*First result on real hardware.* A small four-corner room captured on a Galaxy A36 5G
+closed to **0.4% of its perimeter** — well inside the 2% threshold at which the pipeline
+adjusts silently, and inside the ±1–3% per-wall figure promised above. Floor lock was
+immediate and the live plan matched the room's shape. One measured room is an anecdote,
+not a validation, but it is the first evidence that the maths behaves on a phone the way
+it behaves on synthetic data. Ground-truth wall lengths were not captured, so per-wall
+error is still unmeasured.
+
 **Recorded-session regression tests.** ARCore has a Recording and Playback API: capture a
 real AR session once, complete with camera and sensor data, then replay it deterministically
 on-device. That gives repeatable end-to-end accuracy tests over genuine data — the same
