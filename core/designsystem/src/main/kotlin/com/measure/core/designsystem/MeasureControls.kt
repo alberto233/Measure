@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -411,6 +412,33 @@ fun MeasureField(
                 field()
             }
         },
+    )
+}
+
+/**
+ * A raised surface with an edge.
+ *
+ * The edge is the entire component. `Panel` and `Surface` are both white in this direction,
+ * so a card that sets only a background has no boundary at all — on hardware the editor's
+ * status banners had their text sitting directly on the drawing with the plan's own lines
+ * running behind it, which reads as a rendering fault rather than as a card.
+ *
+ * Opaque for the same reason: whatever this covers must stop being visible.
+ */
+@Composable
+fun MeasureCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(MeasureShape.Panel)
+    Column(
+        modifier
+            .clip(shape)
+            .background(MeasureColours.Panel)
+            .border(Hairline, MeasureColours.Line, shape)
+            .padding(MeasureSpace.Snug),
+        verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair),
+        content = content,
     )
 }
 

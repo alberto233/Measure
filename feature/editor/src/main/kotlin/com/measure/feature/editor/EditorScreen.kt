@@ -38,6 +38,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.measure.core.data.SavedRoom
 import com.measure.core.designsystem.MeasureButton
+import com.measure.core.designsystem.MeasureCard
 import com.measure.core.designsystem.MeasureChip
 import com.measure.core.designsystem.MeasureColours
 import com.measure.core.designsystem.MeasureField
@@ -241,13 +242,25 @@ fun EditorScreen(
                     delay(MESSAGE_DURATION_MS)
                     viewModel.dismissMessage()
                 }
+                // A light card, not the dark slab it was. That slab was correct while the
+                // whole app was dark and is now the only black thing on a white screen,
+                // which reads as a leftover rather than as a message.
                 Text(
                     text = text,
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MeasureColours.Scrim)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .clip(RoundedCornerShape(MeasureShape.Panel))
+                        .background(MeasureColours.Panel)
+                        .border(
+                            1.dp,
+                            if (viewModel.messageIsWarning) {
+                                MeasureColours.Warning
+                            } else {
+                                MeasureColours.Ready
+                            },
+                            RoundedCornerShape(MeasureShape.Panel),
+                        )
+                        .padding(horizontal = MeasureSpace.Base, vertical = MeasureSpace.Snug),
                     // Amber for a refusal, teal for something that worked. Confirming a
                     // success in the colour used for problems teaches people to read
                     // every message as a problem, and then to stop reading them.
@@ -370,14 +383,7 @@ private fun TopBar(
  */
 @Composable
 private fun UnrelatedCapturesNote() {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MeasureColours.Panel)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
+    MeasureCard(Modifier.fillMaxWidth().padding(horizontal = MeasureSpace.Base)) {
         Text(
             text = "Rooms from separate captures",
             color = MeasureColours.Warning,
@@ -406,16 +412,12 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
     val pending = viewModel.pendingEnd
     val drawing = viewModel.drawing
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MeasureColours.Panel)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+    MeasureCard(Modifier.fillMaxWidth().padding(horizontal = MeasureSpace.Base)) {
+      Row(
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
-    ) {
+      ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = when {
@@ -459,6 +461,7 @@ private fun MeasuringBanner(viewModel: EditorViewModel) {
                 )
             }
         }
+      }
     }
 }
 

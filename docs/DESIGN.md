@@ -161,8 +161,30 @@ The editor's bottom sheet was called out specifically: *"the cards don't work pr
   difference. `Panel` and `Surface` are the same white here, so without the line the sheet
   has no top edge at all — which is exactly what the dark build looked like.
 - Two anchors, peek and expanded. Never free height.
+- **Both anchors are capped by what the content needs.** The sheet measures its content and
+  never grows past it. Before this it opened at 62% of the screen whatever was in it, so a
+  two-line readout spent most of that on white space *while covering the drawing the user
+  was reading it about*. On this screen an oversized sheet is not a neutral choice: the plan
+  is the thing it hides. Short content collapses both anchors onto each other, and the sheet
+  correctly stops being draggable — there is nothing to expand to.
 
-## 9. What this does not cover
+## 9. Cards need an edge, not a fill
+
+`Panel` and `Surface` are the same white, so a card that sets only a background has no
+boundary at all. On hardware the editor's status banners had their text sitting directly on
+the plan with the drawing's own lines running behind it, which reads as a rendering fault
+rather than as a card.
+
+`MeasureCard` is therefore hairline-bordered and opaque, and it is what every banner, note
+and floating message uses. Nothing may reach for `Panel` as a background without also taking
+a `Line` border.
+
+The same change retired the last dark surface outside the camera: the editor's transient
+message was a black slab, which was right while the whole app was dark and became the only
+black thing on a white screen — a leftover rather than a message. It is a light card with a
+state-coloured edge now.
+
+## 10. What this does not cover
 
 - **The exports** are light-on-white already and own their own palette, in `PlanDrawing` and
   `SvgExporter`. They get printed. They are not this.

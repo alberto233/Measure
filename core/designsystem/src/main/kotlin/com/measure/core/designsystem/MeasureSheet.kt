@@ -21,11 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -68,12 +72,25 @@ fun MeasureSheet(
         val density = LocalDensity.current
         val available = maxHeight
 
-        // Never taller than there is room for, and never shorter than the peek — on a small
-        // screen or with a large system font the two can meet, and the sheet then simply
-        // stops being draggable rather than inverting.
-        val peekPx = with(density) { peekHeight.coerceAtMost(available).toPx() }
-        val expandedPx = with(density) { (available * expandedFraction).toPx() }
-            .coerceAtLeast(peekPx)
+        // What the content actually needs, measured rather than assumed.
+        //
+        // Without this the sheet was always the same height whatever was in it: a wall
+        // panel and a two-line readout both opened at 62% of the screen, and the readout
+        // spent most of that on white space while covering the drawing the user was
+        // reading it about. A sheet that is bigger than its contents is not a neutral
+        // choice on this screen — the plan is what it is hiding.
+        var contentPx by remember { mutableIntStateOf(0) }
+        var headerPx by remember { mutableIntStateOf(0) }
+        val wantedPx = (contentPx + headerPx).toFloat()
+
+        val ceilingPx = with(density) { (available * expandedFraction).toPx() }
+        val floorPx = with(density) { peekHeight.coerceAtMost(available).toPx() }
+
+        // Both anchors are capped by what the content needs. Short content collapses the
+        // two onto each other, which is correct: there is nothing to expand *to*, so the
+        // sheet stops being draggable rather than offering a gesture that reveals nothing.
+        val expandedPx = wantedPx.coerceIn(MINIMUM_PX, ceilingPx)
+        val peekPx = minOf(floorPx, expandedPx)
 
         val height = remember { Animatable(if (expanded) expandedPx else peekPx) }
         val scope = rememberCoroutineScope()
@@ -110,6 +127,7 @@ fun MeasureSheet(
             Box(
                 Modifier
                     .fillMaxWidth()
+                    .onSizeChanged { headerPx = it.height }
                     .draggable(
                         state = drag,
                         orientation = Orientation.Vertical,
@@ -142,14 +160,24 @@ fun MeasureSheet(
                 )
             }
 
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(scrollState)
-                    .padding(start = MeasureSpace.Base, end = MeasureSpace.Base, bottom = MeasureSpace.Base),
-                verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
-                content = content,
-            )
+            Column(Modifier.fillMaxWidth().verticalScroll(scrollState)) {
+                // Nested so its natural height can be measured. Inside a vertical scroll
+                // the child is given unbounded height, so this reports what the content
+                // wants rather than what the sheet is currently giving it — which is the
+                // number the anchors above are derived from.
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { contentPx = it.height }
+                        .padding(
+                            start = MeasureSpace.Base,
+                            end = MeasureSpace.Base,
+                            bottom = MeasureSpace.Base,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
+                    content = content,
+                )
+            }
         }
     }
 }
@@ -174,3 +202,6 @@ private const val ExpandedFraction = 0.62f
 
 private val HandleWidth = 36.dp
 private val HandleHeight = 4.dp
+
+/** Enough for the handle and one line, before anything has been measured. */
+private const val MINIMUM_PX = 1f
