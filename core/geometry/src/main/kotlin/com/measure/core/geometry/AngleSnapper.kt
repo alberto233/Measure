@@ -43,41 +43,52 @@ class AngleSnapper(
         return SnapResult(axisBearing = axis, snaps = snaps)
     }
 
-    /**
-     * The room's dominant axis, modulo 90°, as a length-weighted circular mean.
-     *
-     * Taking the longest wall alone would work, but it throws away the evidence of every
-     * other wall. Mapping each bearing θ to 4θ folds the four-fold symmetry of a
-     * rectilinear frame onto the full circle, where a circular mean is well defined;
-     * dividing by four maps it back. Long walls dominate, which is what we want, since
-     * a long wall's bearing is measured far more precisely than a short one's.
-     */
-    private fun estimateAxis(edges: List<Polygon.Edge>): Double {
-        var sumX = 0.0
-        var sumY = 0.0
-        for (edge in edges) {
-            val weight = edge.length
-            val folded = 4.0 * edge.bearing
-            sumX += weight * cos(folded)
-            sumY += weight * sin(folded)
-        }
-        if (abs(sumX) < Vec2.EPSILON && abs(sumY) < Vec2.EPSILON) return 0.0
-        return atan2(sumY, sumX) / 4.0
-    }
-
-    /** Folds an angle into (-PI, PI]. */
-    private fun normalise(angle: Double): Double {
-        var a = angle
-        while (a > PI) a -= 2 * PI
-        while (a <= -PI) a += 2 * PI
-        return a
-    }
+    private fun estimateAxis(edges: List<Polygon.Edge>): Double =
+        axisOf(edges.map { WallBearing(it.bearing, it.length) })
 
     companion object {
         /** Six degrees. Loose enough for hand-held capture, tight enough to respect a real bay. */
         val DEFAULT_TOLERANCE = Math.toRadians(6.0)
+
+        /**
+         * The dominant axis of a set of walls, modulo 90°, as a length-weighted circular mean.
+         *
+         * Taking the longest wall alone would work, but it throws away the evidence of every
+         * other wall. Mapping each bearing θ to 4θ folds the four-fold symmetry of a
+         * rectilinear frame onto the full circle, where a circular mean is well defined;
+         * dividing by four maps it back. Long walls dominate, which is what we want, since
+         * a long wall's bearing is measured far more precisely than a short one's.
+         *
+         * Exposed, and taking bearings rather than [Polygon.Edge], because capture needs the
+         * same frame from an *open* chain of corners — there is no polygon yet while the user
+         * is still walking the room. Two implementations of this would be two definitions of
+         * which way the room faces, and a live snap that disagreed with the solve it is
+         * previewing would be worse than no snap at all.
+         */
+        fun axisOf(walls: List<WallBearing>): Double {
+            var sumX = 0.0
+            var sumY = 0.0
+            for (wall in walls) {
+                val folded = 4.0 * wall.bearing
+                sumX += wall.length * cos(folded)
+                sumY += wall.length * sin(folded)
+            }
+            if (abs(sumX) < Vec2.EPSILON && abs(sumY) < Vec2.EPSILON) return 0.0
+            return atan2(sumY, sumX) / 4.0
+        }
+
+        /** Folds an angle into (-PI, PI]. */
+        fun normalise(angle: Double): Double {
+            var a = angle
+            while (a > PI) a -= 2 * PI
+            while (a <= -PI) a += 2 * PI
+            return a
+        }
     }
 }
+
+/** A wall reduced to what [AngleSnapper.axisOf] needs: which way it runs, and how much it counts. */
+data class WallBearing(val bearing: Double, val length: Double)
 
 data class EdgeSnap(
     val edgeIndex: Int,
