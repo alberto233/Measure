@@ -50,11 +50,18 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+# Supplies MigrationTestHelper, which builds an old database from the checked-in schema
+# JSON rather than from hand-written DDL. That distinction is the whole value: a test that
+# creates v1 by hand tests the transcription, not the schema users actually have.
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit5" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version = "1.11.4" }
 
 junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
+# Lets :core:data keep its JUnit 5 tests while running the migration test, which is
+# JUnit 4 because both Robolectric's runner and Room's MigrationTestHelper rule are.
+junit-vintage-engine = { group = "org.junit.vintage", name = "junit-vintage-engine", version.ref = "junit5" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTest" }
 # Versioned by the Compose BOM, like the rest of Compose.

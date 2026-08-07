@@ -77,6 +77,11 @@ jobs:
       # search and sort — but it is an Android library, so its tests need the SDK and
       # cannot run in the JVM job above. They were therefore never run anywhere at all.
       # Run here, where the SDK is, rather than left as tests nobody executes.
+      #
+      # This step also carries MigrationTest, which upgrades a seeded v1 database all the
+      # way to the current version and reads it back. It is the only thing standing between
+      # a hand-written migration and somebody's saved plans, so a failure here should be
+      # read as "this release eats user data", not as a flaky test.
       - name: Test the data layer
         run: ./gradlew :core:data:testDebugUnitTest --stacktrace
 

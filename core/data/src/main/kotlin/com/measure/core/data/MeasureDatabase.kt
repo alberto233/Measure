@@ -178,28 +178,55 @@ abstract class MeasureDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Every migration, in order, as one list.
+         *
+         * A single list rather than six arguments spelled out at the call site, because the
+         * migration test has to be able to register exactly what the app registers. Given
+         * two lists, a migration could be written, tested, and then left out of the builder
+         * — and the test would still pass while upgrades on real phones crashed.
+         */
+        val MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+        )
+
         @Volatile
         private var instance: MeasureDatabase? = null
 
         fun get(context: Context): MeasureDatabase =
             instance ?: synchronized(this) {
-                instance ?: build(context.applicationContext).also { instance = it }
+                instance ?: builder(context.applicationContext).build().also { instance = it }
             }
 
-        private fun build(context: Context): MeasureDatabase =
-            Room.databaseBuilder(context, MeasureDatabase::class.java, NAME)
-                // Cascading deletes are declared on the entities and are load-bearing:
-                // Room does not switch foreign keys on for you.
+        /**
+         * How the app opens its database — and, deliberately, how the migration test opens
+         * it too.
+         *
+         * Exposed rather than inlined into [get] so that the test upgrading a v1 file is
+         * upgrading it through this configuration, not through a second one written to
+         * resemble it. Journal mode and the migration list both affect whether an upgrade
+         * succeeds, so a test that reconstructed them separately would be testing its own
+         * copy of the setup.
+         */
+        internal fun builder(
+            context: Context,
+            name: String = NAME,
+        ): RoomDatabase.Builder<MeasureDatabase> =
+            Room.databaseBuilder(context, MeasureDatabase::class.java, name)
                 .setJournalMode(JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(
-                    MIGRATION_1_2,
-                    MIGRATION_2_3,
-                    MIGRATION_3_4,
-                    MIGRATION_4_5,
-                    MIGRATION_5_6,
-                    MIGRATION_6_7,
-                )
-                .build()
+                // Nothing here switches foreign keys on, and they are on: Room enables them
+                // itself when it opens a database. This line used to carry a comment saying
+                // the opposite, which mattered because the cascading deletes declared on the
+                // entities are load-bearing — orphaned corners are not a state the app
+                // should be able to reach. `MigrationTest.deletesStillCascadeAfterAnUpgrade`
+                // now establishes that on an upgraded file rather than leaving it asserted
+                // in a comment.
+                .addMigrations(*MIGRATIONS)
     }
 }
 

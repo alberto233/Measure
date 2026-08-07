@@ -10,7 +10,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | --- | --- |
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
-| `:core:data` | Room database, repository, project search and sort. 23 tests |
+| `:core:data` | Room database, repository, project search and sort. 32 tests, 9 of them the migration test that walks a seeded v1 database to v7 |
 | Interface tests | Robolectric-hosted Compose tests, 3, plus 19 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |
@@ -20,7 +20,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test the light direction.** Then M10c. See below |
+| Next | **Field test the light direction.** Then M10c. See below. The migration test that blocked it is done |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -510,6 +510,47 @@ place that knows how a repository is built, and is the seam Hilt slots into when
 a graph worth wiring; introducing a framework to hand out one object would be ceremony
 ahead of need.
 
+### Migrations, and what makes them checkable
+
+The database is at **v7** with seven hand-written migrations. Until `MigrationTest` they
+had never been run against a database containing anything — Room compiled them, so the SQL
+was known to parse, but whether a phone holding real measurements arrives at v7 with those
+measurements intact was inferred from reading the SQL rather than observed.
+
+That gap is worth more here than in most apps. A row in this database is a room somebody
+walked with a phone, or a wall they measured with a tape. Losing it means asking them to do
+the work again, which is the work the app exists to save — hence no
+`fallbackToDestructiveMigration`, anywhere, ever.
+
+`core/data/src/test/kotlin/.../MigrationTest.kt` runs on Robolectric in the `android` CI
+job and checks four separate things:
+
+| Check | Catches |
+| --- | --- |
+| Every shipped version has a checked-in schema | A version whose upgrade nobody can ever test |
+| The registered list is an unbroken 1→7 chain | A migration written but left out of `addMigrations` |
+| Every version upgrades to the current one | A migration producing *nearly* the right table |
+| A seeded v1 database survives the walk, and the app then opens and reads it | Silent data loss, which schema validation cannot see |
+
+The last row is the point. `runMigrationsAndValidate` checks that v7 *looks* like v7; a
+migration that empties every table passes it. Each check above was confirmed to fail when
+the corresponding fault was deliberately reintroduced, including a migration that quietly
+deleted every corner — invisible to schema validation, caught by the data assertions.
+
+Two rules follow, and both are enforced by that test rather than by memory:
+
+- **Commit the exported schema in the same commit that bumps the version.** KSP writes
+  `core/data/schemas/…/<version>.json` on every build; it is a source file, not a build
+  artifact. `6.json` was never committed, so the v5→v6 and v6→v7 hops were untestable by
+  anyone until it was recovered by rebuilding at the commit that introduced v6.
+- **Register migrations through `MeasureDatabase.MIGRATIONS`,** the single list both the
+  builder and the test use. Two lists means a migration can be written, tested and then
+  left out of the one that ships.
+
+Adding v8 means extending `MigrationTest`'s seed data and assertions;
+`theCurrentVersionIsTheOneThisTestWalksTo` fails until that happens, rather than letting
+the suite pass while testing one version short of where phones end up.
+
 ### A solve is only repeatable from the observations
 
 Corners store **two** positions: where the solve put them, which is what the plan draws,
@@ -555,6 +596,9 @@ risk in exchange for features we do not use. Revisit if the 3D view in M9 needs 
   should, because that is the code that can be tested quickly and exhaustively.
 - **Report uncertainty.** See `docs/ACCURACY.md`. Values carry a sigma and are displayed
   as `3.42 m ±3 cm`.
+- **Never migrate destructively.** A schema change ships with a hand-written migration, the
+  exported schema JSON, and an extension to `MigrationTest`. Re-measuring a room means
+  walking it again with a tape.
 
 ## 6. Optional setup script
 
@@ -858,20 +902,26 @@ past it, because the screen is used indoors in the evening.
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of
   them want a recorded-session corpus behind them before they harden into promises.
-- **Migrations are written but never run against real data.** The schema is at version 7
-  with six hand-written migrations (walls table; measured corner positions; openings;
-  plan measurements; capture session; project reference). All six are straightforward and Room validates them against the exported schemas at
-  compile time,
-  but no upgrade has been performed on a device holding actual plans. `fallbackToDestructiveMigration`
-  is deliberately not used: re-measuring a room means walking it again with a tape, which
-  is exactly the work this app exists to save.
+- ~~**Migrations are written but never run against real data.**~~ **Closed.** The schema is
+  at version 7 with six hand-written migrations (walls table; measured corner positions;
+  openings; plan measurements; capture session; project reference), and `MigrationTest` now
+  seeds a version-1 database with two measured rooms and a standalone distance, walks it to
+  v7, and reads it back through the real DAOs. Every version from 1 to 6 is also checked to
+  reach v7, because users do not upgrade one release at a time. See "Migrations, and what
+  makes them checkable" above.
 
-  Two gaps in the exported schemas, found while committing `7.json`: **`6.json` was never
-  committed** — the export writes only the current version, so a schema is lost unless
-  somebody commits it in the same change that bumped the version — and no test opens a
-  version-1 database and migrates it forward. The second is the one that matters; a
-  migration test with a seeded old database is a day's work and is the only thing that
-  would turn "Room validated the SQL" into "the upgrade works".
+  Both exported-schema gaps are closed too. **`6.json` had never been committed** — the
+  export writes only the current version, so a schema is lost unless somebody commits it in
+  the change that bumped the version — and it was recovered by rebuilding `:core:data` at
+  `808a889`, the commit that introduced v6, rather than hand-written to look plausible. A
+  test now fails if any version's schema is missing, which is the only reason the next one
+  will not be lost the same way.
+
+  What this does *not* cover: the migrations have still never run on a physical phone. The
+  test runs on Robolectric, so it exercises the SQL, the data and Room's own validation, but
+  not a real device's SQLite build or a database that has been through years of WAL
+  checkpoints. That is a much smaller gap than the one it replaces, and the honest way to
+  close it is the first beta upgrade rather than another test.
 - **The plan-wide overall dimension is gone, deliberately**, along with plan-wide chains.
   It is the number people want for "how wide is the flat", and it comes back the moment
   the app knows a shared wall rather than inferring one from where it drew two rooms.
