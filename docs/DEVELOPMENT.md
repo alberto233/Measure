@@ -11,17 +11,17 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database, repository, project search and sort. 32 tests, 9 of them the migration test that walks a seeded v1 database to v7 |
-| Interface tests | Robolectric-hosted Compose tests, plus 21 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`. The first thing here that renders a screen and looks at it |
+| Interface tests | Robolectric-hosted Compose tests, plus 23 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |
-| `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection |
+| `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection, the live rectilinear corner assist (on by default, toggleable) |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:feature:onboarding` | M10c: the accuracy guidance, shown on first run and reopenable from the home screen. 6 tests, 2 screenshots |
 | `:app` | Assembly, and the device check — Compose now, with its verdict first |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test the light direction.** M10c is under way: crash reporting and the accuracy guidance are done; onboarding polish, device calibration, localisation and the store listing remain |
+| Next | **Field test the corner assist and the light direction.** M10c is under way: crash reporting and the accuracy guidance are done; onboarding polish, device calibration, localisation and the store listing remain |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -551,6 +551,42 @@ Two rules follow, and both are enforced by that test rather than by memory:
 Adding v8 means extending `MigrationTest`'s seed data and assertions;
 `theCurrentVersionIsTheOneThisTestWalksTo` fails until that happens, rather than letting
 the suite pass while testing one version short of where phones end up.
+
+### The corner assist squares the aim, not the measurement
+
+`CornerSnapper` applies the rectilinear prior *while aiming* rather than only during the
+solve. Once one wall is known the next runs square to it, so only the distance along it is
+still in the user's hands — two degrees of freedom become one. Given three corners of a
+rectangle the fourth is determined outright and becomes zero, which is the snap that feels
+like corner detection.
+
+It adds **no new sensing** and cannot invent a corner. It moves a point the user already
+aimed at, never more than 25 cm, and not at all when the wall is outside tolerance of the
+frame. A 45° splay comes through untouched.
+
+Three things hold it honest, and each has a test:
+
+- **The observation is never modified.** The raw hit goes to `measuredX/measuredY`, the
+  snapped point to `x/y`. Turning the assist off — or reverting it out of the app — makes
+  every room captured while it was on re-solve to exactly what the camera saw. The burst
+  aggregator is fed the raw aim for this reason, never the snapped one.
+- **The intersection snap is offered only for a fourth corner.** It is the one snap that
+  moves a point *along* a wall, changing a measured length, so it is restricted to the case
+  where the answer is determined. On an L-shaped room an unrestricted version computes a
+  confident intersection that is not a corner of anything — the M11 failure mode exactly.
+- **The closing observation is never snapped.** The gap between it and the first corner
+  *is* the measured drift the compass rule distributes (M7); squaring it would adjust away
+  the quantity being measured.
+
+The assist is **visible**: the reticle grows a second ring in the accent colour when it is
+holding a point away from the aimed pixel. An app that silently places a corner somewhere
+other than where you pointed reads as broken; the same behaviour with a lock ring reads as
+help, and the difference is only whether the screen says so.
+
+Unproven on hardware. The honest expectation is that most of the benefit is in how capture
+*feels* rather than in the final numbers, since `AngleSnapper` already squares bearings
+during the solve — the exception being the fourth-corner snap, which is a real accuracy
+gain. That is what the field test has to settle.
 
 ### A solve is only repeatable from the observations
 

@@ -28,6 +28,15 @@ internal fun Reticle(
     hasTarget: Boolean,
     samplingProgress: Float?,
     showAlignmentAxes: Boolean = false,
+    /**
+     * Whether the rectilinear assist is holding the point somewhere other than dead centre.
+     *
+     * Shown, and not merely applied. The corner is about to be placed away from the pixel
+     * the user is aiming at, and an app that does that silently reads as broken aim; the
+     * same behaviour with a visible lock reads as help. The marker in the scene is already
+     * drawn at the snapped position, so the ring is what explains why it has moved.
+     */
+    snapped: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val colour = when {
@@ -76,6 +85,16 @@ internal fun Reticle(
                 end = centre + direction * tickOuter,
                 strokeWidth = stroke,
             )
+        }
+
+        // A second ring outside the first, in the accent used nowhere else on this screen.
+        // Distinct from the ready/blocked colours, which carry a different meaning and must
+        // not be overloaded: those say whether a capture would be accepted, this says where
+        // it would land.
+        if (snapped) {
+            val lockRadius = outer + stroke * 4f
+            drawCircle(Color.Black.copy(alpha = 0.35f), lockRadius, centre, style = Stroke(stroke * 1.8f))
+            drawCircle(MeasureColours.Accent, lockRadius, centre, style = Stroke(stroke))
         }
 
         if (samplingProgress != null) {

@@ -31,6 +31,8 @@ import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.CaptureOutcome
 import com.measure.core.geometry.capture.CaptureRejection
 import com.measure.core.geometry.capture.CeilingSelector
+import com.measure.core.geometry.capture.CornerHint
+import com.measure.core.geometry.capture.CornerSnapper
 import com.measure.core.geometry.capture.FloorSelector
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.MeasurementMode
@@ -39,6 +41,7 @@ import com.measure.core.geometry.capture.PointAggregator
 import com.measure.core.geometry.capture.PointSample
 import com.measure.core.geometry.capture.RangeAdvice
 import com.measure.core.geometry.capture.RangeGate
+import com.measure.core.geometry.capture.SnapKind
 import com.measure.core.geometry.capture.TrackingAssessor
 import com.measure.core.geometry.capture.TrackingIssue
 import com.measure.core.geometry.capture.TrackingQuality
@@ -81,6 +84,12 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
     @Volatile
     private var scene = ArScene()
+
+    /**
+     * One instance, holding the tuning. Stateless between calls — the walk so far is
+     * passed in — so it is safe to share with the render thread that drives every frame.
+     */
+    private val snapper = CornerSnapper()
 
     /**
      * Guards every use of [session] against its own lifecycle.
@@ -504,11 +513,27 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
         } else {
             null
         }
-        val movingEnd = constrained?.position ?: aim?.position.takeIf { anchor != null }
+        // The rectilinear assist, applied to what is drawn — docs/ACCURACY.md M6.
+        //
+        // Live rather than at the moment of the tap, deliberately: the point of it is to
+        // take the fiddliest part of capture out of the user's hands, and an assist that
+        // only reveals itself after the shutter cannot do that. The reticle visibly rides
+        // the wall, and the HUD says why.
+        val hint = cornerHint(currentScene, aim, floor)
+        val aimed = aim?.position?.let { raw ->
+            // Back into world space at the hit's own height. The room lives on the floor
+            // plane, so only the horizontal pair moves.
+            hint?.let { Vec3(it.position.x, raw.y, -it.position.y) } ?: raw
+        }
 
+        val movingEnd = constrained?.position ?: aimed.takeIf { anchor != null }
+
+        // Raw, always. The burst aggregator produces the *observation* that gets stored in
+        // `measuredX/measuredY`, and feeding it a snapped point would bake the assist into
+        // the measurement — the one thing that would make this feature unrevertible.
         collectBurstSample(aim, tracking.quality)
 
-        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, aim?.position, floor?.height)
+        drawScene(session, currentScene, cameraPosition, anchor, movingEnd, aimed, floor?.height)
 
         val preview = if (anchor != null && movingEnd != null) {
             MeasurementPreview(
@@ -522,13 +547,44 @@ class MeasureArController(private val context: Context) : GLSurfaceView.Renderer
 
         publish(
             tracking = tracking,
-            target = aim?.let { ReticleTarget(it.position, it.range, it.source) },
+            target = aim?.let {
+                ReticleTarget(
+                    position = aimed ?: it.position,
+                    range = it.range,
+                    source = it.source,
+                    snap = hint?.kind ?: SnapKind.NONE,
+                    observed = it.position,
+                )
+            },
             preview = preview,
             anchors = screenAnchors(currentScene, anchor, movingEnd),
             floor = floor,
             offFloor = offFloor,
             ceilingHeight = ceilingHeight,
         )
+    }
+
+    /**
+     * The rectilinear assist for the point currently under the reticle, or null.
+     *
+     * Null in every case where there is nothing to be confident about: outside room
+     * capture, with the assist switched off, once the perimeter is closed, or before the
+     * floor is established. [CornerSnapper] declines on its own terms too — this only
+     * decides whether to ask it.
+     *
+     * Returns null rather than an unsnapped hint so the caller can use elvis throughout,
+     * and so "the assist did nothing" and "the assist was not consulted" collapse into the
+     * same branch. They are the same thing to everyone downstream.
+     */
+    private fun cornerHint(scene: ArScene, aim: RankedHit?, floor: FloorState?): CornerHint? {
+        if (aim == null || floor == null) return null
+        if (!scene.snapEnabled || scene.roomClosed) return null
+        if (scene.captureMode != CaptureMode.ROOM) return null
+
+        return snapper.hint(
+            captured = scene.roomCorners.map { it.toFloorPlane() },
+            observed = aim.position.toFloorPlane(),
+        ).takeIf { it.isSnapped }
     }
 
     /**

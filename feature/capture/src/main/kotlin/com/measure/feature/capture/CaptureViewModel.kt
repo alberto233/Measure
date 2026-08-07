@@ -18,8 +18,10 @@ import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolution
 import com.measure.core.geometry.RoomSolver
 import com.measure.core.geometry.Vec2
+import com.measure.core.geometry.Vec3
 import com.measure.core.geometry.capture.CaptureOutcome
 import com.measure.core.geometry.capture.ClosingIntent
+import com.measure.core.geometry.capture.CornerSnapper
 import com.measure.core.geometry.capture.LoopClosure
 import com.measure.core.geometry.capture.MeasuredSegment
 import com.measure.core.geometry.capture.MeasurementMode
@@ -73,6 +75,18 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     var showPlanes by mutableStateOf(true)
         private set
 
+    /**
+     * The capture-time rectilinear assist — docs/ACCURACY.md M6.
+     *
+     * **On by default**, which is a deliberate choice and not an oversight. A feature
+     * defaulted off is a feature nobody field-tests, and this one is only worth keeping if
+     * it makes a real capture easier; that cannot be learned from a setting nobody finds.
+     * It stays a toggle because a room with a genuine bay is a room where the user knows
+     * better than the prior does.
+     */
+    var snapEnabled by mutableStateOf(true)
+        private set
+
     /** The first point of a measurement in progress, waiting for its partner. */
     var pending by mutableStateOf<SampledPoint?>(null)
         private set
@@ -92,8 +106,28 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     var captureMode by mutableStateOf(CaptureMode.ROOM)
         private set
 
-    /** Corners in walk order, each already projected onto the floor plane by `:ar`. */
+    /**
+     * Corners in walk order, each already projected onto the floor plane by `:ar`.
+     *
+     * **These are the observations, and nothing ever modifies them.** They are what the
+     * camera reported and what gets written to `measuredX/measuredY`, so that a re-solve
+     * is idempotent and the rectilinear assist can be switched off — or reverted out of
+     * the app entirely — without any room captured while it was on being stuck with it.
+     */
     val roomCorners = mutableStateListOf<SampledPoint>()
+
+    /**
+     * The same corners with the assist applied, which is what gets drawn and solved.
+     *
+     * Derived on read rather than stored alongside the observations. Two lists kept in
+     * step is two lists that can fall out of step, and the failure would be silent: a plan
+     * showing one room while the database held another.
+     */
+    val snappedCorners: List<Vec2>
+        get() = roomCorners.map { it.position.toFloorPlane() }
+            .let { if (snapEnabled) snapper.snapChain(it) else it }
+
+    private val snapper = CornerSnapper()
 
     /**
      * The ceiling height ARCore has seen, if any.
@@ -235,6 +269,23 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         pushScene()
     }
 
+    /**
+     * Turning the assist off takes effect on the corners already walked, not just the next
+     * one.
+     *
+     * [snappedCorners] is derived rather than stored, so the plan redraws from the raw
+     * observations the moment this flips — which is the honest behaviour. Storing the
+     * snapped points instead would leave a room half squared and half not, with no way to
+     * tell which corners had been moved.
+     */
+    fun toggleSnap() {
+        snapEnabled = !snapEnabled
+        notice = CaptureNotice.Advice(
+            if (snapEnabled) "Square corners on" else "Square corners off — corners land where you aim",
+        )
+        pushScene()
+    }
+
     /** Undo the half-finished measurement first, then the last completed one. */
     fun undo() {
         when (captureMode) {
@@ -364,10 +415,18 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
         val measured = roomCorners.map { it.position.toFloorPlane() }
         val sigmas = roomCorners.map { it.sigma }
+        // What the solver starts from: the walk as the user watched it square up. The
+        // observations go through untouched as `measured`, which is what the repository
+        // stores and what every later re-solve begins from.
+        val solving = snappedCorners
 
         finishRoom(
             capture = RoomCapture(
-                corners = measured.mapIndexed { index, position -> CapturedCorner(position, sigmas[index]) },
+                corners = solving.mapIndexed { index, position -> CapturedCorner(position, sigmas[index]) },
+                // Not snapped. The closing reading's whole value is that the gap between it
+                // and the first corner *is* the accumulated drift, measured directly
+                // (docs/ACCURACY.md M7). Squaring it would adjust away the very quantity
+                // the compass rule needs.
                 closingObservation = closingObservation?.position?.toFloorPlane(),
             ),
             measured = measured,
@@ -480,7 +539,12 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 segments = segments.map { ArSegment(it.id, it.from.position, it.to.position) },
                 pendingAnchor = pending?.position,
                 mode = mode,
-                roomCorners = roomCorners.map { it.position },
+                // The squared chain, so the live plan and the minimap show the room that
+                // will actually be saved. Lifted back to each corner's own height.
+                roomCorners = snappedCorners.mapIndexed { index, flat ->
+                    Vec3(flat.x, roomCorners[index].position.y, -flat.y)
+                },
+                snapEnabled = snapEnabled,
                 roomClosed = isRoomClosed,
                 showPlanes = showPlanes,
             ),

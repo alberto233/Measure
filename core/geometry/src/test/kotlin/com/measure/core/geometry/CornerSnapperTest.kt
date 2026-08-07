@@ -218,6 +218,54 @@ class CornerSnapperTest {
         )
     }
 
+    @Test
+    @DisplayName("a whole walk squares up, and a clean walk is left alone")
+    fun `snap chain`() {
+        val wobbly = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(5.0, 0.0),
+            Vec2(5.08, 4.0),
+            Vec2(0.06, 4.05),
+        )
+
+        val squared = snapper.snapChain(wobbly)
+
+        // The first two are always taken as aimed; the rest come onto the frame.
+        assertClose(Vec2(0.0, 0.0), squared[0])
+        assertClose(Vec2(5.0, 0.0), squared[1])
+        assertClose(Vec2(5.0, 4.0), squared[2])
+        assertClose(Vec2(0.0, 4.0), squared[3])
+
+        // Idempotent over the whole walk, not just per corner: re-running must not creep.
+        assertClose(squared[3], snapper.snapChain(squared)[3])
+    }
+
+    /**
+     * A cut corner survives the walk.
+     *
+     * The first version of this test used a wholly irregular quadrilateral and asserted
+     * nothing moved. It was wrong, and instructively so: the frame is a length-weighted
+     * mean of the walls themselves, so an irregular shape pulls the axis towards its own
+     * walls and several of them end up within tolerance of it. "Not a rectangle" does not
+     * imply "not rectilinear".
+     *
+     * A 45° splay is unambiguous — it is 45° from the frame whichever way the frame is
+     * fitted — so it is the honest way to assert that a real architectural angle is left
+     * alone. With `allowDiagonals` it would snap, which is the point of that flag.
+     */
+    @Test
+    @DisplayName("a deliberate 45 degree splay is not squared away")
+    fun `snap chain leaves a real angle alone`() {
+        val withSplay = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(5.0, 0.0),
+            Vec2(5.0, 3.0),
+            Vec2(3.5, 4.5),
+        )
+
+        assertEquals(withSplay, snapper.snapChain(withSplay))
+    }
+
     private fun assertClose(expected: Vec2, actual: Vec2, tolerance: Double = 1e-6) {
         assertTrue(
             hypot(expected.x - actual.x, expected.y - actual.y) <= tolerance,

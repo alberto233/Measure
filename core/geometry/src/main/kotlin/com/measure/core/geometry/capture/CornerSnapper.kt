@@ -131,6 +131,25 @@ class CornerSnapper(
         return CornerHint(onWall, observed, SnapKind.WALL_BEARING)
     }
 
+    /**
+     * Applies [hint] down a whole walk, each corner squared against the ones before it.
+     *
+     * Progressive, and over the *snapped* chain rather than the raw one, because that is
+     * what the user watched happen: each corner was placed against a plan that already had
+     * the previous corners squared into it. Re-deriving the room from raw observations at
+     * the end would produce a different room from the one on screen, and the live plan
+     * would have been a lie.
+     *
+     * Returns positions only. The caller keeps the observations — see [CornerHint].
+     */
+    fun snapChain(observed: List<Vec2>): List<Vec2> {
+        val snapped = ArrayList<Vec2>(observed.size)
+        for (point in observed) {
+            snapped += hint(snapped, point).position
+        }
+        return snapped
+    }
+
     /** The frame bearing nearest [bearing], or null if the aim is too far off it to be square. */
     private fun snapBearing(axis: Double, bearing: Double): Double? {
         val step = if (allowDiagonals) PI / 4 else PI / 2

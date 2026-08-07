@@ -43,6 +43,7 @@ import com.measure.ar.CaptureMode
 import com.measure.ar.ArSurfaceView
 import com.measure.ar.ArUiState
 import com.measure.ar.MeasureArController
+import com.measure.core.geometry.capture.SnapKind
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.delay
 import com.measure.core.designsystem.MeasureColours
@@ -108,6 +109,7 @@ fun CaptureScreen(
             // Only once a measurement is under way. Before that there is no trajectory to
             // hold, and permanent crosshairs over a camera feed are just clutter.
             showAlignmentAxes = state.preview != null,
+            snapped = state.target?.snap?.let { it != SnapKind.NONE } == true,
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -272,6 +274,16 @@ private fun BottomBar(
         if (!room) ModeSelector(viewModel.mode, viewModel::selectMode)
 
         CaptureModeSelector(viewModel.captureMode, viewModel::selectCaptureMode)
+
+        // Room only: there is no rectilinear frame to snap a free-standing distance to.
+        // Its own row rather than a fourth item beside the shutter, which is already the
+        // widest row on the screen and the one that must not start wrapping.
+        if (room) {
+            PillButton(
+                label = if (viewModel.snapEnabled) "Square corners: on" else "Square corners: off",
+                onClick = viewModel::toggleSnap,
+            )
+        }
 
         Row(
             Modifier.fillMaxWidth(),

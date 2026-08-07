@@ -6,6 +6,7 @@ import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.RangeAdvice
 import com.measure.core.geometry.capture.SamplingConfig
+import com.measure.core.geometry.capture.SnapKind
 import com.measure.core.geometry.capture.TrackingStatus
 
 /**
@@ -53,9 +54,23 @@ data class FloorState(
 
 /** Where the reticle is currently pointing, if anywhere. */
 data class ReticleTarget(
+    /**
+     * Where the corner would be placed — the snapped point when [snap] is not
+     * [SnapKind.NONE], and the raw hit otherwise. This is what is drawn.
+     */
     val position: Vec3,
     val range: Double,
     val source: HitSource,
+    /**
+     * Whether the rectilinear assist is holding this point, and how firmly.
+     *
+     * Published so the interface can show it. A reticle that silently stops following the
+     * user's aim reads as a bug; one that visibly locks onto a wall reads as help, and the
+     * difference is entirely whether the screen says which is happening.
+     */
+    val snap: SnapKind = SnapKind.NONE,
+    /** The raw hit, before any snap. Never the snapped point — see [CornerHint]. */
+    val observed: Vec3 = position,
 )
 
 /** Progress of an in-flight multi-frame sample burst, for the capture button animation. */
@@ -144,6 +159,8 @@ data class ArScene(
     /** True once the perimeter has been closed and there is nothing left to add. */
     val roomClosed: Boolean = false,
     val showPlanes: Boolean = true,
+    /** Whether the capture-time rectilinear assist is running — docs/ACCURACY.md M6. */
+    val snapEnabled: Boolean = true,
     val samplingConfig: SamplingConfig = SamplingConfig(),
 ) {
     companion object {
