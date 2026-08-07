@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher mark: a room in plan, with one corner picked out.
+
+  A floor plan rather than a ruler or a tape, because a plan is what this app produces and
+  what none of its competitors' icons show. The accent node on one corner is the specific
+  claim: corners are the thing being captured, and the corner assist is the thing that
+  makes capturing them bearable.
+
+  Drawn on the 108×108 adaptive-icon canvas. Everything sits inside the central 66×66 safe
+  zone, so no launcher mask — circle, squircle, teardrop — can clip any of it.
+
+  Colours are literal rather than references because a launcher icon is rasterised by the
+  system outside any theme, so a token here would be a token nothing could resolve. They
+  are `MeasureColours.Surface`, `Ink` and `Accent`; if the palette moves, this moves by
+  hand and `LauncherIconTest` renders the result to look at.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- The room: 44 × 34, in bars rather than a stroked path so the corners join square
+         the way a drawn plan does.
+
+         Sized against the *safe zone*, not the canvas. An adaptive icon is 108 wide but
+         only its central 72 survives every launcher mask, and the first version of this
+         was drawn to the canvas — which rendered as a mark filling the whole tile with the
+         corner node clipped off at the edge. The whole drawing, node included, now sits
+         inside 27..76.
+
+         Nudged two units up and left of the room's own centre, because the corner node
+         adds mass on one side and optical centring beats arithmetic centring. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,37 h44 v7 h-44 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,64 h44 v7 h-44 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,37 h7 v34 h-7 z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M69,37 h7 v34 h-7 z" />
+
+    <!-- The captured corner. Drawn last so it sits over the join, which is what a corner
+         node does on the plan renderer too. -->
+    <path
+        android:fillColor="#2F6BFF"
+        android:pathData="M35.5,40.5 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+</vector>

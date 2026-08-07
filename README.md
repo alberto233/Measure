@@ -30,6 +30,7 @@ record a point when tracking quality is too poor to trust.
 | Document | What's in it |
 | --- | --- |
 | [docs/PRODUCT_PLAN.md](docs/PRODUCT_PLAN.md) | Vision, target users, competitor teardown, positioning, monetization, risks, milestone roadmap |
+| [docs/STORE_LISTING.md](docs/STORE_LISTING.md) | Play listing copy, data safety answers, privacy policy, and what is still blocking submission |
 | [docs/FEATURES.md](docs/FEATURES.md) | The full feature list, prioritized and grouped by release |
 | [docs/TECHNICAL_DESIGN.md](docs/TECHNICAL_DESIGN.md) | Stack choices, module layout, data model, AR pipeline, export formats, testing strategy |
 | [docs/ACCURACY.md](docs/ACCURACY.md) | The core of the product: where error comes from and the twelve mitigations we apply |

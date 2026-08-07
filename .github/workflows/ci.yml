@@ -143,6 +143,8 @@ jobs:
             feature/capture/build/outputs/roborazzi/
             feature/onboarding/build/outputs/roborazzi/
             app/build/outputs/roborazzi/
+          # app/ also carries the rendered launcher icon at 512, 192 and 48 px — the
+          # 512 is the asset Play wants, so it comes out of CI rather than a design tool.
           retention-days: 14
           if-no-files-found: warn
 

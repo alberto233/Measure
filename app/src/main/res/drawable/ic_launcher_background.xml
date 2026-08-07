@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ink, not the app's white surface.
+
+  The interface is deliberately light — "Drafting", docs/DESIGN.md — but a launcher icon is
+  not seen against the app's own ground; it is seen on a home screen full of other icons,
+  most of which are light. Dark is what makes this one findable there, and white plan lines
+  on ink is the same drawing inverted rather than a different identity.
+-->
+<color xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="#101114" />
