@@ -165,13 +165,20 @@ The editor's bottom sheet was called out specifically: *"the cards don't work pr
 - A **genuine edge** against the drawing: a hairline in this direction, not a colour
   difference. `Panel` and `Surface` are the same white here, so without the line the sheet
   has no top edge at all — which is exactly what the dark build looked like.
-- Two anchors, peek and expanded. Never free height.
-- **Both anchors are capped by what the content needs.** The sheet measures its content and
-  never grows past it. Before this it opened at 62% of the screen whatever was in it, so a
+- Two anchors, never free height. **Open is the size of its content; closed is the handle
+  alone.**
+- **Open is capped by what the content needs.** The sheet measures its content and never
+  grows past it. Before this it opened at 62% of the screen whatever was in it, so a
   two-line readout spent most of that on white space *while covering the drawing the user
   was reading it about*. On this screen an oversized sheet is not a neutral choice: the plan
-  is the thing it hides. Short content collapses both anchors onto each other, and the sheet
-  correctly stops being draggable — there is nothing to expand to.
+  is the thing it hides.
+- **Closed leaves nothing but the grip.** There is no middle "peek". A peek was a compromise
+  between showing the panel and showing the drawing and it did neither — it cropped the
+  panel mid-sentence *and* still covered a fifth of the plan. Pushed down, the sheet gives
+  the drawing the whole screen.
+- **Anything that changes what the panel is for reopens it**, at whatever size the new
+  content needs: a new section, a new selection, a new measurement. Switching to Quantities
+  with the sheet pushed down would otherwise look like a dead tab.
 
 ## 9. Cards need an edge, not a fill
 

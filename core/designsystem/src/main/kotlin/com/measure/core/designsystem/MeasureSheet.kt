@@ -46,19 +46,25 @@ import kotlinx.coroutines.launch
  *
  * Two states rather than free height. A sheet that stops wherever the finger left it looks
  * broken half the time and has to be nudged into place; two anchors mean every release ends
- * somewhere deliberate. Peeked shows the top of the panel and the plan behind it, which is
- * the editor's constraint — chrome that grows eats the drawing the user came to look at.
+ * somewhere deliberate.
  *
- * @param expanded hoisted, because the editor expands the sheet when something is selected.
- *   A panel full of text fields under a keyboard needs the room, and asking the user to drag
- *   for it every time would be the same fault in a politer form.
+ * **Open is the size of its content; closed is the handle alone.** There is no middle
+ * "peek" any more. A peek was a compromise between showing the panel and showing the
+ * drawing and it did neither — it cropped the panel mid-sentence *and* still covered a
+ * fifth of the plan. Pushed down, the sheet leaves nothing but a grip on the bottom edge,
+ * which is what someone looking at a floor plan wants; anything that changes what the panel
+ * is *for* — a new section, a new selection — brings it back at whatever size the new
+ * content needs.
+ *
+ * @param expanded hoisted, because the editor reopens the sheet when the section or the
+ *   selection changes. A panel full of text fields under a keyboard needs the room, and
+ *   asking the user to drag for it every time would be the same fault in a politer form.
  */
 @Composable
 fun MeasureSheet(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    peekHeight: Dp = PeekHeight,
     expandedFraction: Float = ExpandedFraction,
     /**
      * Hoisted so a caller can scroll its own content. The editor uses it to bring the row
@@ -84,13 +90,12 @@ fun MeasureSheet(
         val wantedPx = (contentPx + headerPx).toFloat()
 
         val ceilingPx = with(density) { (available * expandedFraction).toPx() }
-        val floorPx = with(density) { peekHeight.coerceAtMost(available).toPx() }
 
-        // Both anchors are capped by what the content needs. Short content collapses the
-        // two onto each other, which is correct: there is nothing to expand *to*, so the
-        // sheet stops being draggable rather than offering a gesture that reveals nothing.
+        // Open is what the content needs, capped so the sheet can never take the whole
+        // screen. Closed is the header alone — the rule and the handle — so pushing it down
+        // leaves a grip on the bottom edge and gives the drawing everything else.
         val expandedPx = wantedPx.coerceIn(MINIMUM_PX, ceilingPx)
-        val peekPx = minOf(floorPx, expandedPx)
+        val peekPx = minOf(headerPx.toFloat().coerceAtLeast(MINIMUM_PX), expandedPx)
 
         val height = remember { Animatable(if (expanded) expandedPx else peekPx) }
         val scope = rememberCoroutineScope()
@@ -182,20 +187,19 @@ fun MeasureSheet(
     }
 }
 
-/**
- * Defaults a caller may need to reason about without measuring the sheet.
- *
- * [PeekHeight] is public because the editor fits its plan to the space the sheet leaves,
- * and measuring the live sheet to find that out is a race: the sheet expands the moment
- * something is selected, so a fit that happens during the animation reads a height the
- * sheet is only passing through and squashes the drawing into a sliver.
- */
+/** Defaults a caller may need to reason about without measuring the sheet. */
 object MeasureSheetDefaults {
-    /** Enough for a heading and one row of controls, which is what a peeked panel is for. */
-    val PeekHeight: Dp = 132.dp
+    /**
+     * How much of the canvas to keep clear when fitting a drawing behind the sheet.
+     *
+     * Not a height the sheet ever takes — it sizes itself to its content. This is the
+     * editor's allowance for "the sheet will be about this tall", used once, when the plan
+     * is first fitted. Measuring the live sheet instead is a race: it reopens whenever the
+     * selection changes, so a fit during that animation reads a height the sheet is only
+     * passing through, and the drawing ends up squashed into a sliver at the top.
+     */
+    val PlanClearance: Dp = 180.dp
 }
-
-private val PeekHeight = MeasureSheetDefaults.PeekHeight
 
 /** Expanded, but never the whole screen: the plan has to stay visible behind it. */
 private const val ExpandedFraction = 0.62f

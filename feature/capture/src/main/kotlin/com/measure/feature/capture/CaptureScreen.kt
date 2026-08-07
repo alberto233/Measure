@@ -46,6 +46,7 @@ import com.measure.ar.MeasureArController
 import com.measure.core.units.UnitSystem
 import kotlinx.coroutines.delay
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureSpace
 import com.measure.core.designsystem.MeasureShape
 import com.measure.core.designsystem.MeasureType
 
@@ -228,20 +229,18 @@ private fun TopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PillButton("Done", onClick = onExit)
-            TrackingChip(state.tracking, state.depthEnabled)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.torchSupported) {
-                    PillButton(
-                        label = if (state.torchOn) "Torch on" else "Torch",
-                        highlighted = state.torchOn,
-                        onClick = { viewModel.setTorch(!state.torchOn) },
-                    )
-                }
-                PillButton(
-                    label = if (viewModel.unitSystem == UnitSystem.METRIC) "Metres" else "Feet",
-                    onClick = viewModel::toggleUnits,
-                )
-            }
+            // Weighted, so the chip takes what is left between the two buttons instead of
+            // whatever its longest advice string asks for. The advice can run to two lines
+            // inside it; what it may not do is push its neighbours off the row.
+            TrackingChip(
+                tracking = state.tracking,
+                depthEnabled = state.depthEnabled,
+                modifier = Modifier.weight(1f).padding(horizontal = MeasureSpace.Tight),
+            )
+            PillButton(
+                label = if (viewModel.unitSystem == UnitSystem.METRIC) "Metres" else "Feet",
+                onClick = viewModel::toggleUnits,
+            )
         }
 
         AimAdvice(

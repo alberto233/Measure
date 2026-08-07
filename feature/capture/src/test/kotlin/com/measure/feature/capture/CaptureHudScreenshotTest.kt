@@ -94,6 +94,26 @@ class CaptureHudScreenshotTest {
                 depthEnabled = false,
             )
 
+            // The longest advice string there is, in a constrained row, with the depth
+            // suffix beside it. This is the exact case that broke on the A36: the advice
+            // claimed the whole row, the suffix was squeezed to a few pixels wide, and
+            // Compose wrapped it one letter per line — "depth" ran vertically down the
+            // side of the chip. Rendered here at a real width so it cannot come back.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(RETICLE))
+                TrackingChip(
+                    tracking = TrackingStatus(
+                        TrackingQuality.POOR,
+                        TrackingIssue.INSUFFICIENT_FEATURES,
+                        2,
+                        30,
+                    ),
+                    depthEnabled = true,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(Modifier.size(RETICLE))
+            }
+
             AimAdvice(
                 advice = RangeAdvice.TOO_CLOSE,
                 source = HitSource.FEATURE_POINT,

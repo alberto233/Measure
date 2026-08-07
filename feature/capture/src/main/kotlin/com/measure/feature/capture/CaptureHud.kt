@@ -63,11 +63,26 @@ internal fun TrackingChip(
             color = MeasureColours.OnScrim,
             fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.Medium,
+            // Takes the space that is left rather than the space it wants.
+            //
+            // Without the weight, a long advice string — "Not enough detail here — aim at
+            // a textured surface" — claimed the whole row and squeezed the suffix below to
+            // a few pixels wide, which Compose then wrapped one letter per line. On the
+            // A36 that rendered the word "depth" vertically down the side of the chip.
+            // `fill = false` so a short message still makes a short chip.
+            modifier = Modifier.weight(1f, fill = false),
         )
         // Worth surfacing: with depth, hit tests work on surfaces ARCore has not yet
         // fitted a plane to, which is most of the room for the first few seconds.
         if (depthEnabled) {
-            Text("· depth", color = MeasureColours.OnScrimMuted, fontSize = MeasureType.Small.fontSize)
+            Text(
+                text = "· depth",
+                color = MeasureColours.OnScrimMuted,
+                fontSize = MeasureType.Small.fontSize,
+                // Never wraps. It is a two-word aside; breaking it is always wrong.
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
@@ -101,7 +116,10 @@ internal fun AimAdvice(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(MeasureShape.Panel))
-            .background(MeasureColours.ScrimSoft)
+            // The full scrim, like every other slab here. This one carries the amber
+            // advice text, which is the hardest thing on the screen to keep legible over a
+            // bright wall — a softer slab makes exactly the wrong element the subtle one.
+            .background(MeasureColours.Scrim)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),

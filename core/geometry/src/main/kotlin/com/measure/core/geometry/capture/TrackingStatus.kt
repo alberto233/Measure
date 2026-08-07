@@ -18,7 +18,7 @@ enum class TrackingIssue(val advice: String) {
     NO_SURFACES_YET("Point at the floor and move slowly to find surfaces"),
     INSUFFICIENT_FEATURES("Not enough detail here — aim at a textured surface"),
     EXCESSIVE_MOTION("Slow down"),
-    INSUFFICIENT_LIGHT("Too dark — try the torch, or turn a light on"),
+    INSUFFICIENT_LIGHT("Too dark — turn a light on"),
     CAMERA_UNAVAILABLE("Camera unavailable"),
     UNKNOWN("Tracking lost — look around slowly"),
 }

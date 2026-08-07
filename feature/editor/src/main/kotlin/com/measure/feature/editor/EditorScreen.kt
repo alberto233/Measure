@@ -94,7 +94,7 @@ fun EditorScreen(
     // the floor while the user was reading how much paint to buy.
     val editable = mode == EditorMode.PLAN
 
-    var sheetExpanded by remember { mutableStateOf(false) }
+    var sheetExpanded by remember { mutableStateOf(true) }
     val sheetScroll = rememberScrollState()
 
     // What the chrome covers, so the opening fit puts the plan in the part of the canvas
@@ -103,12 +103,12 @@ fun EditorScreen(
     // two-room plan the second room opened underneath the sheet.
     //
     // The top is measured, because it genuinely varies: a banner appears and disappears.
-    // The bottom is the sheet's *peek* height rather than its measured height, which is not
+    // The bottom is a fixed allowance rather than the sheet's measured height, which is not
     // laziness — the sheet expands whenever something is selected, and a fit that happens
     // mid-animation reads a height the sheet is only passing through. That squashed the
     // plan into a sliver at the top of the screen.
     var topChromePx by remember { mutableIntStateOf(0) }
-    val bottomChromePx = with(LocalDensity.current) { MeasureSheetDefaults.PeekHeight.roundToPx() }
+    val bottomChromePx = with(LocalDensity.current) { MeasureSheetDefaults.PlanClearance.roundToPx() }
 
     // Anything selected has a panel with controls in it, and a keyboard over a peeked sheet
     // covers the field it opened for. The quantities view is a reading rather than a
@@ -116,7 +116,9 @@ fun EditorScreen(
     LaunchedEffect(viewModel.selection) {
         if (viewModel.selection != Selection.None) sheetExpanded = true
     }
-    LaunchedEffect(mode) { sheetExpanded = mode == EditorMode.QUANTITIES }
+    // Any change of section reopens it, at whatever size the new content needs. Switching
+    // to Quantities with the sheet pushed down would otherwise look like a dead tab.
+    LaunchedEffect(mode) { sheetExpanded = true }
     // Tapping a dimension in the measure view fills the sheet with a readout and three
     // lines explaining it, and at peek height the last line was cut off mid-sentence —
     // "part of this distance is" and then nothing. The answer arriving is exactly when
