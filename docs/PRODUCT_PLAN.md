@@ -72,10 +72,12 @@ an ARCore app and it is where our competitors visibly fail. We treat AR session
 robustness as a headline feature: defensive lifecycle handling, capability gating before
 we ever open a session, and a graceful non-AR fallback mode.
 
-**3. One-time purchase, no subscription.** The clearest differentiator available and it
-costs us nothing but revenue modelling. Given how much of the competitors' negative
-review volume is subscription anger, "pay once" is a marketing weapon, not just a pricing
-choice.
+**3. One-time purchase, no subscription — and free at launch.** Given how much of the
+competitors' negative review volume is subscription anger, "pay once" is a marketing
+weapon, not just a pricing choice. It is not, however, free to us: this earlier said it
+"costs us nothing but revenue modelling", which understated it badly. Foregoing recurring
+revenue lowers the ceiling substantially — see §6, which also defers charging anything at
+all until there are installs to price against.
 
 Supporting: everything stays on the device. No account, no upload, no camera frames
 leaving the phone. Easy to promise, easy to keep, and it makes the Play Store data-safety
@@ -83,15 +85,48 @@ declaration trivial.
 
 ## 6. Monetization
 
-Free tier — unlimited live measuring, one saved project, PNG export, watermark on
-exports.
+**Decision: ship free and ungated. No paywall, no billing, no watermark, at launch.**
 
-Pro, one-time purchase (indicative £8–12 / $10–15) — unlimited saved projects, PDF, SVG,
-DXF and CSV export, multi-room assembly, no watermark, 3D view.
+This replaces an earlier plan for a capped free tier (one saved project, watermarked
+exports) with Pro at a one-time £8–12. That plan is deferred, not cancelled — but nothing
+in it should be built yet, and the reasoning matters more than the conclusion.
 
-Deliberately excluded: subscriptions, ads in the AR view, any paywall on the act of
-measuring itself. Someone should be able to answer "will this sofa fit" forever without
-paying; we charge when the output becomes a deliverable.
+**Why defer.** Conversion rate is the one number in a revenue model that cannot be
+reasoned about, only measured, and measuring it needs traffic this app does not yet have.
+Building a paywall first means guessing the price, the split and the gate all at once,
+then discovering the guess was wrong from a sample of nobody. The paywall is about a
+week's work whenever it is wanted, which makes it the *last* uncertainty worth buying
+down, not the first. Until then the goal is installs and review velocity, and every
+gate is friction against both.
+
+**What launch optimises for**, in order: installs, rating, and honest reviews mentioning
+accuracy. Those are the inputs to every later pricing decision and the only evidence that
+distinguishes "nobody wants this" from "nobody has seen it" — two situations that look
+identical from zero revenue and have opposite responses.
+
+**What the eventual paid tier probably is.** Not the consumer £8–12. The users with a
+business reason to pay are the ones who need DXF, CSV and a branded PDF — fitters,
+surveyors, estate agents — and someone billing £200 a day will not blink at £40–80 and
+will not value £10 either. Same product, far fewer users, materially more revenue per
+user, and a support burden that scales with customers rather than with downloads. This is
+a hypothesis to test with a price experiment once there is traffic, not a commitment.
+
+**The cost of "one-time, never subscription".** Worth stating plainly, because §5 sells it
+as costless positioning and it is not. One-time purchase means revenue is proportional to
+*new installs, forever* — there is no compounding base and no renewal. A competitor with
+ten thousand subscribers at £3 a month earns recurring revenue while we re-earn every
+pound from scratch. The positioning argument still holds; subscription anger is a real and
+large share of competitor review volume. But it is a trade being made deliberately, with a
+much lower ceiling, and not a free win.
+
+Deliberately excluded regardless of tier: subscriptions, ads in the AR view, and any
+paywall on the act of measuring itself. Someone should be able to answer "will this sofa
+fit" forever without paying; if we ever charge, it is when the output becomes a
+deliverable.
+
+**Nothing in this section is implemented.** There is no billing code, no entitlement
+check, no watermark and no project cap anywhere in the repository, and that is the
+intended state at launch.
 
 ## 7. Risks
 
