@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.core.designsystem"
+    namespace = "com.traza.core.designsystem"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }

@@ -972,7 +972,7 @@ that.
 **`localeFilters` and `localeConfig`.** The build ships `en` and `es` only. Without the
 filter every AndroidX translation is packaged — about a megabyte of APK, and a phone set to
 French showing a French "Cancel" beside an English sentence. `locales_config.xml` is the same
-list declared to the system, which is what puts Measure in Android 13's per-app language
+list declared to the system, which is what puts Traza in Android 13's per-app language
 picker. Adding a language means touching both.
 
 ### The two tests
@@ -1005,7 +1005,6 @@ correct right up until you look at it.
 - **AR is required in release and optional in debug.** `app/src/release/AndroidManifest.xml`
   overrides both the feature and the ARCore metadata. Revisit if a non-AR drawing mode ever
   lands, because that override forecloses it.
-- **App name.** `Measure` is a working title and too generic for the Play Store.
 - **Capture thresholds.** The sampling dispersion limit (3 cm) and the per-source sigmas
   and correlations in `HitSource` are still reasoned estimates rather than measurements.
   The feature-count bands in `TrackingAssessor` have had one pass against the A36. All of

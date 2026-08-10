@@ -9,7 +9,7 @@
 -->
 <resources>
     <!-- The product's name. It is the same word in every language. -->
-    <string name="app_name" translatable="false">Measure</string>
+    <string name="app_name" translatable="false">Traza</string>
 
     <string name="capture_title">Measure</string>
     <string name="device_check_title">Device check</string>

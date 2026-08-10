@@ -1,4 +1,4 @@
-# Measure
+# Traza
 
 An Android AR measuring tape and floor-plan app. Point your phone at a room, tap the
 corners, and get a dimensioned 2D plan you can edit and export — no LiDAR, no extra

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.export"
+    namespace = "com.traza.feature.export"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }

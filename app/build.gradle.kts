@@ -35,10 +35,10 @@ val keystore = Properties().apply {
 fun signingSecret(property: String, variable: String): String? =
     (keystore.getProperty(property) ?: System.getenv(variable))?.takeIf { it.isNotBlank() }
 
-val uploadKeystore = signingSecret("storeFile", "MEASURE_KEYSTORE")
-val uploadStorePassword = signingSecret("storePassword", "MEASURE_KEYSTORE_PASSWORD")
-val uploadKeyAlias = signingSecret("keyAlias", "MEASURE_KEY_ALIAS")
-val uploadKeyPassword = signingSecret("keyPassword", "MEASURE_KEY_PASSWORD")
+val uploadKeystore = signingSecret("storeFile", "TRAZA_KEYSTORE")
+val uploadStorePassword = signingSecret("storePassword", "TRAZA_KEYSTORE_PASSWORD")
+val uploadKeyAlias = signingSecret("keyAlias", "TRAZA_KEY_ALIAS")
+val uploadKeyPassword = signingSecret("keyPassword", "TRAZA_KEY_PASSWORD")
 
 val canSignRelease = uploadKeystore != null &&
     uploadStorePassword != null &&
@@ -46,11 +46,11 @@ val canSignRelease = uploadKeystore != null &&
     uploadKeyPassword != null
 
 android {
-    namespace = "com.measure.app"
+    namespace = "com.traza.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.measure.app"
+        applicationId = "com.traza.app"
         minSdk = 26
         targetSdk = 36
         // Bumped whenever a build goes out for testing. Android will not install a
@@ -61,8 +61,8 @@ android {
         // — see `docs/STORE_LISTING.md` §9 — but the *code* keeps climbing from here
         // rather than restarting at 1, because a lower code will not install over the
         // builds already on test phones.
-        versionCode = 8
-        versionName = "0.1.7"
+        versionCode = 9
+        versionName = "0.2.0"
     }
 
     androidResources {

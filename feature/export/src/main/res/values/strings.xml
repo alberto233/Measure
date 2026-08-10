@@ -32,7 +32,7 @@
     <string name="export_note_arrangement">Rooms placed by hand — each room is measured, the space between them is not</string>
     <string name="export_drawing_empty">%1$s has no rooms yet</string>
     <string name="export_drawing_height">%1$s m high</string>
-    <string name="export_drawing_footer">%1$s · %2$s m² · measured with Measure</string>
+    <string name="export_drawing_footer">%1$s · %2$s m² · measured with Traza</string>
     <plurals name="export_drawing_rooms">
         <item quantity="one">%1$d room</item>
         <item quantity="other">%1$d rooms</item>

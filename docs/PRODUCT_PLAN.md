@@ -1,6 +1,6 @@
 # Product Plan
 
-Working title: **Measure**. The Play Store name is an open decision (see
+Name: **Traza**. Chosen over the working title "Measure" (see
 [Open questions](#open-questions)).
 
 ## 1. Vision
@@ -308,8 +308,14 @@ noisy input, we find out in week three rather than month four.
 
 ## Open questions
 
-- **App name.** "Measure" is the working title and the repository name; it is too generic
-  for the Play Store. Needs a decision before M10.
+- ~~**App name.**~~ **Decided: Traza.** "Measure" was a working title and failed the only
+  test that matters — it is a common word, so it is unfindable and unownable. "Escala" was
+  considered and rejected for the same reason at one remove: *escala* is the everyday
+  Portuguese word for a work rota, and there is a genre of shift-scheduling apps wearing it
+  in the second-largest market in the language region. *Traza* is what a Spanish drawing
+  does — *trazar un plano* is to lay one out — and an English speaker can spell it after
+  hearing it, which is the property a name actually has to have. The store title carries
+  the findability, so the name itself is free to be distinctive rather than descriptive.
 - **Imperial fraction granularity.** Nearest 1/8" or 1/16"? Affects the formatter and the
   editor's input parsing.
 - **Wall thickness.** v1 assumes zero-thickness walls and measures interior faces.

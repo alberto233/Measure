@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.editor"
+    namespace = "com.traza.feature.editor"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }

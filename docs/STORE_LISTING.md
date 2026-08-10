@@ -21,17 +21,24 @@ Three rules hold throughout, and they are the same three the app is built on:
 
 | Field | Value | Limit |
 | --- | --- | --- |
-| App name (launcher) | `Measure` | — |
-| Store title | `Measure: Floor Plans & Area` | 30 chars (27 used) |
-| Package | `com.measure.app` | — |
+| App name (launcher) | `Traza` | — |
+| Store title (en) | `Traza: Floor Plans & Area` | 30 chars (25 used) |
+| Store title (es) | `Traza: planos y superficie` | 30 chars (26 used) |
+| Package | `com.traza.app` | — |
 | Category | Tools | — |
 | Tags | House & Home, Productivity | — |
 | Content rating | Everyone | — |
 
-The store title differs from the launcher label on purpose. "Measure" alone is
-unfindable — it is a common word competing with every measuring app there is — while the
-launcher wants the short one because it sits under an icon. "Floor Plans" and "Area" are
-the two phrases people actually search.
+The store title differs from the launcher label on purpose, and the split is what lets the
+name be a name. "Floor Plans" and "Area" are the phrases people actually search, so the
+subtitle carries findability and the brand does not have to — which is exactly what the
+working title "Measure" got wrong in both directions at once: generic *and* unfindable,
+competing with every measuring app there is.
+
+*Traza* is what a drawing does in Spanish — *trazar un plano* is to lay one out — and an
+English speaker can spell it after hearing it, which "Croquis" could not. The Spanish
+title is not a translation of the English one: *superficie* is the word a Spanish user
+searches for floor area, and *planos* is what they call the output.
 
 ## 2. Short description
 
@@ -115,7 +122,7 @@ Play requires a hosted URL. The text is short enough to sit on a single page; it
 somewhere to live before submission.
 
 ```
-Measure does not collect, transmit, or share any personal data.
+Traza does not collect, transmit, or share any personal data.
 
 Everything you measure is stored on your device and nowhere else. There is no
 account, no sign-in, and no server. We cannot see your plans because they are never
@@ -228,8 +235,8 @@ Blocking, in order:
       keyPassword=…
       ```
 
-      or set `MEASURE_KEYSTORE`, `MEASURE_KEYSTORE_PASSWORD`, `MEASURE_KEY_ALIAS` and
-      `MEASURE_KEY_PASSWORD` in the environment, which is the shape CI wants. With none of
+      or set `TRAZA_KEYSTORE`, `TRAZA_KEYSTORE_PASSWORD`, `TRAZA_KEY_ALIAS` and
+      `TRAZA_KEY_PASSWORD` in the environment, which is the shape CI wants. With none of
       them present `assembleRelease` still succeeds and emits `app-release-unsigned.apk` —
       **deliberately unsigned rather than debug-signed**, because a debug-signed release
       installs perfectly, runs perfectly, and is rejected by Play long after anyone who
@@ -240,9 +247,9 @@ Blocking, in order:
       `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'` — and so is the feature
       graphic (§8). Screenshots are the only image asset still outstanding, and they are the
       one that needs a real room.
-- [ ] **`versionName`** set deliberately for the first public build. Currently `0.1.7`,
+- [ ] **`versionName`** set deliberately for the first public build. Currently `0.2.0`,
       which is a dev sequence rather than a release one. `versionCode` keeps climbing from
-      `8` rather than restarting at `1`: a lower code will not install over the builds
+      `9` rather than restarting at `1`: a lower code will not install over the builds
       already on test phones, and Play only requires that it increase.
 
 Not blocking, and now done:

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.capture"
+    namespace = "com.traza.feature.capture"
     compileSdk = 36
 
     defaultConfig {

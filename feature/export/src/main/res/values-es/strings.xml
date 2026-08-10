@@ -26,7 +26,7 @@
     <string name="export_note_arrangement">Habitaciones colocadas a mano — cada habitación está medida, el espacio entre ellas no</string>
     <string name="export_drawing_empty">%1$s todavía no tiene habitaciones</string>
     <string name="export_drawing_height">%1$s m de altura</string>
-    <string name="export_drawing_footer">%1$s · %2$s m² · medido con Measure</string>
+    <string name="export_drawing_footer">%1$s · %2$s m² · medido con Traza</string>
     <plurals name="export_drawing_rooms">
         <item quantity="one">%1$d habitación</item>
         <item quantity="other">%1$d habitaciones</item>

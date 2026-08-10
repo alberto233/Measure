@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.projects"
+    namespace = "com.traza.feature.projects"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.core.data"
+    namespace = "com.traza.core.data"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     compileOptions {

@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.feature.onboarding"
+    namespace = "com.traza.feature.onboarding"
     compileSdk = 36
     defaultConfig { minSdk = 26 }
     buildFeatures { compose = true }

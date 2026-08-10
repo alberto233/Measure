@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.measure.ar"
+    namespace = "com.traza.ar"
     compileSdk = 36
 
     defaultConfig {
