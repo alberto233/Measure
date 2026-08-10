@@ -16,6 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import android.content.res.Resources
+import androidx.annotation.StringRes
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -142,7 +146,7 @@ fun ProjectsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     MeasureButton(
-                        label = "Device check",
+                        label = stringResource(R.string.projects_device_check),
                         onClick = onDeviceCheck,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -166,7 +170,7 @@ fun ProjectsScreen(
             // The one thing this screen is for, at the size that says so. It used to be
             // the same height and type size as a sort filter.
             MeasurePrimaryButton(
-                label = "New measurement",
+                label = stringResource(R.string.projects_new),
                 onClick = onNewMeasurement,
                 modifier = Modifier.padding(MeasureSpace.Wide),
             )
@@ -190,10 +194,16 @@ fun ProjectsScreen(
         AlertDialog(
             onDismissRequest = { deleting = null },
             containerColor = MeasureColours.Panel,
-            title = { Text("Delete ${project.name}?", color = MeasureColours.Ink, style = MeasureType.Title) },
+            title = {
+                Text(
+                    text = stringResource(R.string.projects_delete_title, project.name),
+                    color = MeasureColours.Ink,
+                    style = MeasureType.Title,
+                )
+            },
             text = {
                 Text(
-                    "Its rooms and measurements go with it. This cannot be undone.",
+                    stringResource(R.string.projects_delete_body),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Body,
                 )
@@ -202,11 +212,13 @@ fun ProjectsScreen(
                 TextButton(onClick = {
                     viewModel.delete(project.id)
                     deleting = null
-                }) { Text("Delete", color = MeasureColours.Accent) }
+                }) {
+                    Text(stringResource(R.string.projects_delete), color = MeasureColours.Accent)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { deleting = null }) {
-                    Text("Keep", color = MeasureColours.InkMuted)
+                    Text(stringResource(R.string.projects_keep), color = MeasureColours.InkMuted)
                 }
             },
         )
@@ -228,11 +240,15 @@ private fun Header(count: Int, onDeviceCheck: () -> Unit) {
             verticalAlignment = Alignment.Bottom,
         ) {
             Column {
-                MeasureTag("measure")
-                Text("Plans", color = MeasureColours.Ink, style = MeasureType.Display)
+                MeasureTag(stringResource(R.string.projects_tag_measure))
+                Text(
+                    text = stringResource(R.string.projects_title),
+                    color = MeasureColours.Ink,
+                    style = MeasureType.Display,
+                )
             }
             Column(horizontalAlignment = Alignment.End) {
-                MeasureTag("saved")
+                MeasureTag(stringResource(R.string.projects_tag_saved))
                 Text(
                     text = count.toString().padStart(2, '0'),
                     color = MeasureColours.Accent,
@@ -256,13 +272,13 @@ private fun FindBar(
         MeasureField(
             value = query,
             onValueChange = onQuery,
-            hint = "Search name or reference",
+            hint = stringResource(R.string.projects_search_hint),
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
             ProjectSort.entries.forEach { option ->
                 MeasureChip(
-                    label = option.label,
+                    label = stringResource(option.label()),
                     onClick = { onSort(option) },
                     selected = option == sort,
                 )
@@ -318,7 +334,7 @@ private fun PlanEntry(
                 // The reference under the name, because when somebody has bothered to
                 // write "14 Ash Road" that is what they are scanning the list for.
                 MeasureTag(
-                    text = project.reference.ifBlank { "no reference" },
+                    text = project.reference.ifBlank { stringResource(R.string.projects_no_reference) },
                     colour = MeasureColours.InkMuted,
                 )
             }
@@ -351,19 +367,20 @@ private fun PlanEntry(
             text = {
                 Text(
                     text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                        .format(Date(project.updatedAt)) + " · " + project.describeContents(),
+                        .format(Date(project.updatedAt)) + " · " +
+                        project.describeContents(LocalContext.current.resources),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
             },
             confirmButton = {
                 TextButton(onClick = { menu = false; onEdit() }) {
-                    Text("Edit details", color = MeasureColours.Accent)
+                    Text(stringResource(R.string.projects_edit_details), color = MeasureColours.Accent)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { menu = false; onDelete() }) {
-                    Text("Delete", color = MeasureColours.Blocked)
+                    Text(stringResource(R.string.projects_delete), color = MeasureColours.Blocked)
                 }
             },
         )
@@ -376,6 +393,7 @@ private fun PlanEntry(
  * Total area for a plan with rooms; the value itself for a plan holding a single
  * measurement, because "1 measurement" tells the user nothing they wanted to know.
  */
+@Composable
 private fun ProjectSummary.headline(): Pair<String, String>? = when {
     roomCount > 0 -> AreaFormatter.format(totalArea, unitSystem).split(" ").let {
         it.first() to it.drop(1).joinToString(" ")
@@ -383,18 +401,41 @@ private fun ProjectSummary.headline(): Pair<String, String>? = when {
     soleMeasurement != null -> LengthFormatter.format(soleMeasurement!!, unitSystem).split(" ").let {
         it.first() to it.drop(1).joinToString(" ")
     }
-    measurementCount > 0 -> measurementCount.toString() to "measurements"
+    measurementCount > 0 ->
+        measurementCount.toString() to stringResource(R.string.projects_headline_measurements)
     else -> null
 }
 
-private fun ProjectSummary.describeContents(): String {
-    if (isEmpty) return "Empty"
+private fun ProjectSummary.describeContents(resources: Resources): String {
+    if (isEmpty) return resources.getString(R.string.projects_empty_contents)
     return buildList {
-        if (roomCount > 0) add("$roomCount ${if (roomCount == 1) "room" else "rooms"}")
+        if (roomCount > 0) {
+            add(resources.getQuantityString(R.plurals.projects_room_count, roomCount, roomCount))
+        }
         if (measurementCount > 0) {
-            add("$measurementCount ${if (measurementCount == 1) "measurement" else "measurements"}")
+            add(
+                resources.getQuantityString(
+                    R.plurals.projects_measurement_count,
+                    measurementCount,
+                    measurementCount,
+                ),
+            )
         }
     }.joinToString(" · ")
+}
+
+/**
+ * The sort chips' labels, mapped here rather than carried on the enum.
+ *
+ * `ProjectSort` lives in `:core:data`, which has no business owning a word that appears on
+ * a chip — and could not translate one anyway without depending on this module's resources,
+ * which is the dependency the other way round.
+ */
+@StringRes
+private fun ProjectSort.label(): Int = when (this) {
+    ProjectSort.RECENT -> R.string.projects_sort_recent
+    ProjectSort.NAME -> R.string.projects_sort_name
+    ProjectSort.LARGEST -> R.string.projects_sort_size
 }
 
 @Composable
@@ -404,9 +445,13 @@ private fun NoMatches(query: String) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
     ) {
-        Text("No plans match “$query”", color = MeasureColours.Ink, style = MeasureType.Title)
         Text(
-            text = "Your plans are all still here — only this search is empty.",
+            text = stringResource(R.string.projects_no_matches_title, query),
+            color = MeasureColours.Ink,
+            style = MeasureType.Title,
+        )
+        Text(
+            text = stringResource(R.string.projects_no_matches_body),
             color = MeasureColours.InkMuted,
             style = MeasureType.Small,
             textAlign = TextAlign.Center,
@@ -421,10 +466,14 @@ private fun EmptyState() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
     ) {
-        MeasureTag("no plans yet")
-        Text("Nothing measured", color = MeasureColours.Ink, style = MeasureType.Title)
+        MeasureTag(stringResource(R.string.projects_none_tag))
         Text(
-            text = "Point the camera at a room and walk the corners.\nEverything saves as you go.",
+            text = stringResource(R.string.projects_none_title),
+            color = MeasureColours.Ink,
+            style = MeasureType.Title,
+        )
+        Text(
+            text = stringResource(R.string.projects_none_body),
             color = MeasureColours.InkMuted,
             style = MeasureType.Body,
             textAlign = TextAlign.Center,
@@ -452,19 +501,29 @@ private fun DetailsDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MeasureColours.Panel,
-        title = { Text("Plan details", color = MeasureColours.Ink, style = MeasureType.Title) },
+        title = {
+            Text(
+                text = stringResource(R.string.projects_details_title),
+                color = MeasureColours.Ink,
+                style = MeasureType.Title,
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug)) {
-                MeasureField(name, { name = it }, hint = "Name", modifier = Modifier.fillMaxWidth())
+                MeasureField(
+                    value = name,
+                    onValueChange = { name = it },
+                    hint = stringResource(R.string.projects_name_hint),
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 MeasureField(
                     value = reference,
                     onValueChange = { reference = it },
-                    hint = "Client, address, anything you would search for",
+                    hint = stringResource(R.string.projects_reference_hint),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "The reference is searched along with the name, and appears on " +
-                        "exports — so a plan sent to someone says whose it is.",
+                    text = stringResource(R.string.projects_reference_note),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
@@ -472,11 +531,13 @@ private fun DetailsDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name, reference) }) {
-                Text("Save", color = MeasureColours.Accent)
+                Text(stringResource(R.string.projects_save), color = MeasureColours.Accent)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel", color = MeasureColours.InkMuted) }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.projects_cancel), color = MeasureColours.InkMuted)
+            }
         },
     )
 }

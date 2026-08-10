@@ -9,12 +9,12 @@ import java.util.Locale
  * Three, not six. Every additional order is another control to read past on the way to the
  * plan someone came here for, and the list is the screen that exists to get out of.
  */
-enum class ProjectSort(val label: String) {
+enum class ProjectSort {
     /** What you were last working on, which is nearly always what you want. */
-    RECENT("Recent"),
-    NAME("Name"),
+    RECENT,
+    NAME,
     /** Biggest first, because "the big job" is how people remember a plan by size. */
-    LARGEST("Size"),
+    LARGEST,
 }
 
 /**

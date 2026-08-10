@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sending a plan somewhere, and the words that end up inside the file when you do.
+
+  Two groups here, and they behave differently. The sheet's own text is read on the phone.
+  Everything below `export_note_arrangement` is read by *somebody else* — a client opening a
+  PDF, a builder opening a DXF — so it has to stand on its own with no app around it.
+
+  Translators: `export_csv_*` are whole header rows, comma-separated. Translate the column
+  names; leave the commas, the order and the bracketed units alone, or the spreadsheet stops
+  lining up with the numbers underneath it.
+-->
+<resources>
+    <string name="export_tag">send as</string>
+    <string name="export_title">Choose a format</string>
+    <string name="export_cancel">Cancel</string>
+
+    <string name="export_format_pdf" translatable="false">PDF</string>
+    <string name="export_format_pdf_detail">A page to print, email or attach to a quote</string>
+    <string name="export_format_png">PNG image</string>
+    <string name="export_format_png_detail">A picture, for a message or a document</string>
+    <string name="export_format_svg">SVG drawing</string>
+    <string name="export_format_svg_detail">A scalable drawing that stays sharp at any size</string>
+    <string name="export_format_dxf">DXF drawing</string>
+    <string name="export_format_dxf_detail">Opens in CAD — AutoCAD, LibreCAD, QCAD</string>
+    <string name="export_format_csv">CSV table</string>
+    <string name="export_format_csv_detail">Room sizes as a spreadsheet</string>
+    <string name="export_format_json">Project file</string>
+    <string name="export_format_json_detail">Everything, in a form this app can read back</string>
+
+    <!-- Drawn into the PDF, the PNG and the SVG. -->
+    <string name="export_note_arrangement">Rooms placed by hand — each room is measured, the space between them is not</string>
+    <string name="export_drawing_empty">%1$s has no rooms yet</string>
+    <string name="export_drawing_height">%1$s m high</string>
+    <string name="export_drawing_footer">%1$s · %2$s m² · measured with Measure</string>
+    <plurals name="export_drawing_rooms">
+        <item quantity="one">%1$d room</item>
+        <item quantity="other">%1$d rooms</item>
+    </plurals>
+
+    <string name="export_csv_rooms">Room,Floor area (m2),Perimeter (m),Ceiling height (m),Wall area (m2),Volume (m3),Misclosure (%)</string>
+    <string name="export_csv_total">Total</string>
+    <string name="export_csv_note">Note</string>
+    <string name="export_csv_measurements">Measurement,Length (m),Tolerance (m),Mode</string>
+    <string name="export_csv_distances">Distance off the plan,Length (m)</string>
+
+    <string name="export_distance_between">%1$s to %2$s</string>
+</resources>

@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.annotation.StringRes
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
@@ -55,14 +57,14 @@ fun ExportSheet(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
-                MeasureTag("send as")
+                MeasureTag(stringResource(R.string.export_tag))
                 Text(
-                    text = "Choose a format",
+                    text = stringResource(R.string.export_title),
                     color = MeasureColours.Ink,
                     style = MeasureType.Title,
                 )
             }
-            MeasureButton("Cancel", onClick = onDismiss)
+            MeasureButton(stringResource(R.string.export_cancel), onClick = onDismiss)
         }
 
         MeasureRule()
@@ -76,9 +78,13 @@ fun ExportSheet(
                     .padding(vertical = MeasureSpace.Snug),
                 verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair),
             ) {
-                Text(format.label, color = MeasureColours.Ink, style = MeasureType.Label)
                 Text(
-                    text = format.description,
+                    text = stringResource(format.label()),
+                    color = MeasureColours.Ink,
+                    style = MeasureType.Label,
+                )
+                Text(
+                    text = stringResource(format.detail()),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
@@ -86,4 +92,31 @@ fun ExportSheet(
             MeasureRule()
         }
     }
+}
+
+/**
+ * A format's name and its one-line explanation, mapped here rather than on the enum.
+ *
+ * `ExportFormat` lives in `:core:export`, which is pure Kotlin: it can own a file extension
+ * and a mime type, because those are facts about the format, but it cannot own a sentence
+ * that has to arrive in the reader's language.
+ */
+@StringRes
+private fun ExportFormat.label(): Int = when (this) {
+    ExportFormat.PDF -> R.string.export_format_pdf
+    ExportFormat.PNG -> R.string.export_format_png
+    ExportFormat.SVG -> R.string.export_format_svg
+    ExportFormat.DXF -> R.string.export_format_dxf
+    ExportFormat.CSV -> R.string.export_format_csv
+    ExportFormat.JSON -> R.string.export_format_json
+}
+
+@StringRes
+private fun ExportFormat.detail(): Int = when (this) {
+    ExportFormat.PDF -> R.string.export_format_pdf_detail
+    ExportFormat.PNG -> R.string.export_format_png_detail
+    ExportFormat.SVG -> R.string.export_format_svg_detail
+    ExportFormat.DXF -> R.string.export_format_dxf_detail
+    ExportFormat.CSV -> R.string.export_format_csv_detail
+    ExportFormat.JSON -> R.string.export_format_json_detail
 }

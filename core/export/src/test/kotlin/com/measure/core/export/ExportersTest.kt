@@ -258,7 +258,7 @@ class ExportersTest {
         assertEquals(extensions.size, extensions.toSet().size)
 
         ExportFormat.entries.forEach { format ->
-            assertTrue(format.mimeType.contains('/'), "${format.label} has no mime type")
+            assertTrue(format.mimeType.contains('/'), "${format.name} has no mime type")
             assertFalse(format.mimeType.startsWith("application/dxf"), "use the registered dxf type")
         }
     }
@@ -268,7 +268,7 @@ class ExportersTest {
         assertFalse(ExportFormat.PDF.isText)
         assertFalse(ExportFormat.PNG.isText)
         listOf(ExportFormat.SVG, ExportFormat.DXF, ExportFormat.CSV, ExportFormat.JSON).forEach {
-            assertTrue(it.isText, "${it.label} should be written as text")
+            assertTrue(it.isText, "${it.name} should be written as text")
         }
     }
 

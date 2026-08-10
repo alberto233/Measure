@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. Los nombres de formato (PDF, SVG, DXF, CSV) no se traducen: son extensiones de
+  archivo, y un usuario que busca "cómo abrir un DXF" busca esa palabra.
+
+  Las filas de cabecera del CSV mantienen las comas, el orden y las unidades entre
+  paréntesis; sólo cambian los nombres de columna.
+-->
+<resources>
+    <string name="export_tag">enviar como</string>
+    <string name="export_title">Elige un formato</string>
+    <string name="export_cancel">Cancelar</string>
+
+    <string name="export_format_pdf_detail">Una página para imprimir, enviar por correo o adjuntar a un presupuesto</string>
+    <string name="export_format_png">Imagen PNG</string>
+    <string name="export_format_png_detail">Una imagen, para un mensaje o un documento</string>
+    <string name="export_format_svg">Dibujo SVG</string>
+    <string name="export_format_svg_detail">Un dibujo escalable que se ve nítido a cualquier tamaño</string>
+    <string name="export_format_dxf">Dibujo DXF</string>
+    <string name="export_format_dxf_detail">Se abre en CAD — AutoCAD, LibreCAD, QCAD</string>
+    <string name="export_format_csv">Tabla CSV</string>
+    <string name="export_format_csv_detail">Las medidas de cada habitación como hoja de cálculo</string>
+    <string name="export_format_json">Archivo del proyecto</string>
+    <string name="export_format_json_detail">Todo, en un formato que esta app puede volver a leer</string>
+
+    <string name="export_note_arrangement">Habitaciones colocadas a mano — cada habitación está medida, el espacio entre ellas no</string>
+    <string name="export_drawing_empty">%1$s todavía no tiene habitaciones</string>
+    <string name="export_drawing_height">%1$s m de altura</string>
+    <string name="export_drawing_footer">%1$s · %2$s m² · medido con Measure</string>
+    <plurals name="export_drawing_rooms">
+        <item quantity="one">%1$d habitación</item>
+        <item quantity="other">%1$d habitaciones</item>
+    </plurals>
+
+    <string name="export_csv_rooms">Habitación,Superficie de suelo (m2),Perímetro (m),Altura de techo (m),Superficie de pared (m2),Volumen (m3),Error de cierre (%)</string>
+    <string name="export_csv_total">Total</string>
+    <string name="export_csv_note">Nota</string>
+    <string name="export_csv_measurements">Medida,Longitud (m),Tolerancia (m),Modo</string>
+    <string name="export_csv_distances">Distancia sobre el plano,Longitud (m)</string>
+
+    <string name="export_distance_between">de %1$s a %2$s</string>
+</resources>

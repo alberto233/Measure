@@ -1,6 +1,7 @@
 package com.measure.feature.export
 
 import android.content.Context
+import android.content.res.Resources
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -54,25 +55,45 @@ object PlanExporter {
     /** Wide enough to stay sharp on a laptop, small enough to send over a message. */
     private const val PNG_LONG_EDGE = 2000
 
-    fun render(project: ProjectDetail, format: ExportFormat): String {
-        val plan = project.toExportable()
+    fun render(resources: Resources, project: ProjectDetail, format: ExportFormat): String {
+        val plan = project.toExportable(resources)
         return when (format) {
             ExportFormat.SVG -> SvgExporter.export(plan)
             ExportFormat.DXF -> DxfExporter.export(plan)
-            ExportFormat.CSV -> CsvExporter.export(plan)
+            ExportFormat.CSV -> CsvExporter.export(plan, csvLabels(resources))
             ExportFormat.JSON -> JsonExporter.export(plan)
             // Not text. Handled by write(), and unreachable through this path.
-            ExportFormat.PDF, ExportFormat.PNG -> error("${format.label} is not a text format")
+            ExportFormat.PDF, ExportFormat.PNG -> error("${format.name} is not a text format")
         }
     }
 
-    private fun write(project: ProjectDetail, format: ExportFormat, file: File) {
+    /**
+     * The CSV's column names, in the reader's language.
+     *
+     * A spreadsheet is the one export nothing reads back — the project file is JSON — so
+     * translating its headers costs nothing and saves the person who opens it from column
+     * names in a language they do not use.
+     */
+    private fun csvLabels(resources: Resources) = CsvExporter.Labels(
+        rooms = resources.getString(R.string.export_csv_rooms),
+        total = resources.getString(R.string.export_csv_total),
+        note = resources.getString(R.string.export_csv_note),
+        measurements = resources.getString(R.string.export_csv_measurements),
+        distances = resources.getString(R.string.export_csv_distances),
+    )
+
+    private fun write(
+        resources: Resources,
+        project: ProjectDetail,
+        format: ExportFormat,
+        file: File,
+    ) {
         if (format.isText) {
-            file.writeText(render(project, format))
+            file.writeText(render(resources, project, format))
             return
         }
 
-        val plan = project.toExportable()
+        val plan = project.toExportable(resources)
         // Orientation follows the plan rather than a default, so a long thin flat is not
         // squeezed into a portrait page with two thirds of it blank.
         val points = plan.allPoints
@@ -89,7 +110,9 @@ object PlanExporter {
                     val page = document.startPage(
                         PdfDocument.PageInfo.Builder(width, height, 1).create(),
                     )
-                    PlanDrawing.draw(page.canvas, plan, width.toFloat(), height.toFloat(), "m²")
+                    PlanDrawing.draw(
+                        resources, page.canvas, plan, width.toFloat(), height.toFloat(), "m²",
+                    )
                     document.finishPage(page)
                     file.outputStream().use(document::writeTo)
                 } finally {
@@ -104,14 +127,16 @@ object PlanExporter {
                 val height = if (wide) PNG_LONG_EDGE * A4_SHORT_POINTS / A4_LONG_POINTS else PNG_LONG_EDGE
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                 try {
-                    PlanDrawing.draw(Canvas(bitmap), plan, width.toFloat(), height.toFloat(), "m²")
+                    PlanDrawing.draw(
+                        resources, Canvas(bitmap), plan, width.toFloat(), height.toFloat(), "m²",
+                    )
                     file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 } finally {
                     bitmap.recycle()
                 }
             }
 
-            else -> error("${format.label} is a text format")
+            else -> error("${format.name} is a text format")
         }
     }
 
@@ -128,7 +153,7 @@ object PlanExporter {
             mkdirs()
         }
         val file = File(directory, format.fileName(project.name))
-        write(project, format, file)
+        write(context.resources, project, format, file)
 
         val uri: Uri = FileProvider.getUriForFile(
             context,
@@ -168,7 +193,7 @@ object PlanExporter {
  * for entirely unrelated reasons, and a migration silently changing what a DXF looks like
  * would be found by whoever opened it in CAD a month later.
  */
-internal fun ProjectDetail.toExportable() = ExportablePlan(
+internal fun ProjectDetail.toExportable(resources: Resources) = ExportablePlan(
     name = name,
     reference = reference,
     rooms = rooms.map(SavedRoom::toExportable),
@@ -188,12 +213,16 @@ internal fun ProjectDetail.toExportable() = ExportablePlan(
             from = measurement.from.position,
             to = measurement.to.position,
             length = measurement.length,
-            description = saved.label
-                ?: "${measurement.from.description} to ${measurement.to.description}",
+            description = saved.label ?: resources.getString(
+                R.string.export_distance_between,
+                measurement.from.description,
+                measurement.to.description,
+            ),
         )
     },
     // The file has to carry this or it makes a claim the screen was careful not to.
     arrangementMeasured = !hasUnrelatedCaptures,
+    arrangementNote = resources.getString(R.string.export_note_arrangement),
 )
 
 internal fun SavedRoom.toExportable() = ExportableRoom(

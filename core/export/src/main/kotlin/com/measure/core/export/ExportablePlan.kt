@@ -34,6 +34,16 @@ data class ExportablePlan(
     val distances: List<ExportableDistance> = emptyList(),
     val unitSuffix: String = "m",
     /**
+     * The wording of [arrangementCaveat], supplied rather than written here.
+     *
+     * This module is pure Kotlin and cannot read a translation, and this sentence is prose
+     * the user's client reads on a drawing. The English default is what the exporters' own
+     * tests assert against; the app overrides it from `res/values/strings.xml`, and there is
+     * exactly one place that builds a plan, so there is exactly one place to get it wrong.
+     */
+    val arrangementNote: String =
+        "Rooms placed by hand — each room is measured, the space between them is not",
+    /**
      * Whether how the rooms sit relative to each other was measured.
      *
      * False once a plan holds rooms from more than one AR session: each session gives the
@@ -78,15 +88,11 @@ data class ExportablePlan(
     /**
      * The one sentence every format says when [arrangementMeasured] is false, or null.
      *
-     * Written once here rather than per exporter so the six files cannot end up making six
+     * Read once here rather than per exporter so the six files cannot end up making six
      * differently worded promises — and so the wording can be argued about in one place.
      */
     val arrangementCaveat: String?
-        get() = if (arrangementMeasured) {
-            null
-        } else {
-            "Rooms placed by hand — each room is measured, the space between them is not"
-        }
+        get() = if (arrangementMeasured) null else arrangementNote
 }
 
 data class ExportableRoom(
@@ -141,22 +147,17 @@ data class ExportableDistance(
 enum class ExportFormat(
     val extension: String,
     val mimeType: String,
-    val label: String,
-    val description: String,
 ) {
     /** First, because it is the one most people mean by "send me the plan". */
-    PDF("pdf", "application/pdf", "PDF", "A page to print, email or attach to a quote"),
-    // Named by its format like the rest. "Image" read as a different kind of thing
-    // beside four formats that name themselves, which is a reason to hesitate over a
-    // choice that should be obvious.
-    PNG("png", "image/png", "PNG image", "A picture, for a message or a document"),
-    SVG("svg", "image/svg+xml", "SVG drawing", "A scalable drawing that stays sharp at any size"),
+    PDF("pdf", "application/pdf"),
+    PNG("png", "image/png"),
+    SVG("svg", "image/svg+xml"),
 
     // The registered type is image/vnd.dxf. application/dxf is a common invention and
     // resolves to nothing on a phone, which is how a share ends up with no apps offered.
-    DXF("dxf", "image/vnd.dxf", "DXF drawing", "Opens in CAD — AutoCAD, LibreCAD, QCAD"),
-    CSV("csv", "text/csv", "CSV table", "Room sizes as a spreadsheet"),
-    JSON("json", "application/json", "Project file", "Everything, in a form this app can read back"),
+    DXF("dxf", "image/vnd.dxf"),
+    CSV("csv", "text/csv"),
+    JSON("json", "application/json"),
     ;
 
     /** Whether the file is text this module writes, or a picture Android has to render. */

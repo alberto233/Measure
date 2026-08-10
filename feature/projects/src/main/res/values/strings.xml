@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home screen: the list of saved plans, and everything that finds one.
+
+  Translators: "plan" here means the drawing of a room, not a scheme or an intention. It is
+  the noun the whole product is built around and it should be the word a builder would use
+  for a floor plan.
+-->
+<resources>
+    <string name="projects_tag_measure">measure</string>
+    <string name="projects_title">Plans</string>
+    <string name="projects_tag_saved">saved</string>
+
+    <string name="projects_search_hint">Search name or reference</string>
+    <string name="projects_sort_recent">Recent</string>
+    <string name="projects_sort_name">Name</string>
+    <string name="projects_sort_size">Size</string>
+
+    <string name="projects_device_check">Device check</string>
+    <string name="projects_new">New measurement</string>
+
+    <string name="projects_delete_title">Delete %1$s?</string>
+    <string name="projects_delete_body">Its rooms and measurements go with it. This cannot be undone.</string>
+    <string name="projects_delete">Delete</string>
+    <string name="projects_keep">Keep</string>
+    <string name="projects_edit_details">Edit details</string>
+
+    <string name="projects_no_reference">no reference</string>
+    <!-- The unit under the count, for a plan holding several one-off distances. -->
+    <string name="projects_headline_measurements">measurements</string>
+
+    <string name="projects_empty_contents">Empty</string>
+    <plurals name="projects_room_count">
+        <item quantity="one">%1$d room</item>
+        <item quantity="other">%1$d rooms</item>
+    </plurals>
+    <plurals name="projects_measurement_count">
+        <item quantity="one">%1$d measurement</item>
+        <item quantity="other">%1$d measurements</item>
+    </plurals>
+
+    <string name="projects_no_matches_title">No plans match “%1$s”</string>
+    <string name="projects_no_matches_body">Your plans are all still here — only this search is empty.</string>
+
+    <string name="projects_none_tag">no plans yet</string>
+    <string name="projects_none_title">Nothing measured</string>
+    <string name="projects_none_body">Point the camera at a room and walk the corners.\nEverything saves as you go.</string>
+
+    <string name="projects_details_title">Plan details</string>
+    <string name="projects_name_hint">Name</string>
+    <string name="projects_reference_hint">Client, address, anything you would search for</string>
+    <string name="projects_reference_note">The reference is searched along with the name, and appears on exports — so a plan sent to someone says whose it is.</string>
+    <string name="projects_save">Save</string>
+    <string name="projects_cancel">Cancel</string>
+</resources>

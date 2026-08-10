@@ -1,5 +1,6 @@
 package com.measure.feature.export
 
+import android.content.res.Resources
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -36,7 +37,14 @@ internal object PlanDrawing {
     private const val RUN_OFFSET = 0.32f
     private const val OVERALL_OFFSET = 0.66f
 
-    fun draw(canvas: Canvas, plan: ExportablePlan, width: Float, height: Float, unitLabel: String) {
+    fun draw(
+        resources: Resources,
+        canvas: Canvas,
+        plan: ExportablePlan,
+        width: Float,
+        height: Float,
+        unitLabel: String,
+    ) {
         canvas.drawColor(BACKGROUND)
 
         val points = plan.allPoints
@@ -44,7 +52,7 @@ internal object PlanDrawing {
 
         if (points.isEmpty()) {
             canvas.drawText(
-                "${plan.name} has no rooms yet",
+                resources.getString(R.string.export_drawing_empty, plan.name),
                 width / 2f,
                 height / 2f,
                 Paint().apply {
@@ -144,7 +152,7 @@ internal object PlanDrawing {
             canvas.drawText(areaOf(room, unitLabel), x(centre), y(centre) + bodyText * 1.1f, sublabel)
             room.ceilingHeight?.let {
                 canvas.drawText(
-                    "${number(it)} m high",
+                    resources.getString(R.string.export_drawing_height, number(it)),
                     x(centre),
                     y(centre) + bodyText * 2.0f,
                     sublabel,
@@ -261,8 +269,15 @@ internal object PlanDrawing {
         }
         canvas.drawText(plan.title, margin, height - margin * 0.9f, footer)
         canvas.drawText(
-            "${plan.rooms.size} ${if (plan.rooms.size == 1) "room" else "rooms"} · " +
-                "${number(plan.totalFloorArea)} m² · measured with Measure",
+            resources.getString(
+                R.string.export_drawing_footer,
+                resources.getQuantityString(
+                    R.plurals.export_drawing_rooms,
+                    plan.rooms.size,
+                    plan.rooms.size,
+                ),
+                number(plan.totalFloorArea),
+            ),
             margin,
             height - margin * 0.45f,
             footer,

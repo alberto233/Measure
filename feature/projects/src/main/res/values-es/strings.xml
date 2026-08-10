@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. "Plano" for plan, "habitación" for room, "medida" for a measurement — the
+  words used on a Spanish building site rather than the literal renderings ("plan",
+  "cuarto", "medición").
+
+  "Referencia" keeps the same double duty it has in English: the client, the address, or
+  whatever the person would search for.
+-->
+<resources>
+    <string name="projects_tag_measure">medir</string>
+    <string name="projects_title">Planos</string>
+    <string name="projects_tag_saved">guardados</string>
+
+    <string name="projects_search_hint">Buscar por nombre o referencia</string>
+    <string name="projects_sort_recent">Recientes</string>
+    <string name="projects_sort_name">Nombre</string>
+    <string name="projects_sort_size">Tamaño</string>
+
+    <string name="projects_device_check">Comprobar el dispositivo</string>
+    <string name="projects_new">Nueva medición</string>
+
+    <string name="projects_delete_title">¿Borrar %1$s?</string>
+    <string name="projects_delete_body">Sus habitaciones y medidas se van con él. Esto no se puede deshacer.</string>
+    <string name="projects_delete">Borrar</string>
+    <string name="projects_keep">Conservar</string>
+    <string name="projects_edit_details">Editar los datos</string>
+
+    <string name="projects_no_reference">sin referencia</string>
+    <string name="projects_headline_measurements">medidas</string>
+
+    <string name="projects_empty_contents">Vacío</string>
+    <plurals name="projects_room_count">
+        <item quantity="one">%1$d habitación</item>
+        <item quantity="other">%1$d habitaciones</item>
+    </plurals>
+    <plurals name="projects_measurement_count">
+        <item quantity="one">%1$d medida</item>
+        <item quantity="other">%1$d medidas</item>
+    </plurals>
+
+    <string name="projects_no_matches_title">Ningún plano coincide con «%1$s»</string>
+    <string name="projects_no_matches_body">Tus planos siguen todos aquí — lo único vacío es esta búsqueda.</string>
+
+    <string name="projects_none_tag">todavía no hay planos</string>
+    <string name="projects_none_title">Nada medido</string>
+    <string name="projects_none_body">Apunta con la cámara a una habitación y recorre las esquinas.\nTodo se guarda sobre la marcha.</string>
+
+    <string name="projects_details_title">Datos del plano</string>
+    <string name="projects_name_hint">Nombre</string>
+    <string name="projects_reference_hint">Cliente, dirección, lo que buscarías</string>
+    <string name="projects_reference_note">La referencia se busca junto con el nombre y aparece en las exportaciones, así que un plano que envías dice de quién es.</string>
+    <string name="projects_save">Guardar</string>
+    <string name="projects_cancel">Cancelar</string>
+</resources>

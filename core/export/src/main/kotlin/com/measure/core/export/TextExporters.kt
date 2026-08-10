@@ -11,8 +11,28 @@ import java.util.Locale
  */
 object CsvExporter {
 
-    fun export(plan: ExportablePlan): String = buildString {
-        append("Room,Floor area (m2),Perimeter (m),Ceiling height (m),Wall area (m2),Volume (m3),Misclosure (%)\n")
+    /**
+     * The words in the table, supplied by the caller.
+     *
+     * Header rows arrive whole rather than column by column, because a header row is a
+     * sentence a translator needs to see together — the unit in brackets after each name is
+     * part of the name, and splitting them into seven strings invites six of them to agree
+     * and one not to.
+     *
+     * The English defaults are what this module's own tests assert against. The app passes
+     * translated ones; see `feature/export`.
+     */
+    data class Labels(
+        val rooms: String =
+            "Room,Floor area (m2),Perimeter (m),Ceiling height (m),Wall area (m2),Volume (m3),Misclosure (%)",
+        val total: String = "Total",
+        val note: String = "Note",
+        val measurements: String = "Measurement,Length (m),Tolerance (m),Mode",
+        val distances: String = "Distance off the plan,Length (m)",
+    )
+
+    fun export(plan: ExportablePlan, labels: Labels = Labels()): String = buildString {
+        append("${labels.rooms}\n")
 
         plan.rooms.forEach { room ->
             val height = room.ceilingHeight
@@ -32,15 +52,15 @@ object CsvExporter {
         }
 
         if (plan.rooms.size > 1) {
-            append("${field("Total")},${number(plan.totalFloorArea)},,,,,\n")
+            append("${field(labels.total)},${number(plan.totalFloorArea)},,,,,\n")
         }
 
         // A spreadsheet has no drawing to qualify, but it does carry room-by-room numbers
         // someone may add up as if the rooms were surveyed together.
-        plan.arrangementCaveat?.let { append("\n${field("Note")},${field(it)}\n") }
+        plan.arrangementCaveat?.let { append("\n${field(labels.note)},${field(it)}\n") }
 
         if (plan.measurements.isNotEmpty()) {
-            append("\nMeasurement,Length (m),Tolerance (m),Mode\n")
+            append("\n${labels.measurements}\n")
             plan.measurements.forEach {
                 append("${field(it.label)},${number(it.length)},${number(it.sigma)},${field(it.mode)}\n")
             }
@@ -49,7 +69,7 @@ object CsvExporter {
         // Kept in their own table and labelled as taken off the plan, because a
         // spreadsheet strips every visual cue that told the user which was which.
         if (plan.distances.isNotEmpty()) {
-            append("\nDistance off the plan,Length (m)\n")
+            append("\n${labels.distances}\n")
             plan.distances.forEach {
                 append("${field(it.description)},${number(it.length)}\n")
             }
