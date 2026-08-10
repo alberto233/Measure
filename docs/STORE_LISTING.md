@@ -78,8 +78,9 @@ WHAT IT DOES
 • Export as PDF, PNG, SVG, DXF or CSV
 
 FREE, AND NOT A TRIAL
-No subscription. No advertising. No paywall on measuring. Nothing is locked, nothing
-expires, and nothing asks you to upgrade halfway through a room.
+No subscription. No advertising. No paywall on measuring, ever — and everything this
+app does today it will keep doing for free. Nothing expires, nothing counts down, and
+nothing asks you to upgrade halfway through a room.
 
 PRIVATE BY DEFAULT
 No account, no sign-in, no upload. Your plans are stored on your phone and nowhere
@@ -97,6 +98,23 @@ reasonably lit room with some visible detail — a pitch-dark room with blank wh
 walls will defeat it, and it will say so rather than guess. It needs a device that
 supports Google Play Services for AR.
 ```
+
+### The one sentence that changed, and why
+
+The block above used to end *"Nothing is locked, nothing expires."* It now promises
+something narrower and stronger: **everything the app does today stays free**.
+
+Narrower because "nothing is locked" is a claim about the app forever, and it would have
+to be broken to ever charge for anything — see `PRODUCT_PLAN.md` §6, where a paid tier is
+deferred rather than cancelled. Stronger because the new wording is a commitment that can
+actually be kept, and it commits to the thing that matters: a person who installs today
+does not wake up to find a feature they were using has moved behind a price.
+
+This is not hedging for its own sake. Exports, DXF, CSV and the quantities are shipping
+free, and a feature that has shipped cannot be taken back — doing so is the single most
+reliable way to earn the one-star reviews §7 of the product plan is about. So the sentence
+was going to constrain the business either way. Writing it deliberately costs nothing;
+discovering it a year later costs the promise.
 
 ## 4. Data safety
 

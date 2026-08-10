@@ -119,10 +119,44 @@ pound from scratch. The positioning argument still holds; subscription anger is 
 large share of competitor review volume. But it is a trade being made deliberately, with a
 much lower ceiling, and not a free win.
 
+**What the paid tier can no longer be, and this is the important constraint.** Exports —
+PDF, PNG, SVG, DXF, CSV — and the flooring and paint quantities are shipping free. A
+feature that has shipped cannot be taken back: moving something behind a price that people
+were already using is the most reliable way there is to earn the reviews §7 is about. So
+the trade tier cannot be "the exports, gated". It has to be *new* value that nobody has
+lost — a branded PDF with a company logo, client and site fields, a priced estimate off
+the quantities. Fewer users still, more work still, and the only version that does not
+cost the thing that got the users.
+
+`STORE_LISTING.md` §3 was rewritten to match before launch. It used to promise "nothing is
+locked", which would have had to be broken to charge for anything at all; it now promises
+that everything the app does *today* stays free, which is a commitment that can be kept and
+which foreclosed nothing that was not already foreclosed by having shipped.
+
+**And charging has a running cost, not just a build cost.** Play's target-API requirement
+means this app needs a day or two a year to stay listed whether or not anyone pays. Taking
+money adds Play Billing Library upgrades on Google's schedule, a support load that scales
+with customers, and — selling to consumers in the EU — an obligation to supply the updates
+needed to keep what was sold working, which is a different footing from giving it away.
+Worth confirming the specifics with someone qualified before taking a euro. The point for
+this section is that a paid tier converts a project that can be abandoned into one that
+cannot be abandoned cleanly, and the revenue has to be worth that and not just worth the
+week of work.
+
 Deliberately excluded regardless of tier: subscriptions, ads in the AR view, and any
 paywall on the act of measuring itself. Someone should be able to answer "will this sofa
 fit" forever without paying; if we ever charge, it is when the output becomes a
 deliverable.
+
+**Ads were considered and rejected on arithmetic.** A measuring app is used in short
+bursts, so impressions per install are low; at a plausible first-year volume the whole
+year's ad revenue is a couple of hundred euros at best. Against that: "private" is one of
+four words in the short description and an ad SDK makes it false, the Data safety
+declaration flips from *no data collected* to *collected and shared* where anyone can read
+it, an EU consent dialog lands before the user has done anything, and the app gains its
+first network dependency. Revisit only at a scale that does not exist yet — tens of
+thousands of installs with a paid tier converting badly — and know the cost by then
+includes a listing rewrite existing users can see.
 
 **Nothing in this section is implemented.** There is no billing code, no entitlement
 check, no watermark and no project cap anywhere in the repository, and that is the
