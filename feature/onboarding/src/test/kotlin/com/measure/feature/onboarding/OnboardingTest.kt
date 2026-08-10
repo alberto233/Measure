@@ -2,9 +2,15 @@ package com.measure.feature.onboarding
 
 import android.app.Application
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.unit.height
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -82,6 +88,36 @@ class OnboardingTest {
         }
     }
 
+    /** The deck is a pager, so a swipe is the first thing anyone will try. */
+    @Test
+    fun `swiping moves the deck forward`() {
+        compose.setContent { OnboardingScreen(onDone = {}) }
+
+        compose.onRoot().performTouchInput { swipeLeft() }
+
+        compose.onNodeWithText("Walk the room").assertIsDisplayed()
+    }
+
+    /**
+     * Swiping back is the whole reason there is no Back button.
+     *
+     * If the pager ever loses its gesture — a `userScrollEnabled = false` added for some
+     * unrelated reason, a parent that eats horizontal drags — the deck becomes one-way and
+     * nothing on the screen says so. This is the test that notices.
+     */
+    @Test
+    fun `swiping back returns to the previous card, which is why there is no back button`() {
+        compose.setContent { OnboardingScreen(onDone = {}) }
+
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Walk the room").assertIsDisplayed()
+        compose.onNodeWithText("Back").assertDoesNotExist()
+
+        compose.onRoot().performTouchInput { swipeRight() }
+
+        compose.onNodeWithText("Expect about ±2–3 cm").assertIsDisplayed()
+    }
+
     /**
      * Skip is on every card except the last, and it finishes.
      *
@@ -99,23 +135,39 @@ class OnboardingTest {
         assertTrue("Skip must actually finish, not merely advance.", done)
     }
 
+    /**
+     * Every control is within thumb reach, and Skip is the quiet one.
+     *
+     * Asserted on geometry rather than trusted to the layout code, because this is a screen
+     * held one-handed by somebody standing in a room, and "the buttons drifted back to the
+     * top" is a regression that looks perfectly fine in a screenshot.
+     */
     @Test
-    fun `back returns to the previous card`() {
+    fun `the actions sit at the bottom with skip to the left of the primary`() {
         compose.setContent { OnboardingScreen(onDone = {}) }
 
-        compose.onNodeWithText("Next").performClick()
-        compose.onNodeWithText("Walk the room").assertIsDisplayed()
-        compose.onNodeWithText("Back").performClick()
+        val screen = compose.onRoot().getUnclippedBoundsInRoot()
+        val skip = compose.onNodeWithText("Skip").getUnclippedBoundsInRoot()
+        val next = compose.onNodeWithText("Next").getUnclippedBoundsInRoot()
 
-        compose.onNodeWithText("Expect about ±2–3 cm").assertIsDisplayed()
+        assertTrue(
+            "Skip is meant to be tertiary and to the left of the primary action.",
+            skip.left < next.left,
+        )
+        assertTrue(
+            "Both actions belong in the bottom quarter of the screen, near the thumb.",
+            skip.top > screen.height * 0.75f && next.top > screen.height * 0.75f,
+        )
     }
 
-    /** There is nothing to go back to from the first card, so nothing offers it. */
+    /** Nothing competes with the button that ends the deck. */
     @Test
-    fun `the first card has no back`() {
+    fun `skip leaves on the last card`() {
         compose.setContent { OnboardingScreen(onDone = {}) }
 
-        compose.onNodeWithText("Back").assertDoesNotExist()
+        repeat(STEP_COUNT - 1) { compose.onNodeWithText("Next").performClick() }
+
+        compose.onNodeWithText("Skip").assertDoesNotExist()
     }
 
     @Test

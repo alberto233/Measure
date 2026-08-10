@@ -18,7 +18,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
-| `:feature:onboarding` | M10c: a five-card guidance deck with drawn illustrations, skippable, shown on first run and reopenable from the home screen. 9 tests, 6 screenshots |
+| `:feature:onboarding` | M10c: a five-card guidance deck with drawn illustrations. Swipeable, every control at the bottom, skippable from the first card, shown on first run and reopenable from the home screen. 11 tests, 6 screenshots |
 | `:app` | Assembly, the device check, and both icons — the adaptive launcher mark and the Play listing asset, each rendered from a checked-in vector |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
 | Next | **Field test the corner assist and the light direction.** M10c is under way: crash reporting, the accuracy guidance, the launcher icon and the store listing copy are done; localisation, device calibration and the launch blockers in `docs/STORE_LISTING.md` §8 remain |

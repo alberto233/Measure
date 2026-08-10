@@ -1,10 +1,5 @@
 package com.measure.feature.onboarding
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,14 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +34,7 @@ import com.measure.core.designsystem.MeasureSpace
 import com.measure.core.designsystem.MeasureTag
 import com.measure.core.designsystem.MeasureType
 import com.measure.core.designsystem.touchTarget
+import kotlinx.coroutines.launch
 
 /**
  * What to expect, then the four things that decide whether the first scan is any good.
@@ -64,9 +60,20 @@ import com.measure.core.designsystem.touchTarget
  * centimetres and getting three is satisfied, and the same user expecting a laser is
  * writing a review.
  *
- * Skip is present on every card and does exactly what it says. A tutorial nobody can escape
- * earns its own one-star reviews, and the guidance is one tap away from the home screen
- * afterwards.
+ * **The deck is a pager, and every control sits at the bottom.** Both halves of that come
+ * from the same observation: this screen is held one-handed by somebody who has just
+ * installed the app, and a card deck that only moves when you reach the top of the screen is
+ * a card deck fighting the thumb. Swipe is the gesture every onboarding deck on the phone
+ * already uses, so it costs nothing to learn; Next is kept beside it for people who do not
+ * swipe, and Back is gone because the swipe replaces it and a third button in that row would
+ * be the crowd rather than the affordance.
+ *
+ * **Skip is tertiary and on the left**, opposite the primary and styled as text rather than
+ * as a button. It has to be reachable — a tutorial nobody can escape earns its own one-star
+ * reviews, and the guidance is one tap away from the home screen afterwards — without
+ * competing with the action that moves the deck forward. It leaves on the last card, where
+ * the primary already ends the deck and two controls doing the same thing is a choice nobody
+ * needs to make.
  */
 @Composable
 fun OnboardingScreen(
@@ -74,9 +81,9 @@ fun OnboardingScreen(
     modifier: Modifier = Modifier,
     firstRun: Boolean = true,
 ) {
-    var index by rememberSaveable { mutableIntStateOf(0) }
-    val step = STEPS[index]
-    val last = index == STEPS.lastIndex
+    val pager = rememberPagerState(pageCount = { STEPS.size })
+    val scope = rememberCoroutineScope()
+    val last = pager.currentPage == STEPS.lastIndex
 
     Column(
         modifier
@@ -85,12 +92,26 @@ fun OnboardingScreen(
             .safeDrawingPadding()
             .padding(horizontal = MeasureSpace.Base),
     ) {
+        Box(Modifier.fillMaxWidth().padding(top = MeasureSpace.Tight)) {
+            MeasureTag(if (firstRun) "welcome" else "guide")
+        }
+
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.weight(1f),
+        ) { page ->
+            StepCard(STEPS[page])
+        }
+
+        Dots(count = STEPS.size, current = pager.currentPage)
+
         Row(
-            Modifier.fillMaxWidth().padding(top = MeasureSpace.Tight),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            Modifier
+                .fillMaxWidth()
+                .padding(top = MeasureSpace.Base, bottom = MeasureSpace.Base),
+            horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MeasureTag(if (firstRun) "welcome" else "guide")
             if (!last) {
                 Text(
                     text = "Skip",
@@ -100,43 +121,24 @@ fun OnboardingScreen(
                         .clip(RoundedCornerShape(MeasureShape.Edge))
                         .touchTarget()
                         .clickable(onClick = onDone)
-                        .padding(horizontal = MeasureSpace.Tight),
+                        .padding(horizontal = MeasureSpace.Snug),
                 )
             }
-        }
-
-        // Crossfade only. A horizontal slide would imply the cards can be swiped, and
-        // they cannot — one promise the interface should not make and then break.
-        AnimatedContent(
-            targetState = index,
-            transitionSpec = { fadeIn(tween(160)) togetherWith fadeOut(tween(160)) },
-            label = "guidance step",
-            modifier = Modifier.weight(1f),
-        ) { current ->
-            StepCard(STEPS[current])
-        }
-
-        Dots(count = STEPS.size, current = index)
-
-        Column(
-            Modifier.padding(top = MeasureSpace.Base, bottom = MeasureSpace.Base),
-            verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
-        ) {
             MeasurePrimaryButton(
                 label = when {
                     last && firstRun -> "Start measuring"
                     last -> "Done"
                     else -> "Next"
                 },
-                onClick = { if (last) onDone() else index++ },
+                onClick = {
+                    if (last) {
+                        onDone()
+                    } else {
+                        scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
+                    }
+                },
+                modifier = Modifier.weight(1f),
             )
-            if (index > 0) {
-                MeasureButton(
-                    label = "Back",
-                    onClick = { index-- },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
         }
     }
 }
@@ -144,7 +146,10 @@ fun OnboardingScreen(
 @Composable
 private fun StepCard(step: GuidanceStep) {
     Column(
-        Modifier.fillMaxSize(),
+        // Centred in the pager, then nudged up by roughly the height of the dots. Optically
+        // centred on the *screen* rather than in the box it is given, which are no longer the
+        // same thing now that every control lives at the bottom.
+        Modifier.fillMaxSize().padding(bottom = MeasureSpace.Wide),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
