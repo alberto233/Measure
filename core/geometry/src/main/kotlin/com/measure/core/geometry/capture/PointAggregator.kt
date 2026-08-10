@@ -26,12 +26,20 @@ data class SampledPoint(
     val sampleCount: Int,
 )
 
-enum class CaptureRejection(val message: String) {
-    NO_SURFACE("Nothing to measure — aim at a surface"),
-    TRACKING_LOST("Tracking dropped out — hold steadier and try again"),
-    TOO_FEW_SAMPLES("Hold still a moment longer"),
-    UNSTABLE("Too much wobble — hold steadier or step closer"),
-    TOO_CLOSE("Too close to measure — step back"),
+/**
+ * Why a tap produced no point.
+ *
+ * Every one of these is said out loud. Refusing a measurement silently is how a user
+ * concludes the shutter is broken, and refusing one *without* saying why is how they conclude
+ * the app is. What each is called to the user lives in `:core:designsystem`, because this
+ * module has no resources — see `GeometryNames.kt`.
+ */
+enum class CaptureRejection {
+    NO_SURFACE,
+    TRACKING_LOST,
+    TOO_FEW_SAMPLES,
+    UNSTABLE,
+    TOO_CLOSE,
 }
 
 sealed interface CaptureOutcome {

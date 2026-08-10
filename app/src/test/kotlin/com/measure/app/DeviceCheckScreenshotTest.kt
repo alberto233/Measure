@@ -3,9 +3,12 @@ package com.measure.app
 import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.google.ar.core.ArCoreApk
+import com.measure.core.geometry.capture.Calibration
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -42,15 +45,24 @@ class DeviceCheckScreenshotTest {
     private val resources
         get() = ApplicationProvider.getApplicationContext<Application>().resources
 
-    private fun shoot(report: DeviceReport, name: String) {
+    private fun shoot(
+        report: DeviceReport,
+        name: String,
+        calibration: Calibration = Calibration.NONE,
+        scrollTo: Int? = null,
+    ) {
         compose.setContent {
             DeviceCheckScreen(
                 report = report,
                 onStartMeasuring = {},
                 onPrimaryCheckAction = {},
                 onClearCrash = {},
+                calibration = calibration,
             )
         }
+        // A render of a scrolling screen shows the top of it, which is the wrong part when
+        // the point of the render is something further down.
+        scrollTo?.let { compose.onNodeWithText(resources.getString(it)).performScrollTo() }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/$name.png")
     }
 
@@ -167,5 +179,33 @@ class DeviceCheckScreenshotTest {
                 at com.measure.feature.capture.CaptureViewModel.tick(CaptureViewModel.kt:204)
                 at android.view.Choreographer.doCallbacks(Choreographer.java:923)
         """.trimIndent()
+    }
+
+    /**
+     * A phone carrying a correction.
+     *
+     * Its own render because the calibrated state is the one nobody will see while building
+     * it — every device this is developed on reads true — and because the sentences under it
+     * are the part most likely to be quietly trimmed by someone tidying the layout.
+     */
+    @Test
+    fun `calibrated`() {
+        shoot(
+            DeviceCheck.of(
+                resources = resources,
+                runCount = 7,
+                stamp = "09:41:07",
+                availability = ArCoreApk.Availability.SUPPORTED_INSTALLED,
+                hasCamera = true,
+                depth = DepthSupport(automatic = true, raw = true),
+                crash = null,
+            ),
+            "device-check-calibrated",
+            calibration = Calibration(0.98),
+            // The *last* line of the card, because performScrollTo stops as soon as the
+            // node it is given is on screen — aiming at the heading would leave the rest
+            // of the card, which is the part worth looking at, still below the fold.
+            scrollTo = R.string.calibration_still_approximate,
+        )
     }
 }

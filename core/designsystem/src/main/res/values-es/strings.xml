@@ -35,4 +35,11 @@
     <string name="range_too_close">Demasiado cerca — retrocede</string>
     <string name="range_long">Bastante lejos — acércate si puedes</string>
     <string name="range_very_long">Muy lejos — cuenta con varios centímetros de error</string>
+
+    <!-- Por qué un toque no ha dado ningún punto. Cada uno dice qué hacer, no qué falla. -->
+    <string name="rejected_no_surface">No hay nada que medir — apunta a una superficie</string>
+    <string name="rejected_tracking_lost">Se ha perdido el seguimiento — sujeta más firme e inténtalo otra vez</string>
+    <string name="rejected_too_few_samples">Aguanta quieto un momento más</string>
+    <string name="rejected_unstable">Demasiado temblor — sujeta más firme o acércate</string>
+    <string name="rejected_too_close">Demasiado cerca para medir — retrocede</string>
 </resources>

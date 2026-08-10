@@ -16,6 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -24,12 +28,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.measure.core.designsystem.MeasureButton
 import com.measure.core.designsystem.MeasureColours
+import com.measure.core.designsystem.MeasureField
 import com.measure.core.designsystem.MeasurePrimaryButton
 import com.measure.core.designsystem.MeasureRule
 import com.measure.core.designsystem.MeasureShape
 import com.measure.core.designsystem.MeasureSpace
 import com.measure.core.designsystem.MeasureTag
 import com.measure.core.designsystem.MeasureType
+import com.measure.core.geometry.capture.Calibration
+import kotlin.math.abs
 
 /** Matches the hairline the design system uses; it is not exported as a token. */
 private val Hairline = 1.dp
@@ -61,6 +68,10 @@ fun DeviceCheckScreen(
     onPrimaryCheckAction: () -> Unit,
     onClearCrash: () -> Unit,
     modifier: Modifier = Modifier,
+    calibration: Calibration = Calibration.NONE,
+    onCalibrate: (measured: String, actual: String) -> Unit = { _, _ -> },
+    onClearCalibration: () -> Unit = {},
+    calibrationNote: String? = null,
 ) {
     Column(
         modifier
@@ -112,6 +123,15 @@ fun DeviceCheckScreen(
             )
             report.core.forEach { CheckRow(it) }
 
+            MeasureRule()
+
+            CalibrationSection(
+                calibration = calibration,
+                note = calibrationNote,
+                onCalibrate = onCalibrate,
+                onClear = onClearCalibration,
+            )
+
             Text(
                 text = stringResource(
                     R.string.device_check_run,
@@ -159,6 +179,117 @@ fun DeviceCheckScreen(
             }
         }
     }
+}
+
+/**
+ * The optional scale correction — `docs/ACCURACY.md` M9.
+ *
+ * **On this screen and not in a settings menu.** A calibration is a fact about the handset,
+ * and this is the screen that exists to say what the handset can do. It also has the right
+ * audience: nobody arrives here by accident, and the person who has come to find out why
+ * their measurements look off is exactly the person this is for.
+ *
+ * **Two typed figures rather than a guided measuring flow.** That is how somebody actually
+ * discovers a bias — they measure a door they know, see 2.09 m, and go looking for the
+ * setting. Sending them back to measure the same door again inside a special mode would add
+ * navigation and learn nothing new.
+ *
+ * The two sentences under the state are the important part of the whole feature. One says the
+ * correction is not retroactive; the other says it removes bias and not spread. Without them
+ * "calibrated" reads as "now it is exact", which is the overclaim this product is built
+ * against.
+ */
+@Composable
+private fun CalibrationSection(
+    calibration: Calibration,
+    note: String?,
+    onCalibrate: (String, String) -> Unit,
+    onClear: () -> Unit,
+) {
+    var measured by rememberSaveable { mutableStateOf("") }
+    var actual by rememberSaveable { mutableStateOf("") }
+
+    MeasureTag(stringResource(R.string.calibration_tag))
+    Text(
+        text = stringResource(R.string.calibration_title),
+        color = MeasureColours.Ink,
+        style = MeasureType.Title,
+    )
+
+    Text(
+        text = when {
+            calibration.isIdentity -> stringResource(R.string.calibration_none)
+            calibration.bias > 0 -> stringResource(
+                R.string.calibration_long,
+                stringResource(R.string.calibration_percent, abs(calibration.bias) * 100),
+            )
+            else -> stringResource(
+                R.string.calibration_short,
+                stringResource(R.string.calibration_percent, abs(calibration.bias) * 100),
+            )
+        },
+        color = if (calibration.isIdentity) MeasureColours.InkMuted else MeasureColours.Ink,
+        style = MeasureType.Body,
+    )
+
+    Text(
+        text = stringResource(R.string.calibration_help),
+        color = MeasureColours.InkMuted,
+        style = MeasureType.Small,
+    )
+
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
+    ) {
+        MeasureField(
+            value = measured,
+            onValueChange = { measured = it },
+            hint = stringResource(R.string.calibration_measured_hint),
+            numeric = true,
+            modifier = Modifier.weight(1f),
+        )
+        MeasureField(
+            value = actual,
+            onValueChange = { actual = it },
+            hint = stringResource(R.string.calibration_actual_hint),
+            numeric = true,
+            modifier = Modifier.weight(1f),
+        )
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
+        MeasureButton(
+            label = stringResource(R.string.calibration_apply),
+            onClick = { onCalibrate(measured, actual) },
+            enabled = measured.isNotBlank() && actual.isNotBlank(),
+        )
+        if (!calibration.isIdentity) {
+            MeasureButton(
+                label = stringResource(R.string.calibration_clear),
+                onClick = {
+                    measured = ""
+                    actual = ""
+                    onClear()
+                },
+            )
+        }
+    }
+
+    note?.let {
+        Text(text = it, color = MeasureColours.Ink, style = MeasureType.Small)
+    }
+
+    Text(
+        text = stringResource(R.string.calibration_not_retroactive),
+        color = MeasureColours.InkMuted,
+        style = MeasureType.Small,
+    )
+    Text(
+        text = stringResource(R.string.calibration_still_approximate),
+        color = MeasureColours.InkMuted,
+        style = MeasureType.Small,
+    )
 }
 
 /** The answer, at the size of an answer. */

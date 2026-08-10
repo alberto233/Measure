@@ -3,6 +3,7 @@ package com.measure.core.designsystem
 import androidx.annotation.StringRes
 import com.measure.core.geometry.DoorSwing
 import com.measure.core.geometry.OpeningKind
+import com.measure.core.geometry.capture.CaptureRejection
 import com.measure.core.geometry.capture.HitSource
 import com.measure.core.geometry.capture.MeasurementMode
 import com.measure.core.geometry.capture.RangeAdvice
@@ -76,4 +77,20 @@ fun RangeAdvice.messageRes(): Int? = when (this) {
     RangeAdvice.IDEAL -> null
     RangeAdvice.LONG -> R.string.range_long
     RangeAdvice.VERY_LONG -> R.string.range_very_long
+}
+
+/**
+ * Why a tap produced no point, in words the user can act on.
+ *
+ * Each one names the fix rather than the fault. "Nothing to measure" is a diagnosis; "aim at
+ * a surface" is what to do next, and a person holding a phone up in someone else's hallway
+ * wants the second one.
+ */
+@StringRes
+fun CaptureRejection.messageRes(): Int = when (this) {
+    CaptureRejection.NO_SURFACE -> R.string.rejected_no_surface
+    CaptureRejection.TRACKING_LOST -> R.string.rejected_tracking_lost
+    CaptureRejection.TOO_FEW_SAMPLES -> R.string.rejected_too_few_samples
+    CaptureRejection.UNSTABLE -> R.string.rejected_unstable
+    CaptureRejection.TOO_CLOSE -> R.string.rejected_too_close
 }

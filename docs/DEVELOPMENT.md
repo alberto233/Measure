@@ -22,7 +22,8 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:app` | Assembly, the device check, release signing off a key held outside the repository, and every store image — both icons and the 1024×500 feature graphic, each rendered from checked-in source |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
 | Localisation | English and Spanish, every module. Enforced by `TranslationTest` and rendered in `SpanishTest` — see §14 |
-| Next | **Field test the corner assist and the light direction, in both languages.** M10c is all but closed: crash reporting, the accuracy guidance, both icons, the feature graphic, the store listing copy, release signing and localisation are done. Device calibration remains, and of the launch blockers in `docs/STORE_LISTING.md` §9 the only code-side one left is a deliberate `versionName` |
+| Calibration | Optional per-device scale correction on the device check screen — `docs/ACCURACY.md` M9. Refuses more offers than it accepts, on purpose |
+| Next | **Field test the corner assist and the light direction, in both languages.** M10c is done. What remains before a store listing is in `docs/STORE_LISTING.md` §9, and none of it is code except a deliberate `versionName` |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds

@@ -61,8 +61,8 @@ android {
         // — see `docs/STORE_LISTING.md` §9 — but the *code* keeps climbing from here
         // rather than restarting at 1, because a lower code will not install over the
         // builds already on test phones.
-        versionCode = 7
-        versionName = "0.1.6"
+        versionCode = 8
+        versionName = "0.1.7"
     }
 
     androidResources {
@@ -148,6 +148,10 @@ kotlin {
 dependencies {
     implementation(project(":core:units"))
     implementation(project(":core:geometry"))
+    // For CalibrationStore. Arrives transitively through :feature:editor's api() today, but
+    // depending on that means this module breaks the day the editor narrows its own
+    // dependency for reasons of its own.
+    implementation(project(":core:data"))
     // The device check is Compose now, and uses the same tokens and controls as every
     // other screen rather than the six duplicated Color.parseColor constants it had.
     implementation(project(":core:designsystem"))

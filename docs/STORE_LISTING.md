@@ -240,9 +240,9 @@ Blocking, in order:
       `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'` — and so is the feature
       graphic (§8). Screenshots are the only image asset still outstanding, and they are the
       one that needs a real room.
-- [ ] **`versionName`** set deliberately for the first public build. Currently `0.1.6`,
+- [ ] **`versionName`** set deliberately for the first public build. Currently `0.1.7`,
       which is a dev sequence rather than a release one. `versionCode` keeps climbing from
-      `7` rather than restarting at `1`: a lower code will not install over the builds
+      `8` rather than restarting at `1`: a lower code will not install over the builds
       already on test phones, and Play only requires that it increase.
 
 Not blocking, and now done:

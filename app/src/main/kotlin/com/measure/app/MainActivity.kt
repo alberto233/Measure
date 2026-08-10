@@ -14,6 +14,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.google.ar.core.ArCoreApk
+import com.measure.core.data.CalibrationStore
+import com.measure.core.geometry.capture.Calibration
+import com.measure.core.geometry.capture.CalibrationOutcome
+import com.measure.core.geometry.capture.Refusal
+import com.measure.core.units.LengthParser
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import java.util.Date
@@ -59,6 +64,19 @@ class MainActivity : ComponentActivity() {
     /** What the bottom action does, which depends on what the checks found. */
     private var action: () -> Unit = ::refresh
 
+    private val calibrationStore by lazy { CalibrationStore(this) }
+
+    private var calibration by mutableStateOf(Calibration.NONE)
+
+    /**
+     * What the last calibration attempt did, or why it did nothing.
+     *
+     * Held rather than shown as a toast because most attempts are *refused*, and every
+     * refusal is a sentence worth reading twice — "those two agree to within the margin this
+     * app already expects" is an explanation, not a beep.
+     */
+    private var calibrationNote by mutableStateOf<String?>(null)
+
     /**
      * The Activity Result API rather than `requestPermissions`, which the plain-view
      * version used. The answer arrives on this launcher instead of in an override, which
@@ -82,14 +100,60 @@ class MainActivity : ComponentActivity() {
                     CrashLog.clear(this)
                     refresh()
                 },
+                calibration = calibration,
+                onCalibrate = ::calibrate,
+                onClearCalibration = {
+                    calibrationStore.clear()
+                    calibration = Calibration.NONE
+                    calibrationNote = getString(R.string.calibration_removed)
+                },
+                calibrationNote = calibrationNote,
             )
         }
     }
 
     override fun onResume() {
         super.onResume()
+        calibration = calibrationStore.calibration
         requestCameraPermissionIfNeeded()
         refresh()
+    }
+
+    /**
+     * Take the two typed figures and either store a correction or say why not.
+     *
+     * The deciding is `Calibration.of`, in `:core:geometry`, where it is tested against every
+     * refusal without a device. All this does is turn text into metres — through
+     * `LengthParser`, so a Spanish phone's "2,05" is read as a length and not as nothing —
+     * and turn the answer back into a sentence.
+     */
+    private fun calibrate(measuredText: String, actualText: String) {
+        val measured = LengthParser.parseMetric(measuredText)?.metres
+        val actual = LengthParser.parseMetric(actualText)?.metres
+
+        if (measured == null || actual == null) {
+            calibrationNote = getString(R.string.calibration_not_a_length)
+            return
+        }
+
+        when (val outcome = Calibration.of(measured, actual)) {
+            is CalibrationOutcome.Calibrated -> {
+                calibrationStore.calibration = outcome.calibration
+                calibration = outcome.calibration
+                calibrationNote = getString(R.string.calibration_applied)
+            }
+
+            is CalibrationOutcome.Refused -> {
+                calibrationNote = getString(
+                    when (outcome.reason) {
+                        Refusal.NOT_A_LENGTH -> R.string.calibration_not_a_length
+                        Refusal.REFERENCE_TOO_SHORT -> R.string.calibration_too_short
+                        Refusal.WITHIN_NOISE -> R.string.calibration_within_noise
+                        Refusal.IMPLAUSIBLE -> R.string.calibration_implausible
+                    },
+                )
+            }
+        }
     }
 
     override fun onPause() {

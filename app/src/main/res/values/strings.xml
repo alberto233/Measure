@@ -91,4 +91,32 @@
     <string name="device_check_android_version">Android %1$s (API %2$d)</string>
     <string name="device_check_no_message">no message</string>
     <string name="device_check_install_failed">Install request failed: %1$s</string>
+
+    <!--
+      Calibration — docs/ACCURACY.md M9. Note what these do and do not claim: a correction
+      removes a device's systematic bias and does nothing whatever to the ±2–3 cm spread. An
+      interface that let anyone read "calibrated" as "now it is exact" would undo the one
+      thing the guidance deck is for.
+    -->
+    <string name="calibration_tag">Calibration</string>
+    <string name="calibration_title">Correct this phone\'s scale</string>
+    <string name="calibration_help">Measure something you know the true length of — a door, or a wall you have run a tape across — then type both figures. Anything under a metre is too short to tell a bias from ordinary noise.</string>
+    <string name="calibration_measured_hint">What the app said</string>
+    <string name="calibration_actual_hint">What it really is</string>
+    <string name="calibration_apply">Apply</string>
+    <string name="calibration_clear">Remove correction</string>
+
+    <string name="calibration_none">Not calibrated. Measurements are exactly what the camera reports.</string>
+    <string name="calibration_long">This phone reads %1$s long. Everything captured from now on is corrected.</string>
+    <string name="calibration_short">This phone reads %1$s short. Everything captured from now on is corrected.</string>
+    <string name="calibration_percent" translatable="false">%1$.1f%%</string>
+    <string name="calibration_not_retroactive">Plans you have already saved keep the lengths they were measured with.</string>
+    <string name="calibration_still_approximate">A correction removes a consistent bias. It does not make a measurement more repeatable — expect ±2–3 cm either way, as before.</string>
+
+    <string name="calibration_applied">Correction stored. New captures are scaled from now on.</string>
+    <string name="calibration_removed">Correction removed.</string>
+    <string name="calibration_not_a_length">Type both figures as lengths — for example 2.05 and 2.00.</string>
+    <string name="calibration_too_short">Use something at least a metre long. Below that the app\'s own margin is bigger than the bias you are trying to find.</string>
+    <string name="calibration_within_noise">Those two agree to within the ±2–3 cm this app already expects. There is no bias here to correct.</string>
+    <string name="calibration_implausible">That is further out than a working phone gets. Check the figures, or that you measured the same thing you typed.</string>
 </resources>

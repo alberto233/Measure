@@ -12,9 +12,11 @@ import com.measure.ar.ArScene
 import com.measure.ar.ArSegment
 import com.measure.ar.CaptureMode
 import com.measure.ar.MeasureArController
+import com.measure.core.data.CalibrationStore
 import com.measure.core.data.MeasureData
 import com.measure.core.data.MeasureRepository
 import com.measure.core.designsystem.hintRes
+import com.measure.core.designsystem.messageRes
 import com.measure.core.designsystem.labelRes
 import com.measure.core.geometry.CapturedCorner
 import com.measure.core.geometry.RoomCapture
@@ -63,6 +65,40 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
      */
     private fun say(@StringRes id: Int, vararg args: Any): String =
         getApplication<Application>().getString(id, *args)
+
+    /**
+     * This device's scale correction, read once when the session opens.
+     *
+     * Read once rather than per point so a capture cannot change scale halfway through: the
+     * calibration screen is reachable while a capture is in progress, and a room whose first
+     * three corners used one factor and whose last three used another is not a room, it is a
+     * bug that would be almost impossible to see.
+     */
+    private val calibration = CalibrationStore(application).calibration
+
+    /**
+     * A captured point, with this device's bias taken out — `docs/ACCURACY.md` M9.
+     *
+     * Applied here, at the single seam every measurement passes through, rather than where
+     * lengths are displayed. Two reasons, and the second is the important one. Scaling the
+     * points scales everything derived from them for free — distances, perimeters, areas by
+     * the square, volumes by the cube — so there is no list of places to remember. And it
+     * means the correction is baked into what gets *saved*: a plan captured today keeps the
+     * lengths it was captured with, and calibrating tomorrow does not silently rewrite it.
+     *
+     * The uncertainty scales with the position, because it is a distance too. The range does
+     * not, being an input to the accuracy model rather than an output of it.
+     */
+    private fun corrected(point: SampledPoint): SampledPoint =
+        if (calibration.isIdentity) {
+            point
+        } else {
+            point.copy(
+                position = point.position * calibration.scale,
+                sigma = calibration.apply(point.sigma),
+                dispersion = calibration.apply(point.dispersion),
+            )
+        }
 
     private val repository: MeasureRepository = MeasureData.repository(application)
 
@@ -171,7 +207,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         private set
 
     fun noteCeilingHeight(metres: Double?) {
-        if (metres != null && metres > 0.0) detectedCeilingHeight = metres
+        if (metres != null && metres > 0.0) detectedCeilingHeight = calibration.apply(metres)
     }
 
     /** Non-null once the perimeter is closed and the correction pipeline has run. */
@@ -393,18 +429,18 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     private fun onCaptureOutcome(outcome: CaptureOutcome) {
         when (outcome) {
             is CaptureOutcome.Rejected -> {
-                notice = CaptureNotice.Warning(outcome.reason.message)
+                notice = CaptureNotice.Warning(say(outcome.reason.messageRes()))
             }
 
             is CaptureOutcome.Accepted -> when (captureMode) {
-                CaptureMode.ROOM -> addCorner(outcome.point)
+                CaptureMode.ROOM -> addCorner(corrected(outcome.point))
                 CaptureMode.DISTANCE -> {
                     val anchor = pending
                     if (anchor == null) {
-                        pending = outcome.point
+                        pending = corrected(outcome.point)
                         notice = CaptureNotice.Advice(say(R.string.capture_other_end))
                     } else {
-                        completeSegment(anchor, outcome.point)
+                        completeSegment(anchor, corrected(outcome.point))
                     }
                 }
             }

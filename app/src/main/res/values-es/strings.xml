@@ -81,4 +81,30 @@
     <string name="device_check_android_version">Android %1$s (API %2$d)</string>
     <string name="device_check_no_message">sin mensaje</string>
     <string name="device_check_install_failed">Falló la solicitud de instalación: %1$s</string>
+
+    <!--
+      Calibración. Ojo con lo que se afirma: una corrección elimina el sesgo sistemático del
+      dispositivo y no toca en absoluto la dispersión de ±2–3 cm. Que alguien lea "calibrado"
+      como "ahora es exacto" desharía justo lo que enseña la guía inicial.
+    -->
+    <string name="calibration_tag">Calibración</string>
+    <string name="calibration_title">Corrige la escala de este móvil</string>
+    <string name="calibration_help">Mide algo cuya longitud real conozcas — una puerta, o una pared que hayas medido con un metro — y escribe las dos cifras. Menos de un metro es demasiado corto para distinguir un sesgo del ruido normal.</string>
+    <string name="calibration_measured_hint">Lo que dijo la app</string>
+    <string name="calibration_actual_hint">Lo que mide de verdad</string>
+    <string name="calibration_apply">Aplicar</string>
+    <string name="calibration_clear">Quitar la corrección</string>
+
+    <string name="calibration_none">Sin calibrar. Las medidas son exactamente lo que dice la cámara.</string>
+    <string name="calibration_long">Este móvil mide un %1$s de más. Todo lo que captures a partir de ahora se corrige.</string>
+    <string name="calibration_short">Este móvil mide un %1$s de menos. Todo lo que captures a partir de ahora se corrige.</string>
+    <string name="calibration_not_retroactive">Los planos que ya tienes guardados conservan las medidas con las que se tomaron.</string>
+    <string name="calibration_still_approximate">Una corrección elimina un sesgo constante. No hace que una medida sea más repetible: sigue contando con ±2–3 cm arriba o abajo, como antes.</string>
+
+    <string name="calibration_applied">Corrección guardada. Las capturas nuevas se escalan a partir de ahora.</string>
+    <string name="calibration_removed">Corrección eliminada.</string>
+    <string name="calibration_not_a_length">Escribe las dos cifras como longitudes — por ejemplo 2,05 y 2,00.</string>
+    <string name="calibration_too_short">Usa algo de al menos un metro. Por debajo, el propio margen de la app es mayor que el sesgo que intentas encontrar.</string>
+    <string name="calibration_within_noise">Esas dos cifras coinciden dentro de los ±2–3 cm que esta app ya da por hechos. Aquí no hay ningún sesgo que corregir.</string>
+    <string name="calibration_implausible">Eso se sale más de lo que se desvía un móvil que funciona. Revisa las cifras, o si mediste lo mismo que has escrito.</string>
 </resources>

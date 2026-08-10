@@ -143,10 +143,47 @@ piece of certainty.
 ### M9 — Known-reference calibration
 
 ARCore's scale should be metrically correct, but device-specific bias exists. Offer an
-optional calibration: measure something of known length — a door, a sheet of A4, a credit
-card, a real tape measure — enter the true value, and store the resulting scale factor
-per device. Optional, never blocking, and probably a settings-screen affair rather than
-part of onboarding.
+optional calibration: measure something of known length, enter the true value, and store the
+resulting scale factor per device. Optional, never blocking, and probably a settings-screen
+affair rather than part of onboarding.
+
+**Built, with two corrections to the paragraph above.**
+
+*"A sheet of A4, a credit card" was wrong.* A measurement carries roughly 3 cm of
+uncertainty regardless of how long the thing is, so on a 210 mm sheet the noise is 15% of the
+answer and no bias smaller than that is visible underneath it. Calibrating on one would store
+noise and apply it to every wall. The implementation refuses any reference under a metre; a
+door is the shortest useful thing in an ordinary room, and a tape run across one is better.
+
+*Most attempts are refused, and that is the feature.* `Calibration.of` hands back a
+correction only when the gap between the two figures exceeds two sigma of the app's own
+declared margin. The case this exists for is the satisfied user: somebody measures their
+2.00 m door, sees 2.02 m, and reaches for calibration. There is nothing there — 2 cm is
+inside what the first card of the guidance deck told them to expect — and storing it would
+make the next reading of the same door 1.98 m and look like a bug. Differences beyond 5% are
+refused too, from the other end: that is not a device with a bias, it is a typo or a
+different object.
+
+Three properties the implementation holds to, all of them tested:
+
+- **It corrects bias, not spread.** A calibrated phone still reports ±2–3 cm. The interface
+  says so in as many words, because "calibrated" otherwise reads as "now it is exact" — the
+  overclaim this whole document exists to prevent.
+- **It is never retroactive.** The factor is applied to points as they are captured, so it is
+  baked into what gets saved. A plan measured before calibration keeps the lengths it was
+  measured with. The alternative — correcting at display time — means a stored measurement
+  silently changes value between one launch and the next, which is the same fault the corner
+  assist had to have removed from it after a field test.
+- **One factor covers everything.** Scaling the captured points scales distances by *k*,
+  areas by *k²* and volumes by *k³* with no list of call sites to keep in step. It also means
+  the model is a ratio rather than an offset, which is the correct shape: a bias that were
+  additive — always 3 cm long, whatever the distance — would make calibrating on a door
+  actively worsen a 5 m wall.
+
+It lives on the device check screen rather than in a settings menu. A calibration is a fact
+about the handset, that screen exists to say what the handset can do, and nobody arrives
+there by accident — the person who has come to find out why their measurements look off is
+exactly who it is for.
 
 ### M10 — Two ways to capture a corner
 

@@ -39,4 +39,11 @@
     <string name="range_too_close">Too close — step back</string>
     <string name="range_long">Quite far — walk closer if you can</string>
     <string name="range_very_long">Very far — expect several centimetres of error</string>
+
+    <!-- Why a tap produced no point. Each names the fix, not the fault. -->
+    <string name="rejected_no_surface">Nothing to measure — aim at a surface</string>
+    <string name="rejected_tracking_lost">Tracking dropped out — hold steadier and try again</string>
+    <string name="rejected_too_few_samples">Hold still a moment longer</string>
+    <string name="rejected_unstable">Too much wobble — hold steadier or step closer</string>
+    <string name="rejected_too_close">Too close to measure — step back</string>
 </resources>
