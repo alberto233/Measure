@@ -46,7 +46,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "xhdpi")
+@Config(qualifiers = "w900dp-h1400dp-xhdpi")
 class IconConceptRenderTest {
 
     @get:Rule
@@ -68,13 +68,22 @@ class IconConceptRenderTest {
             ) {
                 // 2 x 2 rather than a row of four: a single row overflowed the root and
                 // silently clipped the last two concepts out of the picture entirely.
-                for (pair in CONCEPTS.chunked(2)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        for ((_, art) in pair) Tile(132.dp, art)
-                    }
-                }
+                // Ours, large enough to judge the drawing.
                 Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    for ((_, art) in CONCEPTS) Tile(24.dp, art)
+                    for ((_, art) in CONCEPTS) Tile(180.dp, art)
+                }
+
+                // The shelf: ours interleaved with the genre decoys, at the size a store
+                // search result actually shows. Interleaved rather than grouped, because
+                // grouping would tell the eye which is which before it decides.
+                val shelf = listOf(
+                    DECOYS[0], CONCEPTS[0], DECOYS[1],
+                    CONCEPTS[1], DECOYS[2], CONCEPTS[2],
+                )
+                for (row in shelf.chunked(3)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                        for ((_, art) in row) Tile(38.dp, art)
+                    }
                 }
             }
         }
@@ -101,9 +110,21 @@ class IconConceptRenderTest {
 
         val CONCEPTS: List<Pair<String, DrawScope.() -> Unit>> = listOf(
             "A-plan" to { drawPlan() },
-            "B-two-room" to { drawTwoRoomPlan() },
-            "C-phone" to { drawPhoneAndPlan() },
-            "D-iso-room" to { drawIsoRoom() },
+            "E-ruler" to { drawPlanWithRuler() },
+            "F-arrows" to { drawPlanWithArrows() },
+        )
+
+        /**
+         * My approximations of the genre, not anybody's actual logo.
+         *
+         * A control, not artwork. The question they answer is whether our candidates read
+         * as the same *category* when they are sitting on a shelf together, which is the
+         * only thing an icon has to do in a store search grid.
+         */
+        val DECOYS: List<Pair<String, DrawScope.() -> Unit>> = listOf(
+            "G1-ruler-phone" to { drawRulerPhone() },
+            "G2-tape" to { drawTapeMeasure() },
+            "G3-ruler-house" to { drawRulerHouse() },
         )
     }
 }
@@ -115,7 +136,6 @@ private val WHITE_ = Color(0xFFFFFFFF)
 private val INK_ = Color(0xFF101114)
 private val ACCENT_ = Color(0xFF2F6BFF)
 
-/** Four wall bands, drawn as a plan cuts them: solid poché with square corners. */
 private fun DrawScope.walls(l: Float, t: Float, r: Float, b: Float, w: Float) {
     drawRect(WHITE_, at(l, t), Size(u(r - l), u(w)))
     drawRect(WHITE_, at(l, b - w), Size(u(r - l), u(w)))
@@ -123,58 +143,72 @@ private fun DrawScope.walls(l: Float, t: Float, r: Float, b: Float, w: Float) {
     drawRect(WHITE_, at(r - w, t), Size(u(w), u(b - t)))
 }
 
-/** Knocks a hole in a wall. Everything else is drawn into the hole. */
 private fun DrawScope.cut(x0: Float, y0: Float, x1: Float, y1: Float) =
     drawRect(INK_, at(x0, y0), Size(u(x1 - x0), u(y1 - y0)))
 
-/**
- * A door: the gap, the leaf standing open, and the arc it sweeps.
- *
- * The single most legible thing in this whole exploration. A rectangle is a box; a
- * rectangle with a swing arc is a *floor plan*, and almost everybody recognises it without
- * being able to say why.
- */
+/** The door swing arc — the one mark that makes a rectangle read as architecture. */
 private fun DrawScope.doorInBottomWall(from: Float, to: Float, wallTop: Float, wallBottom: Float) {
     cut(from, wallTop, to, wallBottom)
     val span = to - from
     val stroke = u(0.014f)
     drawLine(ACCENT_, at(from, wallTop), at(from, wallTop - span), stroke * 1.4f)
     drawArc(
-        color = ACCENT_,
-        startAngle = 270f,
-        sweepAngle = 90f,
-        useCenter = false,
+        color = ACCENT_, startAngle = 270f, sweepAngle = 90f, useCenter = false,
         topLeft = at(from - span, wallTop - span),
-        size = Size(u(span * 2), u(span * 2)),
-        style = Stroke(stroke),
+        size = Size(u(span * 2), u(span * 2)), style = Stroke(stroke),
     )
 }
 
-/**
- * A window: the gap, with glazing drawn on both wall faces.
- *
- * The first version put one line down the middle of the gap, which read as a detached
- * floating bar rather than as glass in a wall — a glitch, not a symbol. Two lines on the
- * faces is how a plan actually draws it, and it reads immediately.
- */
 private fun DrawScope.windowInTopWall(from: Float, to: Float, wallTop: Float, wallBottom: Float) {
     cut(from, wallTop, to, wallBottom)
     val stroke = u(0.011f)
-    for (y in listOf(wallTop, wallBottom)) {
-        drawLine(WHITE_, at(from, y), at(to, y), stroke)
-    }
+    for (y in listOf(wallTop, wallBottom)) drawLine(WHITE_, at(from, y), at(to, y), stroke)
 }
 
-/** A dimension string: the run, and a tick at each end. */
 private fun DrawScope.dimension(from: Float, to: Float, y: Float) {
     val stroke = u(0.014f)
     drawLine(ACCENT_, at(from, y), at(to, y), stroke, cap = StrokeCap.Round)
-    for (x in listOf(from, to)) {
-        drawLine(ACCENT_, at(x, y - 0.042f), at(x, y + 0.042f), stroke)
+    for (x in listOf(from, to)) drawLine(ACCENT_, at(x, y - 0.042f), at(x, y + 0.042f), stroke)
+}
+
+/**
+ * A ruler edge: a baseline with graduated ticks.
+ *
+ * The borrowed category signal. A ruler is pre-learned — it means "measuring" before
+ * anybody has read a word — and unlike a phone silhouette it sits along one edge instead
+ * of taking the middle of the tile away from the thing that makes us different.
+ */
+private fun DrawScope.rulerEdge(from: Float, to: Float, y: Float, divisions: Int = 8) {
+    val stroke = u(0.016f)
+    drawLine(WHITE_, at(from, y), at(to, y), stroke, cap = StrokeCap.Round)
+    for (i in 0..divisions) {
+        val x = from + (to - from) * i / divisions
+        val long = i % 2 == 0
+        drawLine(
+            color = if (long) ACCENT_ else WHITE_,
+            start = at(x, y),
+            end = at(x, y + if (long) 0.075f else 0.045f),
+            strokeWidth = stroke * if (long) 1.0f else 0.7f,
+        )
     }
 }
 
-/** One room, dimensioned: the cleaned-up version of the strongest first-round concept. */
+/** A dimension run with real arrowheads rather than ticks. */
+private fun DrawScope.dimensionArrows(from: Float, to: Float, y: Float) {
+    val stroke = u(0.018f)
+    drawLine(ACCENT_, at(from, y), at(to, y), stroke, cap = StrokeCap.Round)
+    for ((x, dir) in listOf(from to 1f, to to -1f)) {
+        val head = Path().apply {
+            moveTo(at(x, y).x, at(x, y).y)
+            lineTo(at(x + dir * 0.085f, y - 0.052f).x, at(x + dir * 0.085f, y - 0.052f).y)
+            lineTo(at(x + dir * 0.085f, y + 0.052f).x, at(x + dir * 0.085f, y + 0.052f).y)
+            close()
+        }
+        drawPath(head, ACCENT_)
+    }
+}
+
+/** Baseline: the plan that read best last round. */
 private fun DrawScope.drawPlan() {
     val l = 0.15f; val r = 0.85f; val t = 0.16f; val b = 0.72f; val w = 0.055f
     walls(l, t, r, b, w)
@@ -183,104 +217,70 @@ private fun DrawScope.drawPlan() {
     dimension(l, r, 0.86f)
 }
 
-/**
- * Two rooms and the wall between them — a plan rather than a room.
- *
- * The richer answer to "hard to interpret": one rectangle is ambiguous, but a partition
- * with a door through it is unmistakably a *building*. It costs legibility at launcher
- * size, which is the trade this concept exists to show.
- */
-private fun DrawScope.drawTwoRoomPlan() {
-    val l = 0.12f; val r = 0.88f; val t = 0.14f; val b = 0.70f; val w = 0.05f
+/** The plan, with the category signal borrowed: a graduated ruler along the bottom. */
+private fun DrawScope.drawPlanWithRuler() {
+    val l = 0.15f; val r = 0.85f; val t = 0.12f; val b = 0.64f; val w = 0.055f
     walls(l, t, r, b, w)
-
-    // The partition, with a doorway through it.
-    val px = 0.54f
-    drawRect(WHITE_, at(px, t), Size(u(w), u(b - t)))
-    cut(px, 0.40f, px + w, 0.56f)
-    // Hinged at the top of the opening, swinging into the right-hand room. The first
-    // version hung it from the bottom and swept the arc the wrong way, which left the leaf
-    // and the arc visibly detached from each other.
-    val stroke = u(0.012f)
-    val hinge = 0.40f
-    val leaf = 0.16f
-    drawLine(ACCENT_, at(px + w, hinge), at(px + w + leaf, hinge), stroke * 1.3f)
-    drawArc(
-        color = ACCENT_,
-        startAngle = 0f,
-        sweepAngle = 90f,
-        useCenter = false,
-        topLeft = at(px + w - leaf, hinge - leaf),
-        size = Size(u(leaf * 2), u(leaf * 2)),
-        style = Stroke(stroke),
-    )
-
-    windowInTopWall(0.20f, 0.42f, t, t + w)
-    windowInTopWall(0.66f, 0.80f, t, t + w)
-    dimension(l, px + w, 0.84f)
-    dimension(px + w, r, 0.84f)
+    doorInBottomWall(0.30f, 0.48f, b - w, b)
+    windowInTopWall(0.56f, 0.78f, t, t + w)
+    rulerEdge(l, r, 0.80f)
 }
 
-/** A phone with a real plan on it, and the reticle on the corner being taken. */
-private fun DrawScope.drawPhoneAndPlan() {
-    val l = 0.24f; val r = 0.76f; val t = 0.10f; val b = 0.90f
-    val stroke = u(0.022f)
+/** The plan, with the measurement said louder: arrowheads instead of ticks. */
+private fun DrawScope.drawPlanWithArrows() {
+    val l = 0.15f; val r = 0.85f; val t = 0.16f; val b = 0.70f; val w = 0.055f
+    walls(l, t, r, b, w)
+    doorInBottomWall(0.32f, 0.52f, b - w, b)
+    windowInTopWall(0.56f, 0.78f, t, t + w)
+    dimensionArrows(l, r, 0.85f)
+}
 
+// --- genre decoys: crude on purpose, and nobody's actual logo -----------------------
+
+private fun DrawScope.drawRulerPhone() {
+    val stroke = u(0.028f)
     drawRoundRect(
-        color = WHITE_,
-        topLeft = at(l, t),
-        size = Size(u(r - l), u(b - t)),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(u(0.09f), u(0.09f)),
+        color = WHITE_, topLeft = at(0.28f, 0.10f), size = Size(u(0.44f), u(0.80f)),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(u(0.10f), u(0.10f)),
         style = Stroke(stroke),
     )
-
-    // A plan on the screen — walls with thickness and a door, not a plain rectangle.
-    val pl = 0.32f; val pr = 0.68f; val pt = 0.32f; val pb = 0.62f; val pw = 0.035f
-    walls(pl, pt, pr, pb, pw)
-    doorInBottomWall(0.42f, 0.55f, pb - pw, pb)
-
-    // The corner being aimed at.
-    drawCircle(WHITE_, u(0.052f), at(pr - pw / 2, pt + pw / 2), style = Stroke(u(0.014f)))
-    drawCircle(ACCENT_, u(0.020f), at(pr - pw / 2, pt + pw / 2))
+    drawLine(ACCENT_, at(0.20f, 0.72f), at(0.80f, 0.28f), stroke * 1.4f, cap = StrokeCap.Round)
+    for (i in 1..4) {
+        val f = i / 5f
+        val x = 0.20f + 0.60f * f; val y = 0.72f - 0.44f * f
+        drawLine(ACCENT_, at(x, y), at(x - 0.05f, y - 0.07f), stroke * 0.6f)
+    }
 }
 
-/**
- * A room as a volume, with a door on the floor so it reads as a room and not a cube.
- *
- * The first version was a handsome wireframe box that said nothing about buildings. The
- * door arc and the dimensioned base edge are what turn it into a room.
- */
-private fun DrawScope.drawIsoRoom() {
-    val cx = 0.5f; val cy = 0.56f
-    val run = 0.32f; val rise = 0.16f; val h = 0.24f
-    val stroke = u(0.014f)
-    fun p(dx: Float, dy: Float) = at(cx + dx, cy + dy)
-
-    val near = p(0f, h / 2 + rise)
-    val left = p(-run, h / 2)
-    val right = p(run, h / 2)
-    val far = p(0f, h / 2 - rise)
-
-    val floor = Path().apply {
-        moveTo(near.x, near.y); lineTo(left.x, left.y)
-        lineTo(far.x, far.y); lineTo(right.x, right.y); close()
+private fun DrawScope.drawTapeMeasure() {
+    val stroke = u(0.030f)
+    drawRoundRect(
+        color = WHITE_, topLeft = at(0.14f, 0.42f), size = Size(u(0.44f), u(0.42f)),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(u(0.10f), u(0.10f)),
+        style = Stroke(stroke),
+    )
+    drawCircle(WHITE_, u(0.075f), at(0.36f, 0.63f), style = Stroke(stroke * 0.7f))
+    val tape = Path().apply {
+        moveTo(at(0.58f, 0.50f).x, at(0.58f, 0.50f).y)
+        quadraticBezierTo(at(0.82f, 0.34f).x, at(0.82f, 0.34f).y, at(0.86f, 0.16f).x, at(0.86f, 0.16f).y)
     }
-    drawPath(floor, ACCENT_.copy(alpha = 0.20f))
-    drawPath(floor, WHITE_, style = Stroke(stroke))
+    drawPath(tape, ACCENT_, style = Stroke(stroke * 1.2f))
+}
 
-    val tops = listOf(near, left, right, far).map { Offset(it.x, it.y - u(h)) }
-    listOf(near, left, right).forEachIndexed { i, base -> drawLine(WHITE_, base, tops[i], stroke) }
-    val ceiling = Path().apply {
-        moveTo(tops[0].x, tops[0].y); lineTo(tops[1].x, tops[1].y)
-        lineTo(tops[3].x, tops[3].y); lineTo(tops[2].x, tops[2].y); close()
+private fun DrawScope.drawRulerHouse() {
+    val stroke = u(0.030f)
+    val house = Path().apply {
+        moveTo(at(0.50f, 0.14f).x, at(0.50f, 0.14f).y)
+        lineTo(at(0.84f, 0.42f).x, at(0.84f, 0.42f).y)
+        lineTo(at(0.84f, 0.70f).x, at(0.84f, 0.70f).y)
+        lineTo(at(0.16f, 0.70f).x, at(0.16f, 0.70f).y)
+        lineTo(at(0.16f, 0.42f).x, at(0.16f, 0.42f).y)
+        close()
     }
-    drawPath(ceiling, WHITE_, style = Stroke(stroke))
-
-    // A doorway on the near-right base edge, drawn flat on the floor plane.
-    val doorA = Offset(near.x + (right.x - near.x) * 0.30f, near.y + (right.y - near.y) * 0.30f)
-    val doorB = Offset(near.x + (right.x - near.x) * 0.62f, near.y + (right.y - near.y) * 0.62f)
-    drawLine(INK_, doorA, doorB, stroke * 2.2f)
-    drawLine(ACCENT_, doorA, Offset(doorA.x + u(0.10f), doorA.y - u(0.10f)), stroke * 1.2f)
-
-    for (corner in listOf(near, left, right)) drawCircle(ACCENT_, u(0.028f), corner)
+    drawPath(house, WHITE_, style = Stroke(stroke))
+    drawLine(ACCENT_, at(0.16f, 0.84f), at(0.84f, 0.84f), stroke, cap = StrokeCap.Round)
+    for (i in 0..4) {
+        val x = 0.16f + 0.68f * i / 4f
+        drawLine(ACCENT_, at(x, 0.84f), at(x, 0.90f), stroke * 0.7f)
+    }
 }
