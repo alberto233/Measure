@@ -11,3 +11,8 @@ captures/
 *.aab
 *.keystore
 !debug.keystore
+
+# The upload key and its passwords. The debug keystore above is committed on purpose and
+# is the only one that ever will be — see the comment in app/build.gradle.kts.
+*.jks
+keystore.properties

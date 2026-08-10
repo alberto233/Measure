@@ -193,17 +193,39 @@ the only text. Not yet made.
 
 Blocking, in order:
 
-- [ ] **A release signing key.** `app/build.gradle.kts` has a `release` build type with no
-      `signingConfig`, so release builds are unsigned. The debug key is committed
-      deliberately (so sideloaded updates install over each other) and must never be the
-      upload key.
+- [ ] **A release signing key.** The build is ready for one; the key itself does not exist.
+      Make it, keep it somewhere that is not this repository, and never lose it — Play ties
+      the app to it permanently.
+
+      ```
+      keytool -genkeypair -v -keystore measure-upload.jks -storetype PKCS12 \
+        -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+      ```
+
+      Then either write a `keystore.properties` at the repository root (gitignored):
+
+      ```
+      storeFile=/absolute/path/to/measure-upload.jks
+      storePassword=…
+      keyAlias=upload
+      keyPassword=…
+      ```
+
+      or set `MEASURE_KEYSTORE`, `MEASURE_KEYSTORE_PASSWORD`, `MEASURE_KEY_ALIAS` and
+      `MEASURE_KEY_PASSWORD` in the environment, which is the shape CI wants. With none of
+      them present `assembleRelease` still succeeds and emits `app-release-unsigned.apk` —
+      **deliberately unsigned rather than debug-signed**, because a debug-signed release
+      installs perfectly, runs perfectly, and is rejected by Play long after anyone who
+      sideloaded it is locked to a key that can never be used again.
 - [ ] **A Play Console account** and the one-off registration fee.
 - [ ] **Somewhere to host the privacy policy**, and a contact address for it.
 - [ ] **A feature graphic** (§8).
 - [ ] **Real screenshots** (§6). The 512 listing icon is done — regenerate it with
       `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'`.
-- [ ] **`versionName` and `versionCode`** set deliberately for the first public build.
-      Currently `0.1.5` / `6`, which is a dev sequence rather than a release one.
+- [ ] **`versionName`** set deliberately for the first public build. Currently `0.1.6`,
+      which is a dev sequence rather than a release one. `versionCode` keeps climbing from
+      `7` rather than restarting at `1`: a lower code will not install over the builds
+      already on test phones, and Play only requires that it increase.
 
 Not blocking, but worth having first:
 

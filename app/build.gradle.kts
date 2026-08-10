@@ -1,6 +1,8 @@
 // AGP 9.0 has built-in Kotlin support and enables it by default. The standalone
 // org.jetbrains.kotlin.android plugin is not merely redundant now, it is rejected:
 // applying it fails the build outright.
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.roborazzi)
@@ -13,6 +15,36 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+/**
+ * The upload key, from anywhere except this repository.
+ *
+ * A `keystore.properties` at the repository root for a person's own machine, environment
+ * variables for CI, and nothing at all for everyone else — which is the case that has to keep
+ * working, because a signed release build is a thing exactly one person can produce and every
+ * other build in the world must not fail for want of it.
+ *
+ * Both sources are read here rather than in the `signingConfigs` block so that the *absence*
+ * of a key is a value this file can branch on, instead of an exception thrown deep inside
+ * AGP at execution time.
+ */
+val keystore = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
+fun signingSecret(property: String, variable: String): String? =
+    (keystore.getProperty(property) ?: System.getenv(variable))?.takeIf { it.isNotBlank() }
+
+val uploadKeystore = signingSecret("storeFile", "MEASURE_KEYSTORE")
+val uploadStorePassword = signingSecret("storePassword", "MEASURE_KEYSTORE_PASSWORD")
+val uploadKeyAlias = signingSecret("keyAlias", "MEASURE_KEY_ALIAS")
+val uploadKeyPassword = signingSecret("keyPassword", "MEASURE_KEY_PASSWORD")
+
+val canSignRelease = uploadKeystore != null &&
+    uploadStorePassword != null &&
+    uploadKeyAlias != null &&
+    uploadKeyPassword != null
+
 android {
     namespace = "com.measure.app"
     compileSdk = 36
@@ -24,8 +56,13 @@ android {
         // Bumped whenever a build goes out for testing. Android will not install a
         // lower code over a higher one, and a version that never changes gives the user
         // no way to tell which build is on the phone.
-        versionCode = 6
-        versionName = "0.1.5"
+        //
+        // Still a dev sequence. The first public build wants a deliberate `versionName`
+        // — see `docs/STORE_LISTING.md` §9 — but the *code* keeps climbing from here
+        // rather than restarting at 1, because a lower code will not install over the
+        // builds already on test phones.
+        versionCode = 7
+        versionName = "0.1.6"
     }
 
     // A debug keystore committed to the repository, so every build — CI, local, anyone's
@@ -48,6 +85,14 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
+        if (canSignRelease) {
+            create("release") {
+                storeFile = file(uploadKeystore!!)
+                storePassword = uploadStorePassword
+                keyAlias = uploadKeyAlias
+                keyPassword = uploadKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -56,6 +101,13 @@ android {
         }
         release {
             isMinifyEnabled = false
+
+            // Null when no key is configured, which leaves the APK unsigned rather than
+            // silently falling back to the debug key. An unsigned release fails at install
+            // with a message about signing; a debug-signed one installs perfectly, runs
+            // perfectly, and is rejected by Play months later with the plans of everyone
+            // who sideloaded it now locked to a key that cannot be used again.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
