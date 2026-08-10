@@ -35,6 +35,32 @@ import java.io.File
 @Config(sdk = [34])
 class LauncherIconTest {
 
+    /**
+     * The Play listing icon, full-bleed at the size Play asks for.
+     *
+     * Drawn onto an ink square rather than through `AdaptiveIconDrawable`, because this
+     * asset has no launcher mask to survive: Play takes a 512 square and rounds it itself.
+     * Rendered from the checked-in vector so the upload can always be regenerated from
+     * source, instead of being a PNG somebody has to remember to redo when the mark moves.
+     */
+    @Test
+    fun `the store icon renders at 512`() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val mark = ContextCompat.getDrawable(context, R.drawable.ic_store_foreground)
+        assertNotNull("The store icon vector does not resolve.", mark)
+
+        val size = 512
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(android.graphics.Color.parseColor("#101114"))
+        mark!!.setBounds(0, 0, size, size)
+        mark.draw(canvas)
+
+        val file = File(File("build/outputs/roborazzi").apply { mkdirs() }, "store-icon-512.png")
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        assertTrue("Nothing was written for the store icon.", file.length() > 0)
+    }
+
     @Test
     fun `the launcher icon renders at every size it is seen at`() {
         val context = ApplicationProvider.getApplicationContext<Application>()
@@ -51,6 +77,7 @@ class LauncherIconTest {
             val file = File(output, "launcher-icon-$size.png")
             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             assertTrue("Nothing was written for the ${size}px icon.", file.length() > 0)
+
         }
     }
 }

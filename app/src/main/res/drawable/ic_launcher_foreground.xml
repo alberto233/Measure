@@ -1,19 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The launcher mark: a room in plan, with one corner picked out.
+  The launcher mark: a measured floor plan.
 
-  A floor plan rather than a ruler or a tape, because a plan is what this app produces and
-  what none of its competitors' icons show. The accent node on one corner is the specific
-  claim: corners are the thing being captured, and the corner assist is the thing that
-  makes capturing them bearable.
+  Chosen over the abstract rectangle-and-dot it replaces because that mark said "shape",
+  not "measure a room" — it was correct and uninterpretable. Three things carry the
+  meaning here, and each was tested against a mock store shelf before being kept:
 
-  Drawn on the 108×108 adaptive-icon canvas. Everything sits inside the central 66×66 safe
-  zone, so no launcher mask — circle, squircle, teardrop — can clip any of it.
+  * **The door swing arc.** The single mark that makes a rectangle read as architecture
+    rather than as a box. Almost everybody recognises it and nobody can say why.
+  * **No window.** It is in the store icon and not here. Two glazing lines 1.3 units apart
+    merge into one floating bar well before 48 px, which is the same glitch the concept
+    round removed — and at launcher size the detail was never legible anyway.
+  * **The dimension arrow.** The borrowed category signal. A double-headed arrow says
+    "measured" pre-verbally and, unlike a ruler's graduations, survives being shrunk to a
+    48 px launcher tile — which is what this asset is for. The graduated variant is the
+    store listing's icon, where the detail is affordable.
 
-  Colours are literal rather than references because a launcher icon is rasterised by the
-  system outside any theme, so a token here would be a token nothing could resolve. They
-  are `MeasureColours.Surface`, `Ink` and `Accent`; if the palette moves, this moves by
-  hand and `LauncherIconTest` renders the result to look at.
+  Deliberately no camera or phone. It is the most cloned element in this category, and a
+  phone silhouette eats the tile and leaves the plan too small to read. That message
+  belongs in the screenshots and the feature graphic.
+
+  **Sized to the safe circle, not the canvas.** An adaptive icon is 108 wide, but only a
+  circle of radius 36 about the centre survives every launcher mask — the corners of the
+  nominal 72 square are clipped by a round one. Every extreme point here is inside that
+  circle; the furthest is the back corner of a dimension arrowhead at r=35.5.
+
+  Colours are literal because the system rasterises this outside any theme. They are
+  MeasureColours Surface, Ink and Accent.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -21,33 +34,23 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- The room: 44 × 34, in bars rather than a stroked path so the corners join square
-         the way a drawn plan does.
+    <!-- Walls, cut only for the door. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M30,30 h48 v5 h-48 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M30,30 h5 v36 h-5 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M73,30 h5 v36 h-5 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M30,61 h10 v5 h-10 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M50,61 h28 v5 h-28 z" />
 
-         Sized against the *safe zone*, not the canvas. An adaptive icon is 108 wide but
-         only its central 72 survives every launcher mask, and the first version of this
-         was drawn to the canvas — which rendered as a mark filling the whole tile with the
-         corner node clipped off at the edge. The whole drawing, node included, now sits
-         inside 27..76.
+    <!-- The door: leaf standing open, and the quarter it sweeps. -->
+    <path android:fillColor="#2F6BFF" android:pathData="M38.3,51 h3.4 v10 h-3.4 z" />
+    <path
+        android:strokeColor="#2F6BFF"
+        android:strokeWidth="2.9"
+        android:fillColor="#00000000"
+        android:pathData="M40,51 A10,10 0 0 1 50,61" />
 
-         Nudged two units up and left of the room's own centre, because the corner node
-         adds mass on one side and optical centring beats arithmetic centring. -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,37 h44 v7 h-44 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,64 h44 v7 h-44 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M32,37 h7 v34 h-7 z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M69,37 h7 v34 h-7 z" />
-
-    <!-- The captured corner. Drawn last so it sits over the join, which is what a corner
-         node does on the plan renderer too. -->
-    <path
-        android:fillColor="#2F6BFF"
-        android:pathData="M35.5,40.5 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+    <!-- The dimension: run and two heads. -->
+    <path android:fillColor="#2F6BFF" android:pathData="M37,74.2 h34 v3.6 h-34 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M30,76 L39,71.8 L39,80.2 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M78,76 L69,71.8 L69,80.2 z" />
 </vector>

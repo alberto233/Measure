@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Play listing icon: the same plan, measured with a graduated ruler.
+
+  Not the launcher's artwork. The launcher gets a dimension arrow because a double-headed
+  arrow is the mark that survives 48 px; this one gets a ruler because a store search grid
+  is a findability problem, and a ruler is the strongest pre-learned "measuring" signal
+  there is. Same motif, two detail budgets — which is what apps with detailed icons do.
+
+  Drawn full-bleed rather than to the adaptive safe zone. Play wants a 512 square and
+  applies its own rounding, so there is no launcher mask to survive and the mark can use
+  the canvas. That is also why the window is here and not on the launcher: at listing size
+  the glazing reads, and it is one more thing that says "floor plan" rather than "box".
+
+  Composed as one object rather than two. The first version left fourteen units of dead
+  canvas between the plan and the ruler, which read as a drawing with an unrelated ruler
+  parked underneath it; closing that gap and centring the pair vertically makes the ruler
+  look like it is measuring the room above it.
+
+  Not referenced by the app at runtime — it is an upload asset, rendered to PNG by
+  LauncherIconTest so it stays reproducible from source rather than living in a
+  screenshot somebody has to remember to redo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Walls, cut for a window in the top run and a door in the bottom one. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M18,20 h46 v6 h-46 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M82,20 h8 v6 h-8 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M18,20 h6 v44 h-6 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M84,20 h6 v44 h-6 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M18,58 h16 v6 h-16 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M54,58 h36 v6 h-36 z" />
+
+    <!-- Glazing on both wall faces: what makes the gap read as a window and not a hole. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M64,20 h18 v1.6 h-18 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M64,24.4 h18 v1.6 h-18 z" />
+
+    <!-- The door: leaf standing open, and the quarter it sweeps. -->
+    <path android:fillColor="#2F6BFF" android:pathData="M32.4,38 h3.2 v20 h-3.2 z" />
+    <path
+        android:strokeColor="#2F6BFF"
+        android:strokeWidth="3.2"
+        android:fillColor="#00000000"
+        android:pathData="M34,38 A20,20 0 0 1 54,58" />
+
+    <!-- The ruler: a baseline, and graduations alternating long and short. -->
+    <path android:fillColor="#FFFFFF" android:pathData="M18,74 h72 v3.5 h-72 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M18,77.5 h3.4 v9 h-3.4 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M25.8,77.5 h2.4 v5.5 h-2.4 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M34.3,77.5 h3.4 v9 h-3.4 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M43.8,77.5 h2.4 v5.5 h-2.4 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M52.3,77.5 h3.4 v9 h-3.4 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M61.8,77.5 h2.4 v5.5 h-2.4 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M70.3,77.5 h3.4 v9 h-3.4 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M79.8,77.5 h2.4 v5.5 h-2.4 z" />
+    <path android:fillColor="#2F6BFF" android:pathData="M86.6,77.5 h3.4 v9 h-3.4 z" />
+</vector>

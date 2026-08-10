@@ -151,12 +151,45 @@ Suggested order, because the first two are the only ones most people see:
 Take 1, 2 and 4 from a real room on a real phone. 3 and 5 can come from the Roborazzi
 renders, which are pixel-accurate to the shipped build.
 
-## 7. Feature graphic
+## 7. Icons
 
-1024 × 500. Ink ground, the plan mark from the launcher icon, and the short description as
+Two assets, same motif, different detail budgets — which is what apps with detailed icons
+generally do.
+
+| Asset | Source | Rendered by |
+| --- | --- | --- |
+| Launcher | `app/src/main/res/drawable/ic_launcher_foreground.xml` | `LauncherIconTest` at 512/192/48 |
+| Play listing (512²) | `app/src/main/res/drawable/ic_store_foreground.xml` | `LauncherIconTest` → `store-icon-512.png` |
+
+Both are a floor plan with a door swing arc. The arc is the whole reason they read as
+architecture rather than as a box, and it is the thing no competitor icon in this category
+has — they lean on rulers, tape measures and phones, which say "measures a line" rather
+than "produces a plan".
+
+They differ in how they say *measured*, and the difference is a size argument:
+
+- **Launcher — a dimension arrow.** A double-headed arrow is the mark that still resolves
+  at 48 px. It also carries no window, because two glazing lines merge into one floating
+  bar long before that size.
+- **Listing — a graduated ruler.** A store search grid is a findability problem before it
+  is a differentiation one, and a ruler is the strongest pre-learned "measuring" signal
+  available. At 512 the graduations and the window are affordable, and both help.
+
+Neither carries a camera or a phone. It is the most cloned element in the category, and a
+phone silhouette eats the tile and leaves the plan too small to read. That message belongs
+in the screenshots and the feature graphic, which have room to make it properly.
+
+Chosen by rendering candidates into a mock store shelf — ours interleaved with genre
+decoys at real listing size — rather than by argument. The launcher artwork is sized to a
+circle of radius 36 about the canvas centre, not to the nominal 72 safe square, because a
+round launcher mask clips that square's corners.
+
+## 8. Feature graphic
+
+1024 × 500. Ink ground, the plan mark from the listing icon, and the short description as
 the only text. Not yet made.
 
-## 8. Before submission
+## 9. Before submission
 
 Blocking, in order:
 
@@ -166,8 +199,9 @@ Blocking, in order:
       upload key.
 - [ ] **A Play Console account** and the one-off registration fee.
 - [ ] **Somewhere to host the privacy policy**, and a contact address for it.
-- [ ] **A feature graphic** (§7).
-- [ ] **Real screenshots** (§6).
+- [ ] **A feature graphic** (§8).
+- [ ] **Real screenshots** (§6). The 512 listing icon is done — regenerate it with
+      `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'`.
 - [ ] **`versionName` and `versionCode`** set deliberately for the first public build.
       Currently `0.1.5` / `6`, which is a dev sequence rather than a release one.
 
