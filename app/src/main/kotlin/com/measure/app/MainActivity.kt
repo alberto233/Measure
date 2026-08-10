@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
      */
     private var runCount = 0
 
-    private var report by mutableStateOf(DeviceCheck.checking(runCount, stamp()))
+    private var report by mutableStateOf(DeviceCheck.checking(resources, runCount, stamp()))
 
     /** ARCore's install flow may only be requested once per user gesture. */
     private var userRequestedInstall = true
@@ -113,15 +113,15 @@ class MainActivity : ComponentActivity() {
         val availability = try {
             ArCoreApk.getInstance().checkAvailability(this)
         } catch (error: Throwable) {
-            val message = "${error.javaClass.simpleName}: ${error.message ?: "no message"}"
-            report = DeviceCheck.failed(runCount, stamp(), message, CrashLog.read(this))
+            val message = "${error.javaClass.simpleName}: ${error.message ?: noMessage()}"
+            report = DeviceCheck.failed(resources, runCount, stamp(), message, CrashLog.read(this))
             action = ::refresh
             return
         }
 
         // The Play Store lookup is asynchronous the first time. Poll until it settles.
         if (availability == ArCoreApk.Availability.UNKNOWN_CHECKING) {
-            report = DeviceCheck.checking(runCount, stamp())
+            report = DeviceCheck.checking(resources, runCount, stamp())
             val recheck = Runnable { refresh() }
             pendingRecheck = recheck
             handler.postDelayed(recheck, RECHECK_DELAY_MS)
@@ -136,6 +136,7 @@ class MainActivity : ComponentActivity() {
         }
 
         report = DeviceCheck.of(
+            resources = resources,
             runCount = runCount,
             stamp = stamp(),
             availability = availability,
@@ -161,7 +162,7 @@ class MainActivity : ComponentActivity() {
                 raw = session.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY),
             )
         } catch (error: Throwable) {
-            DepthSupport(error = "${error.javaClass.simpleName}: ${error.message ?: "no message"}")
+            DepthSupport(error = "${error.javaClass.simpleName}: ${error.message ?: noMessage()}")
         } finally {
             try {
                 session?.close()
@@ -176,8 +177,11 @@ class MainActivity : ComponentActivity() {
             ArCoreApk.getInstance().requestInstall(this, userRequestedInstall)
             userRequestedInstall = false
         } catch (error: Throwable) {
-            val message = "Install request failed: ${error.message ?: "no message"}"
-            report = DeviceCheck.failed(runCount, stamp(), message, CrashLog.read(this))
+            val message = getString(
+                R.string.device_check_install_failed,
+                error.message ?: noMessage(),
+            )
+            report = DeviceCheck.failed(resources, runCount, stamp(), message, CrashLog.read(this))
         }
     }
 
@@ -189,6 +193,8 @@ class MainActivity : ComponentActivity() {
     private fun requestCameraPermissionIfNeeded() {
         if (!hasCameraPermission()) cameraPermission.launch(Manifest.permission.CAMERA)
     }
+
+    private fun noMessage(): String = getString(R.string.device_check_no_message)
 
     private fun stamp(): String =
         java.text.SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())

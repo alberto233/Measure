@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.measure.core.designsystem.MeasureButton
@@ -75,8 +76,12 @@ fun DeviceCheckScreen(
                 .padding(MeasureSpace.Loose),
             verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
         ) {
-            MeasureTag("Device capability")
-            Text("What this phone can do", color = MeasureColours.Ink, style = MeasureType.Display)
+            MeasureTag(stringResource(R.string.device_check_tag))
+            Text(
+                text = stringResource(R.string.device_check_heading),
+                color = MeasureColours.Ink,
+                style = MeasureType.Display,
+            )
 
             report.crash?.let { CrashReport(it) }
 
@@ -84,12 +89,12 @@ fun DeviceCheckScreen(
 
             MeasureRule()
 
-            MeasureTag("Checks")
+            MeasureTag(stringResource(R.string.device_check_tag_checks))
             report.checks.forEach { CheckRow(it) }
 
             MeasureRule()
 
-            MeasureTag("Device")
+            MeasureTag(stringResource(R.string.device_check_tag_device))
             report.device.forEach {
                 Text(it, color = MeasureColours.InkMuted, style = MeasureType.Body)
             }
@@ -99,16 +104,20 @@ fun DeviceCheckScreen(
             // The measurement core, run on the handset against the same synthetic room the
             // JVM tests use. It proves the maths is wired in and behaves identically on ARM
             // as it does in CI, which is the one thing a device cannot be asked about.
-            MeasureTag("Measurement core")
+            MeasureTag(stringResource(R.string.device_check_tag_core))
             Text(
-                text = "A synthetic 5.00 × 4.00 m room, solved here rather than in CI",
+                text = stringResource(R.string.device_check_core_note),
                 color = MeasureColours.InkMuted,
                 style = MeasureType.Small,
             )
             report.core.forEach { CheckRow(it) }
 
             Text(
-                text = "Check ${report.runCount} at ${report.stamp}",
+                text = stringResource(
+                    R.string.device_check_run,
+                    report.runCount,
+                    report.stamp,
+                ),
                 color = MeasureColours.InkMuted,
                 style = MeasureType.Small,
             )
@@ -126,7 +135,13 @@ fun DeviceCheckScreen(
             verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
         ) {
             MeasurePrimaryButton(
-                label = if (report.canMeasure) "Start measuring" else "Measuring unavailable",
+                label = stringResource(
+                    if (report.canMeasure) {
+                        R.string.device_check_start
+                    } else {
+                        R.string.device_check_cannot_start
+                    },
+                ),
                 onClick = onStartMeasuring,
                 enabled = report.canMeasure,
             )
@@ -137,7 +152,7 @@ fun DeviceCheckScreen(
             )
             if (report.crash != null) {
                 MeasureButton(
-                    label = "Clear crash report",
+                    label = stringResource(R.string.device_check_clear_crash),
                     onClick = onClearCrash,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -158,7 +173,7 @@ private fun Verdict(report: DeviceReport) {
             .padding(MeasureSpace.Base),
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Hair),
     ) {
-        MeasureTag("Verdict", colour = report.verdictColour)
+        MeasureTag(stringResource(R.string.device_check_tag_verdict), colour = report.verdictColour)
         Text(report.verdictHeadline, color = report.verdictColour, style = MeasureType.Title)
         Text(report.verdictDetail, color = MeasureColours.InkMuted, style = MeasureType.Body)
     }
@@ -215,7 +230,7 @@ private fun CrashReport(crash: String) {
             .padding(MeasureSpace.Base),
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
     ) {
-        MeasureTag("Previous run crashed", colour = MeasureColours.Blocked)
+        MeasureTag(stringResource(R.string.device_check_crashed), colour = MeasureColours.Blocked)
         Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
             Text(crash.trimEnd(), color = MeasureColours.InkMuted, style = MeasureType.ValueSmall)
         }

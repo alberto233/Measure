@@ -1,6 +1,94 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The device check, plus the activity labels the launcher and the task switcher show.
+
+  Translators: this screen is the earliest statement the product makes about how good a
+  measurement on this phone can be, so its verdicts are precise on purpose. "Supported,
+  without depth" is not the same claim as "supported", and the difference is what the user
+  is being told to expect.
+-->
 <resources>
-    <string name="app_name">Measure</string>
+    <!-- The product's name. It is the same word in every language. -->
+    <string name="app_name" translatable="false">Measure</string>
+
     <string name="capture_title">Measure</string>
     <string name="device_check_title">Device check</string>
+
+    <string name="device_check_tag">Device capability</string>
+    <string name="device_check_heading">What this phone can do</string>
+    <string name="device_check_tag_verdict">Verdict</string>
+    <string name="device_check_tag_checks">Checks</string>
+    <string name="device_check_tag_device">Device</string>
+    <string name="device_check_tag_core">Measurement core</string>
+    <string name="device_check_core_note">A synthetic 5.00 × 4.00 m room, solved here rather than in CI</string>
+    <string name="device_check_run">Check %1$d at %2$s</string>
+    <string name="device_check_crashed">Previous run crashed</string>
+
+    <string name="device_check_start">Start measuring</string>
+    <string name="device_check_cannot_start">Measuring unavailable</string>
+    <string name="device_check_clear_crash">Clear crash report</string>
+
+    <string name="device_check_action_install_arcore">Install or update ARCore</string>
+    <string name="device_check_action_grant_camera">Grant camera permission</string>
+    <string name="device_check_action_rerun">Re-run checks</string>
+
+    <string name="device_check_checking">Checking</string>
+    <string name="device_check_checking_detail">Asking Google Play what this phone supports.</string>
+
+    <string name="device_check_failed">The check itself failed</string>
+    <string name="device_check_failed_detail">ARCore could not be asked whether it supports this phone. That is not the same as an unsupported phone, and re-running may well succeed.</string>
+
+    <string name="device_check_unsupported">This phone cannot measure</string>
+    <string name="device_check_unsupported_detail">ARCore does not support this device, so measuring by camera is not possible here. Saved plans can still be opened and sent.</string>
+
+    <string name="device_check_needs_install">One install away</string>
+    <string name="device_check_needs_install_detail">This phone is supported, but Google Play Services for AR is not installed yet.</string>
+
+    <string name="device_check_needs_update">One update away</string>
+    <string name="device_check_needs_update_detail">This phone is supported, but Google Play Services for AR needs updating.</string>
+
+    <string name="device_check_session_failed">ARCore would not start</string>
+    <string name="device_check_session_failed_detail">The device reports support, but opening a session failed. The reason is below; it is usually a permission or an ARCore update in progress.</string>
+
+    <string name="device_check_full">Fully supported</string>
+    <string name="device_check_full_detail">ARCore and the Depth API are both available. Everything this app can do, it can do on this phone.</string>
+
+    <string name="device_check_no_depth">Supported, without depth</string>
+    <string name="device_check_no_depth_detail">ARCore works but the Depth API is not available, so measuring falls back to detected planes. Corners away from a floor or a wall will be less accurate.</string>
+
+    <string name="device_check_needs_camera">Camera access needed</string>
+    <string name="device_check_needs_camera_detail">ARCore is supported. Grant camera access to test the Depth API.</string>
+
+    <!-- The left-hand column of the checks list. -->
+    <string name="device_check_row_arcore" translatable="false">ARCore</string>
+    <string name="device_check_row_camera">Camera permission</string>
+    <string name="device_check_row_depth" translatable="false">Depth API</string>
+    <string name="device_check_row_raw_depth">Raw depth</string>
+    <string name="device_check_row_reason">Reason</string>
+    <string name="device_check_row_error">Error</string>
+    <string name="device_check_row_wall">Wall %1$d</string>
+    <string name="device_check_row_area">Area, true 20 m²</string>
+    <string name="device_check_row_misclosure">Misclosure</string>
+    <string name="device_check_row_reliable">Reliable</string>
+    <string name="device_check_row_core_failed">Core failed</string>
+
+    <!-- The right-hand column. Lower case because they complete the label beside them. -->
+    <string name="device_check_arcore_installed">installed</string>
+    <string name="device_check_arcore_not_installed">not installed</string>
+    <string name="device_check_arcore_needs_update">needs updating</string>
+    <string name="device_check_arcore_unsupported">not supported</string>
+    <string name="device_check_arcore_checking">checking</string>
+    <string name="device_check_arcore_play_error">unknown (Play error)</string>
+    <string name="device_check_arcore_timed_out">unknown (timed out)</string>
+    <string name="device_check_granted">granted</string>
+    <string name="device_check_not_granted">not granted</string>
+    <string name="device_check_needs_camera_short">needs camera access</string>
+    <string name="device_check_needs_arcore_short">needs ARCore</string>
+    <string name="device_check_session_failed_short">session failed</string>
+    <string name="device_check_yes">yes</string>
+    <string name="device_check_no">no</string>
+
+    <string name="device_check_android_version">Android %1$s (API %2$d)</string>
+    <string name="device_check_no_message">no message</string>
+    <string name="device_check_install_failed">Install request failed: %1$s</string>
 </resources>

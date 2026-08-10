@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. "Comprobación del dispositivo" rather than "chequeo", and "profundidad" for
+  the Depth API's subject while "Depth API" itself stays in English — it is the name Google
+  gives the thing, and a user searching for why their phone lacks it will search for that.
+-->
+<resources>
+    <string name="capture_title">Medir</string>
+    <string name="device_check_title">Comprobación del dispositivo</string>
+
+    <string name="device_check_tag">Capacidad del dispositivo</string>
+    <string name="device_check_heading">Qué puede hacer este móvil</string>
+    <string name="device_check_tag_verdict">Veredicto</string>
+    <string name="device_check_tag_checks">Comprobaciones</string>
+    <string name="device_check_tag_device">Dispositivo</string>
+    <string name="device_check_tag_core">Núcleo de medición</string>
+    <string name="device_check_core_note">Una habitación sintética de 5,00 × 4,00 m, resuelta aquí y no en CI</string>
+    <string name="device_check_run">Comprobación %1$d a las %2$s</string>
+    <string name="device_check_crashed">La ejecución anterior falló</string>
+
+    <string name="device_check_start">Empezar a medir</string>
+    <string name="device_check_cannot_start">No se puede medir</string>
+    <string name="device_check_clear_crash">Borrar el informe de fallo</string>
+
+    <string name="device_check_action_install_arcore">Instalar o actualizar ARCore</string>
+    <string name="device_check_action_grant_camera">Conceder permiso de cámara</string>
+    <string name="device_check_action_rerun">Volver a comprobar</string>
+
+    <string name="device_check_checking">Comprobando</string>
+    <string name="device_check_checking_detail">Preguntando a Google Play qué admite este móvil.</string>
+
+    <string name="device_check_failed">Falló la propia comprobación</string>
+    <string name="device_check_failed_detail">No se ha podido preguntar a ARCore si admite este móvil. Eso no es lo mismo que un móvil no admitido, y es muy posible que volver a intentarlo funcione.</string>
+
+    <string name="device_check_unsupported">Este móvil no puede medir</string>
+    <string name="device_check_unsupported_detail">ARCore no admite este dispositivo, así que aquí no se puede medir con la cámara. Los planos guardados se pueden seguir abriendo y enviando.</string>
+
+    <string name="device_check_needs_install">A una instalación de distancia</string>
+    <string name="device_check_needs_install_detail">Este móvil está admitido, pero todavía no tienes instalado Google Play Services para RA.</string>
+
+    <string name="device_check_needs_update">A una actualización de distancia</string>
+    <string name="device_check_needs_update_detail">Este móvil está admitido, pero Google Play Services para RA necesita actualizarse.</string>
+
+    <string name="device_check_session_failed">ARCore no arrancó</string>
+    <string name="device_check_session_failed_detail">El dispositivo dice que está admitido, pero al abrir una sesión falló. El motivo está abajo; suele ser un permiso o una actualización de ARCore en curso.</string>
+
+    <string name="device_check_full">Totalmente admitido</string>
+    <string name="device_check_full_detail">ARCore y la Depth API están disponibles. Todo lo que esta app sabe hacer, lo puede hacer en este móvil.</string>
+
+    <string name="device_check_no_depth">Admitido, sin profundidad</string>
+    <string name="device_check_no_depth_detail">ARCore funciona pero la Depth API no está disponible, así que la medición recurre a los planos detectados. Las esquinas alejadas de un suelo o una pared serán menos precisas.</string>
+
+    <string name="device_check_needs_camera">Hace falta acceso a la cámara</string>
+    <string name="device_check_needs_camera_detail">ARCore está admitido. Concede acceso a la cámara para probar la Depth API.</string>
+
+    <string name="device_check_row_camera">Permiso de cámara</string>
+    <string name="device_check_row_raw_depth">Profundidad en bruto</string>
+    <string name="device_check_row_reason">Motivo</string>
+    <string name="device_check_row_error">Error</string>
+    <string name="device_check_row_wall">Pared %1$d</string>
+    <string name="device_check_row_area">Superficie, real 20 m²</string>
+    <string name="device_check_row_misclosure">Error de cierre</string>
+    <string name="device_check_row_reliable">Fiable</string>
+    <string name="device_check_row_core_failed">Falló el núcleo</string>
+
+    <string name="device_check_arcore_installed">instalado</string>
+    <string name="device_check_arcore_not_installed">no instalado</string>
+    <string name="device_check_arcore_needs_update">necesita actualizarse</string>
+    <string name="device_check_arcore_unsupported">no admitido</string>
+    <string name="device_check_arcore_checking">comprobando</string>
+    <string name="device_check_arcore_play_error">desconocido (error de Play)</string>
+    <string name="device_check_arcore_timed_out">desconocido (agotó el tiempo)</string>
+    <string name="device_check_granted">concedido</string>
+    <string name="device_check_not_granted">no concedido</string>
+    <string name="device_check_needs_camera_short">falta acceso a la cámara</string>
+    <string name="device_check_needs_arcore_short">falta ARCore</string>
+    <string name="device_check_session_failed_short">falló la sesión</string>
+    <string name="device_check_yes">sí</string>
+    <string name="device_check_no">no</string>
+
+    <string name="device_check_android_version">Android %1$s (API %2$d)</string>
+    <string name="device_check_no_message">sin mensaje</string>
+    <string name="device_check_install_failed">Falló la solicitud de instalación: %1$s</string>
+</resources>

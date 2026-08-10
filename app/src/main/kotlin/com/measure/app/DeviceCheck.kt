@@ -1,5 +1,6 @@
 package com.measure.app
 
+import android.content.res.Resources
 import android.os.Build
 import androidx.compose.ui.graphics.Color
 import com.google.ar.core.ArCoreApk
@@ -34,11 +35,18 @@ data class DepthSupport(
  *
  * The colours are the measurement-state family from `docs/ACCURACY.md`, used deliberately:
  * this screen is the earliest statement of how good a measurement on this phone can be.
+ *
+ * **Every entry point takes `Resources`.** The verdicts are prose, and prose is translated;
+ * an object that decided what to say without being able to say it in the user's language
+ * would have to hand back identifiers for the screen to resolve, which is the same coupling
+ * with an extra indirection. The screenshot tests pass Robolectric's, which is also how the
+ * Spanish renders in `DeviceCheckScreenshotTest` are taken.
  */
 object DeviceCheck {
 
     /** The full report, once the availability check has settled. */
     fun of(
+        resources: Resources,
         runCount: Int,
         stamp: String,
         availability: ArCoreApk.Availability,
@@ -46,7 +54,7 @@ object DeviceCheck {
         depth: DepthSupport?,
         crash: String?,
     ): DeviceReport {
-        val verdict = verdict(availability, depth)
+        val verdict = verdict(resources, availability, depth)
         val needsArCore = availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED ||
             availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD
 
@@ -56,118 +64,126 @@ object DeviceCheck {
             verdictHeadline = verdict.headline,
             verdictDetail = verdict.detail,
             verdictColour = verdict.colour,
-            checks = checkLines(availability, hasCamera, depth),
-            device = deviceLines(),
-            core = coreLines(),
+            checks = checkLines(resources, availability, hasCamera, depth),
+            device = deviceLines(resources),
+            core = coreLines(resources),
             crash = crash,
             // Capture is offered only once the device has actually proved it can do it.
             // Opening an AR session we already know will fail is how competitors produce
             // the crash-on-scan-start reviews in docs/PRODUCT_PLAN.md §4.
             canMeasure = availability == ArCoreApk.Availability.SUPPORTED_INSTALLED && hasCamera,
-            actionLabel = when {
-                needsArCore -> "Install or update ARCore"
-                !hasCamera -> "Grant camera permission"
-                else -> "Re-run checks"
-            },
+            actionLabel = resources.getString(
+                when {
+                    needsArCore -> R.string.device_check_action_install_arcore
+                    !hasCamera -> R.string.device_check_action_grant_camera
+                    else -> R.string.device_check_action_rerun
+                },
+            ),
         )
     }
 
     /** Before anything has been asked, and while Google Play is still answering. */
-    fun checking(runCount: Int, stamp: String) = DeviceReport(
+    fun checking(resources: Resources, runCount: Int, stamp: String) = DeviceReport(
         runCount = runCount,
         stamp = stamp,
-        verdictHeadline = "Checking",
-        verdictDetail = "Asking Google Play what this phone supports.",
+        verdictHeadline = resources.getString(R.string.device_check_checking),
+        verdictDetail = resources.getString(R.string.device_check_checking_detail),
         verdictColour = MeasureColours.InkMuted,
         checks = emptyList(),
-        device = deviceLines(),
+        device = deviceLines(resources),
         core = emptyList(),
         crash = null,
         canMeasure = false,
-        actionLabel = "Re-run checks",
+        actionLabel = resources.getString(R.string.device_check_action_rerun),
     )
 
     /** The check itself threw, which is not the same as an unsupported device. */
-    fun failed(runCount: Int, stamp: String, message: String, crash: String?) = DeviceReport(
+    fun failed(
+        resources: Resources,
+        runCount: Int,
+        stamp: String,
+        message: String,
+        crash: String?,
+    ) = DeviceReport(
         runCount = runCount,
         stamp = stamp,
-        verdictHeadline = "The check itself failed",
-        verdictDetail = "ARCore could not be asked whether it supports this phone. That is " +
-            "not the same as an unsupported phone, and re-running may well succeed.",
+        verdictHeadline = resources.getString(R.string.device_check_failed),
+        verdictDetail = resources.getString(R.string.device_check_failed_detail),
         verdictColour = MeasureColours.Blocked,
-        checks = listOf(CheckLine("Error", message, MeasureColours.Blocked)),
-        device = deviceLines(),
-        core = coreLines(),
+        checks = listOf(
+            CheckLine(
+                resources.getString(R.string.device_check_row_error),
+                message,
+                MeasureColours.Blocked,
+            ),
+        ),
+        device = deviceLines(resources),
+        core = coreLines(resources),
         crash = crash,
         canMeasure = false,
-        actionLabel = "Re-run checks",
+        actionLabel = resources.getString(R.string.device_check_action_rerun),
     )
 
     private data class VerdictText(val headline: String, val detail: String, val colour: Color)
 
     private fun verdict(
+        resources: Resources,
         availability: ArCoreApk.Availability,
         depth: DepthSupport?,
     ): VerdictText = when {
         availability == ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> VerdictText(
-            headline = "This phone cannot measure",
-            detail = "ARCore does not support this device, so measuring by camera is not " +
-                "possible here. Saved plans can still be opened and sent.",
+            headline = resources.getString(R.string.device_check_unsupported),
+            detail = resources.getString(R.string.device_check_unsupported_detail),
             colour = MeasureColours.Blocked,
         )
 
         availability == ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> VerdictText(
-            headline = "One install away",
-            detail = "This phone is supported, but Google Play Services for AR is not " +
-                "installed yet.",
+            headline = resources.getString(R.string.device_check_needs_install),
+            detail = resources.getString(R.string.device_check_needs_install_detail),
             colour = MeasureColours.Warning,
         )
 
         availability == ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> VerdictText(
-            headline = "One update away",
-            detail = "This phone is supported, but Google Play Services for AR needs " +
-                "updating.",
+            headline = resources.getString(R.string.device_check_needs_update),
+            detail = resources.getString(R.string.device_check_needs_update_detail),
             colour = MeasureColours.Warning,
         )
 
         depth?.error != null -> VerdictText(
-            headline = "ARCore would not start",
-            detail = "The device reports support, but opening a session failed. The reason " +
-                "is below; it is usually a permission or an ARCore update in progress.",
+            headline = resources.getString(R.string.device_check_session_failed),
+            detail = resources.getString(R.string.device_check_session_failed_detail),
             colour = MeasureColours.Blocked,
         )
 
         depth?.automatic == true -> VerdictText(
-            headline = "Fully supported",
-            detail = "ARCore and the Depth API are both available. Everything this app can " +
-                "do, it can do on this phone.",
+            headline = resources.getString(R.string.device_check_full),
+            detail = resources.getString(R.string.device_check_full_detail),
             colour = MeasureColours.Ready,
         )
 
         depth != null -> VerdictText(
-            headline = "Supported, without depth",
-            detail = "ARCore works but the Depth API is not available, so measuring falls " +
-                "back to detected planes. Corners away from a floor or a wall will be less " +
-                "accurate.",
+            headline = resources.getString(R.string.device_check_no_depth),
+            detail = resources.getString(R.string.device_check_no_depth_detail),
             colour = MeasureColours.Warning,
         )
 
         else -> VerdictText(
-            headline = "Camera access needed",
-            detail = "ARCore is supported. Grant camera access to test the Depth API.",
+            headline = resources.getString(R.string.device_check_needs_camera),
+            detail = resources.getString(R.string.device_check_needs_camera_detail),
             colour = MeasureColours.Warning,
         )
     }
 
     private fun checkLines(
+        resources: Resources,
         availability: ArCoreApk.Availability,
         hasCamera: Boolean,
         depth: DepthSupport?,
     ): List<CheckLine> = buildList {
         add(
             CheckLine(
-                label = "ARCore",
-                value = describe(availability),
+                label = resources.getString(R.string.device_check_row_arcore),
+                value = describe(resources, availability),
                 colour = when (availability) {
                     ArCoreApk.Availability.SUPPORTED_INSTALLED -> MeasureColours.Ready
                     ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> MeasureColours.Blocked
@@ -177,35 +193,59 @@ object DeviceCheck {
         )
         add(
             CheckLine(
-                label = "Camera permission",
-                value = if (hasCamera) "granted" else "not granted",
+                label = resources.getString(R.string.device_check_row_camera),
+                value = resources.getString(
+                    if (hasCamera) R.string.device_check_granted else R.string.device_check_not_granted,
+                ),
                 colour = if (hasCamera) MeasureColours.Ready else MeasureColours.Blocked,
             ),
         )
         when {
-            depth == null && !hasCamera ->
-                add(CheckLine("Depth API", "needs camera access", MeasureColours.Warning))
+            depth == null && !hasCamera -> add(
+                CheckLine(
+                    resources.getString(R.string.device_check_row_depth),
+                    resources.getString(R.string.device_check_needs_camera_short),
+                    MeasureColours.Warning,
+                ),
+            )
 
-            depth == null ->
-                add(CheckLine("Depth API", "needs ARCore", MeasureColours.Warning))
+            depth == null -> add(
+                CheckLine(
+                    resources.getString(R.string.device_check_row_depth),
+                    resources.getString(R.string.device_check_needs_arcore_short),
+                    MeasureColours.Warning,
+                ),
+            )
 
             depth.error != null -> {
-                add(CheckLine("Depth API", "session failed", MeasureColours.Blocked))
-                add(CheckLine("Reason", depth.error, MeasureColours.Blocked))
+                add(
+                    CheckLine(
+                        resources.getString(R.string.device_check_row_depth),
+                        resources.getString(R.string.device_check_session_failed_short),
+                        MeasureColours.Blocked,
+                    ),
+                )
+                add(
+                    CheckLine(
+                        resources.getString(R.string.device_check_row_reason),
+                        depth.error,
+                        MeasureColours.Blocked,
+                    ),
+                )
             }
 
             else -> {
                 add(
                     CheckLine(
-                        label = "Depth API",
-                        value = yesNo(depth.automatic),
+                        label = resources.getString(R.string.device_check_row_depth),
+                        value = yesNo(resources, depth.automatic),
                         colour = if (depth.automatic) MeasureColours.Ready else MeasureColours.Warning,
                     ),
                 )
                 add(
                     CheckLine(
-                        label = "Raw depth",
-                        value = yesNo(depth.raw),
+                        label = resources.getString(R.string.device_check_row_raw_depth),
+                        value = yesNo(resources, depth.raw),
                         colour = if (depth.raw) MeasureColours.Ready else MeasureColours.InkMuted,
                     ),
                 )
@@ -213,9 +253,13 @@ object DeviceCheck {
         }
     }
 
-    private fun deviceLines(): List<String> = listOf(
+    private fun deviceLines(resources: Resources): List<String> = listOf(
         "${Build.MANUFACTURER} ${Build.MODEL}",
-        "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+        resources.getString(
+            R.string.device_check_android_version,
+            Build.VERSION.RELEASE,
+            Build.VERSION.SDK_INT,
+        ),
         Build.SUPPORTED_ABIS.joinToString(", "),
     )
 
@@ -224,7 +268,7 @@ object DeviceCheck {
      * same noise and drift used in the JVM tests. It proves the core is wired in and
      * behaves identically on ARM as it does in CI.
      */
-    private fun coreLines(): List<CheckLine> = try {
+    private fun coreLines(resources: Resources): List<CheckLine> = try {
         val truth = listOf(Vec2(0.0, 0.0), Vec2(5.0, 0.0), Vec2(5.0, 4.0), Vec2(0.0, 4.0))
         val drift = Vec2(0.10, -0.06)
         val noise = listOf(
@@ -244,7 +288,7 @@ object DeviceCheck {
             solution.polygon.edges.forEachIndexed { index, edge ->
                 add(
                     CheckLine(
-                        label = "Wall ${index + 1}",
+                        label = resources.getString(R.string.device_check_row_wall, index + 1),
                         value = LengthFormatter.formatMetric(Length(edge.length)),
                         colour = MeasureColours.Ink,
                     ),
@@ -252,14 +296,14 @@ object DeviceCheck {
             }
             add(
                 CheckLine(
-                    label = "Area, true 20 m²",
+                    label = resources.getString(R.string.device_check_row_area),
                     value = AreaFormatter.format(solution.area, UnitSystem.METRIC),
                     colour = MeasureColours.Ink,
                 ),
             )
             add(
                 CheckLine(
-                    label = "Misclosure",
+                    label = resources.getString(R.string.device_check_row_misclosure),
                     value = String.format(
                         Locale.getDefault(), "%.1f%%", solution.closure.relativeError * 100,
                     ),
@@ -268,8 +312,8 @@ object DeviceCheck {
             )
             add(
                 CheckLine(
-                    label = "Reliable",
-                    value = yesNo(solution.isReliable),
+                    label = resources.getString(R.string.device_check_row_reliable),
+                    value = yesNo(resources, solution.isReliable),
                     colour = if (solution.isReliable) MeasureColours.Ready else MeasureColours.Warning,
                 ),
             )
@@ -277,22 +321,28 @@ object DeviceCheck {
     } catch (error: Throwable) {
         listOf(
             CheckLine(
-                label = "Core failed",
+                label = resources.getString(R.string.device_check_row_core_failed),
                 value = "${error.javaClass.simpleName}: ${error.message}",
                 colour = MeasureColours.Blocked,
             ),
         )
     }
 
-    private fun describe(availability: ArCoreApk.Availability): String = when (availability) {
-        ArCoreApk.Availability.SUPPORTED_INSTALLED -> "installed"
-        ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> "not installed"
-        ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> "needs updating"
-        ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> "not supported"
-        ArCoreApk.Availability.UNKNOWN_CHECKING -> "checking"
-        ArCoreApk.Availability.UNKNOWN_ERROR -> "unknown (Play error)"
-        ArCoreApk.Availability.UNKNOWN_TIMED_OUT -> "unknown (timed out)"
-    }
+    private fun describe(
+        resources: Resources,
+        availability: ArCoreApk.Availability,
+    ): String = resources.getString(
+        when (availability) {
+            ArCoreApk.Availability.SUPPORTED_INSTALLED -> R.string.device_check_arcore_installed
+            ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED -> R.string.device_check_arcore_not_installed
+            ArCoreApk.Availability.SUPPORTED_APK_TOO_OLD -> R.string.device_check_arcore_needs_update
+            ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE -> R.string.device_check_arcore_unsupported
+            ArCoreApk.Availability.UNKNOWN_CHECKING -> R.string.device_check_arcore_checking
+            ArCoreApk.Availability.UNKNOWN_ERROR -> R.string.device_check_arcore_play_error
+            ArCoreApk.Availability.UNKNOWN_TIMED_OUT -> R.string.device_check_arcore_timed_out
+        },
+    )
 
-    private fun yesNo(value: Boolean): String = if (value) "yes" else "no"
+    private fun yesNo(resources: Resources, value: Boolean): String =
+        resources.getString(if (value) R.string.device_check_yes else R.string.device_check_no)
 }

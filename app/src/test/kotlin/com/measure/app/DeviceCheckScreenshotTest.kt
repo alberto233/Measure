@@ -1,6 +1,8 @@
 package com.measure.app
 
+import android.app.Application
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.google.ar.core.ArCoreApk
@@ -36,6 +38,10 @@ class DeviceCheckScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /** Robolectric's, which is where the locale under test comes from. */
+    private val resources
+        get() = ApplicationProvider.getApplicationContext<Application>().resources
+
     private fun shoot(report: DeviceReport, name: String) {
         compose.setContent {
             DeviceCheckScreen(
@@ -53,6 +59,7 @@ class DeviceCheckScreenshotTest {
     fun `everything supported`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 1,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.SUPPORTED_INSTALLED,
@@ -69,6 +76,7 @@ class DeviceCheckScreenshotTest {
     fun `no depth api`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 2,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.SUPPORTED_INSTALLED,
@@ -84,6 +92,7 @@ class DeviceCheckScreenshotTest {
     fun `arcore not installed`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 3,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.SUPPORTED_NOT_INSTALLED,
@@ -100,6 +109,7 @@ class DeviceCheckScreenshotTest {
     fun `device not capable`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 4,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE,
@@ -115,6 +125,7 @@ class DeviceCheckScreenshotTest {
     fun `camera permission refused`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 5,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.SUPPORTED_INSTALLED,
@@ -136,6 +147,7 @@ class DeviceCheckScreenshotTest {
     fun `after a crash`() {
         shoot(
             DeviceCheck.of(
+                resources = resources,
                 runCount = 6,
                 stamp = "09:41:07",
                 availability = ArCoreApk.Availability.SUPPORTED_INSTALLED,
