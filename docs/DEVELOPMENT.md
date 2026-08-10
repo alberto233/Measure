@@ -11,7 +11,7 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database (v8), repository, project search and sort. Migration test walks a seeded v1 database to v8 |
-| Interface tests | Robolectric-hosted Compose tests, plus 23 Roborazzi screenshots across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`. The first thing here that renders a screen and looks at it |
+| Interface tests | Robolectric-hosted Compose tests, plus 27 rendered screens across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`, and 5 store images. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
 | `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection, the live rectilinear corner assist (on by default, toggleable) |
@@ -19,9 +19,9 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
 | `:feature:export` | The share sheet and the FileProvider that serves the file |
 | `:feature:onboarding` | M10c: a five-card guidance deck with drawn illustrations. Swipeable, every control at the bottom, skippable from the first card, shown on first run and reopenable from the home screen. 11 tests, 6 screenshots |
-| `:app` | Assembly, the device check, and both icons — the adaptive launcher mark and the Play listing asset, each rendered from a checked-in vector |
+| `:app` | Assembly, the device check, release signing off a key held outside the repository, and every store image — both icons and the 1024×500 feature graphic, each rendered from checked-in source |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test the corner assist and the light direction.** M10c is under way: crash reporting, the accuracy guidance, the launcher icon and the store listing copy are done; localisation, device calibration and the launch blockers in `docs/STORE_LISTING.md` §8 remain |
+| Next | **Field test the corner assist and the light direction.** M10c is nearly closed: crash reporting, the accuracy guidance, both icons, the feature graphic, the store listing copy and release signing are done. Localisation and device calibration remain, and of the launch blockers in `docs/STORE_LISTING.md` §9 the only code-side one left is a deliberate `versionName` |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds

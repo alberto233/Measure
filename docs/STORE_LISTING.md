@@ -187,7 +187,24 @@ round launcher mask clips that square's corners.
 ## 8. Feature graphic
 
 1024 × 500. Ink ground, the plan mark from the listing icon, and the short description as
-the only text. Not yet made.
+the only text.
+
+| Asset | Source | Rendered by |
+| --- | --- | --- |
+| Feature graphic | `app/src/test/kotlin/com/measure/app/FeatureGraphicTest.kt` | → `feature-graphic-1024x500.png` |
+
+Regenerate with `./gradlew :app:recordRoborazziDebug --tests '*FeatureGraphicTest'`.
+
+Two decisions worth keeping. **The text is §2 verbatim**, split at its full stop, rather than
+a banner headline of its own — the short description sits directly under this image in the
+listing, and a banner that says something different is a second promise to keep. **The mark
+carries no tile**: its ground and the banner's are the same ink, so a tile would be an
+invisible rectangle that only ever showed up as a seam.
+
+Everything sits inside a 76 px margin because Play crops this image differently in different
+placements, and the one thing it must never crop is a word. It also has its own type scale —
+a poster is not a screen — while taking its weights, spacing and colours from the same
+tokens as the app.
 
 ## 9. Before submission
 
@@ -219,9 +236,10 @@ Blocking, in order:
       sideloaded it is locked to a key that can never be used again.
 - [ ] **A Play Console account** and the one-off registration fee.
 - [ ] **Somewhere to host the privacy policy**, and a contact address for it.
-- [ ] **A feature graphic** (§8).
 - [ ] **Real screenshots** (§6). The 512 listing icon is done — regenerate it with
-      `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'`.
+      `./gradlew :app:testDebugUnitTest --tests '*LauncherIconTest'` — and so is the feature
+      graphic (§8). Screenshots are the only image asset still outstanding, and they are the
+      one that needs a real room.
 - [ ] **`versionName`** set deliberately for the first public build. Currently `0.1.6`,
       which is a dev sequence rather than a release one. `versionCode` keeps climbing from
       `7` rather than restarting at `1`: a lower code will not install over the builds
