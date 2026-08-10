@@ -11,9 +11,9 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | Product plan, features, technical design, accuracy strategy | Written — see the other files in `docs/` |
 | `:core:units`, `:core:geometry`, `:core:export` | Implemented, 236 tests, CI green |
 | `:core:data` | Room database (v8), repository, project search and sort. Migration test walks a seeded v1 database to v8 |
-| Interface tests | Robolectric-hosted Compose tests, plus 27 rendered screens across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app`, and 5 store images. The first thing here that renders a screen and looks at it |
+| Interface tests | Robolectric-hosted Compose tests, plus 29 rendered screens across `:feature:editor`, `:feature:projects`, `:feature:capture`, `:feature:onboarding` and `:app` — two of them in Spanish — and 5 store images. The first thing here that renders a screen and looks at it |
 | `:ar` | ARCore session, hit-test ranking, multi-frame sampling, GLES renderers |
-| `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer. See `docs/DESIGN.md` |
+| `:core:designsystem` | Direction 01 "Drafting": light tokens, the three-rung button ladder, the sheet, the plan renderer, and the names the interface gives to `:core:geometry`'s values. See `docs/DESIGN.md` |
 | `:feature:capture` | M1 capture, M3 room capture, M6 ceiling detection, the live rectilinear corner assist (on by default, toggleable) |
 | `:feature:projects` | The home screen: saved plans with drawn thumbnails, M13 search and sort |
 | `:feature:editor` | M5 plan editor, M6 openings and volume, M12 measuring on the plan, M10b quantities |
@@ -21,7 +21,8 @@ fresh session, or a new contributor, can start without re-deriving any of it.
 | `:feature:onboarding` | M10c: a five-card guidance deck with drawn illustrations. Swipeable, every control at the bottom, skippable from the first card, shown on first run and reopenable from the home screen. 11 tests, 6 screenshots |
 | `:app` | Assembly, the device check, release signing off a key held outside the repository, and every store image — both icons and the 1024×500 feature graphic, each rendered from checked-in source |
 | CI | Green. Builds the APK and publishes it to a rolling prerelease |
-| Next | **Field test the corner assist and the light direction.** M10c is nearly closed: crash reporting, the accuracy guidance, both icons, the feature graphic, the store listing copy and release signing are done. Localisation and device calibration remain, and of the launch blockers in `docs/STORE_LISTING.md` §9 the only code-side one left is a deliberate `versionName` |
+| Localisation | English and Spanish, every module. Enforced by `TranslationTest` and rendered in `SpanishTest` — see §14 |
+| Next | **Field test the corner assist and the light direction, in both languages.** M10c is all but closed: crash reporting, the accuracy guidance, both icons, the feature graphic, the store listing copy, release signing and localisation are done. Device calibration remains, and of the launch blockers in `docs/STORE_LISTING.md` §9 the only code-side one left is a deliberate `versionName` |
 
 **M1 is validated on the A36.** Camera, planes, reticle, gating and point-to-point
 measuring all work on hardware, and a short measurement matched a tape. The thresholds
@@ -851,10 +852,11 @@ screen now says `"SEND"` — which is the tests doing their job: a visual change
 could not see, caught before a device did. They match case-insensitively now, because a test
 pinned to the source casing is testing the design rather than the behaviour.
 
-**The hazard to remember at M10c:** `String.uppercase()` uses the default locale, and in
-Turkish that turns `i` into `İ`. Spanish is unaffected, so this is not urgent, but the
-moment the app ships a language list this needs deciding — either a locale-safe cast or
-dropping the transform and setting the labels uppercase in the string resources.
+**The hazard, now closed.** `String.uppercase()` with no argument uses the *device* locale,
+and in Turkish that turns `i` into `İ` — which is correct Turkish applied to a string that
+is not in Turkish. `MeasureTag` now takes its locale from `LocalConfiguration`, which is the
+configuration the string itself was resolved under. The question it asks is the right one:
+capitalise this the way the language it is written in does.
 
 ## Where M10b actually stands
 
@@ -930,6 +932,68 @@ over a sunlit wall — on the capture screen "DISTANCE", "FREE" and "PLUMB" simp
 there. The fill is `Panel` now, which changes nothing on a panel and everything over a
 camera. It is the clearest case yet for these pictures: three field sessions looked straight
 past it, because the screen is used indoors in the evening.
+
+## 14. Localisation
+
+English and Spanish, in every module, with two tests holding it together.
+
+**Where the strings live.** Each Android module owns its own `res/values/strings.xml` and
+`res/values-es/strings.xml`, and the app merges them. Names are prefixed by module —
+`editor_`, `capture_`, `projects_` — because a merge is a flat namespace and two modules
+that both want `save` would silently pick one.
+
+**Three modules could not own theirs.** `:core:units`, `:core:geometry` and `:core:export`
+are pure Kotlin: they have no resources and never will, because that purity is what lets
+them be tested without a device. The prose they used to carry moved out in two different
+ways, and the difference is worth keeping straight:
+
+- **Names for domain values** — a measurement mode, an opening kind, a door swing, a hit
+  source, the range advice — moved *up* into `:core:designsystem`, as `@StringRes`
+  extension functions in `GeometryNames.kt`. Every feature module already depends on it, so
+  a door is hung "Left, in" in exactly one place instead of three. The enums kept what is
+  genuinely theirs: which jamb the hinge is on, what a hit source's sigma is.
+- **Prose an exporter writes into a file** — the CSV's column headers, the "rooms placed by
+  hand" caveat — stayed in `:core:export` as *English defaults on a parameter*
+  (`CsvExporter.Labels`, `ExportablePlan.arrangementNote`). The exporters' own tests assert
+  against those defaults and needed no locale; the app overrides them from resources. There
+  is one place that builds an `ExportablePlan`, so there is one place to get it wrong.
+
+**What is deliberately not translated.** The JSON project file's field values — the `mode`
+of a measurement is written from `modeKey`, which is the enum name — because a machine reads
+them and a field that changes meaning with the phone's language is not a format. The CSV's
+headers *are* translated, because nothing reads a CSV back and its column names belong to
+whoever opens it. `ARCore` and `Depth API` keep their English, because they are the names
+Google gives those things and a user searching for why their phone lacks one will search for
+that.
+
+**Casing follows the text, not the phone.** See the uppercase section above.
+
+**`localeFilters` and `localeConfig`.** The build ships `en` and `es` only. Without the
+filter every AndroidX translation is packaged — about a megabyte of APK, and a phone set to
+French showing a French "Cancel" beside an English sentence. `locales_config.xml` is the same
+list declared to the system, which is what puts Measure in Android 13's per-app language
+picker. Adding a language means touching both.
+
+### The two tests
+
+`TranslationTest` reads the XML directly rather than reflecting over `R`, because `R` is
+generated *from* the resources and would only ever agree with itself. It fails on four
+things: a module with no English strings, a module with English and no Spanish, a name in one
+language and not the other, and a string of 40 characters or more left word-for-word
+identical — which is what an untranslated line looks like in a file that was copied and
+mostly translated. Symbols and bare substitutions (`←`, `×`, `%1$d%%`) are exempted at the
+string with `translatable="false"`, so the exemption sits beside the thing exempted.
+
+It also checks that every declared string is referenced from somewhere. That one exists
+because of an actual near-miss: a rebase reverted a screen to hardcoded text and left its
+`strings.xml` behind, at which point both languages agreed perfectly and the screen was in
+neither of them.
+
+`SpanishTest` renders the device check under `es-rES` and asserts three strings that reach
+the screen by three different routes — one from the composable, one from `DeviceCheck`'s own
+mapping, one from a `when` picking between three resources. There is a Spanish screenshot of
+the accuracy card too, because a translation that is correct and two lines too long is
+correct right up until you look at it.
 
 ## 8. Open decisions
 

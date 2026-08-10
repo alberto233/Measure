@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The guidance deck. Every line here is a mitigation rather than a caption: see the class
+  comment on OnboardingScreen for which risk each card answers.
+
+  Translators: "±2–3 cm" is a claim the whole product is built on and appears identically in
+  the store listing, the accuracy card and docs/ACCURACY.md. It is not a figure to round.
+-->
+<resources>
+    <string name="onboarding_tag_welcome">welcome</string>
+    <string name="onboarding_tag_guide">guide</string>
+
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_start">Start measuring</string>
+    <string name="onboarding_done">Done</string>
+    <string name="onboarding_open">How to measure</string>
+
+    <string name="onboarding_tolerance_title">Expect about ±2–3 cm</string>
+    <string name="onboarding_tolerance_body">Your phone measures with its camera, not a laser. Done well that is accurate enough to order flooring or check a sofa fits. Every measurement is shown with its own tolerance, so you can always see how much to trust it — and for anything that has to be exact, check it with a tape.</string>
+
+    <string name="onboarding_walk_title">Walk the room</string>
+    <string name="onboarding_walk_body">Stand 1–3 m from each corner and move round to the next one. Measuring the far wall from the doorway is the single most common way to get a bad plan — accuracy falls off with distance.</string>
+
+    <string name="onboarding_light_title">Give it light and detail</string>
+    <string name="onboarding_light_body">The camera needs to see texture to know where it is. A dim room, blank white walls or a glossy floor all make tracking drift. Put the lights on.</string>
+
+    <string name="onboarding_slow_title">Move slowly</string>
+    <string name="onboarding_slow_body">Sweep the phone gently and pause before each tap. Quick movements blur the frames the measurement is built from, and the app will tell you when it has lost confidence.</string>
+
+    <string name="onboarding_joint_title">Aim where the wall meets the floor</string>
+    <string name="onboarding_joint_body">Put the reticle in the joint itself, not on the skirting board above it. A skirting board is a couple of centimetres proud of the wall, and that error goes straight into the plan.</string>
+</resources>

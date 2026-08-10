@@ -51,3 +51,26 @@ class OnboardingScreenshotTest {
         val NAMES = listOf("1-tolerance", "2-walk", "3-light", "4-slow", "5-joint")
     }
 }
+
+/**
+ * The first card, in Spanish.
+ *
+ * The accuracy card is the one worth looking at in another language rather than merely
+ * asserting. It is the longest body text in the app and the only one whose whole job is to
+ * be read before anything else happens — so it is where a translation that is correct but
+ * two lines too long stops being correct.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(qualifiers = "es-rES-w411dp-h891dp-xhdpi")
+class SpanishOnboardingScreenshotTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    @Test
+    fun `the accuracy card in Spanish`() {
+        compose.setContent { OnboardingScreen(onDone = {}) }
+        compose.onRoot().captureRoboImage("build/outputs/roborazzi/onboarding-es.png")
+    }
+}

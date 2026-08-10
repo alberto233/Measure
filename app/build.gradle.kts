@@ -65,6 +65,14 @@ android {
         versionName = "0.1.6"
     }
 
+    androidResources {
+        // Ship only what is written here. AndroidX arrives translated into eighty-odd
+        // languages, and without this every one of them is packaged — which inflates the
+        // APK and, worse, makes a phone set to French show a French "Cancel" beside an
+        // English sentence.
+        localeFilters += listOf("en", "es")
+    }
+
     // A debug keystore committed to the repository, so every build — CI, local, anyone's
     // machine — is signed with the same key.
     //

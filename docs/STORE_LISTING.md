@@ -245,9 +245,11 @@ Blocking, in order:
       `7` rather than restarting at `1`: a lower code will not install over the builds
       already on test phones, and Play only requires that it increase.
 
-Not blocking, but worth having first:
+Not blocking, and now done:
 
-- [ ] Localisation. The listing can be translated per-locale in the console independently
-      of the app, so a translated listing with an English app is possible — and is usually
-      a worse experience than an English listing, because it converts installs the app
-      then disappoints.
+- [x] **Localisation.** The app ships in English and Spanish. That makes the Spanish listing
+      worth writing — the console translates a listing per locale independently of the app,
+      and the failure mode it warns against (a translated listing over an English app, which
+      converts an install and then disappoints) no longer applies. §2 and §3 need a Spanish
+      pass before the Spanish listing goes up, held to the same rule as the English: never
+      claim precision we do not have.

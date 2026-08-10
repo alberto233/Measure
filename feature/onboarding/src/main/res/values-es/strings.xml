@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. Tuteo throughout, which is what a tool a person holds in their hand should
+  use; "usted" would put a counter between the app and the room.
+
+  "rodapié" for skirting board, "encuentro de la pared con el suelo" for the wall–floor
+  joint, and "retícula" for the reticle — the terms a Spanish builder's merchant uses,
+  rather than the ones a dictionary offers first.
+-->
+<resources>
+    <string name="onboarding_tag_welcome">bienvenido</string>
+    <string name="onboarding_tag_guide">guía</string>
+
+    <string name="onboarding_skip">Saltar</string>
+    <string name="onboarding_next">Siguiente</string>
+    <string name="onboarding_start">Empezar a medir</string>
+    <string name="onboarding_done">Listo</string>
+    <string name="onboarding_open">Cómo medir</string>
+
+    <string name="onboarding_tolerance_title">Cuenta con unos ±2–3 cm</string>
+    <string name="onboarding_tolerance_body">Tu móvil mide con la cámara, no con un láser. Bien hecho, eso basta para pedir suelo o comprobar si cabe un sofá. Cada medida se muestra con su propia tolerancia, así que siempre ves cuánto puedes fiarte de ella — y para lo que tenga que ser exacto, compruébalo con un metro.</string>
+
+    <string name="onboarding_walk_title">Recorre la habitación</string>
+    <string name="onboarding_walk_body">Ponte a 1–3 m de cada esquina y ve pasando a la siguiente. Medir la pared del fondo desde la puerta es la forma más habitual de acabar con un plano malo: la precisión cae con la distancia.</string>
+
+    <string name="onboarding_light_title">Dale luz y textura</string>
+    <string name="onboarding_light_body">La cámara necesita ver textura para saber dónde está. Una habitación con poca luz, paredes blancas lisas o un suelo brillante hacen que el seguimiento derive. Enciende las luces.</string>
+
+    <string name="onboarding_slow_title">Muévete despacio</string>
+    <string name="onboarding_slow_body">Mueve el móvil con suavidad y detente antes de cada toque. Los movimientos bruscos emborronan los fotogramas con los que se construye la medida, y la app te avisará cuando pierda confianza.</string>
+
+    <string name="onboarding_joint_title">Apunta al encuentro de la pared con el suelo</string>
+    <string name="onboarding_joint_body">Pon la retícula en el encuentro mismo, no en el rodapié que hay encima. Un rodapié sobresale un par de centímetros de la pared, y ese error va directo al plano.</string>
+</resources>

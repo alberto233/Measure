@@ -25,23 +25,65 @@ import javax.xml.parsers.DocumentBuilderFactory
  */
 class TranslationTest {
 
+    /**
+     * Every listed module has both files, and the list itself is not quietly rotting.
+     *
+     * The second half is the one that has already caught something. An earlier version
+     * skipped any module with no English file, on the reasoning that a module with no text
+     * needs no translation — and then a module's resources went missing and the test went on
+     * passing, because "has no strings" and "lost its strings" look identical from here.
+     * Every module on that list ships text; a missing file is a fault, not an exemption.
+     */
     @Test
-    fun `every module that has strings has them in both languages`() {
-        val modules = modulesWithStrings()
-
-        assertTrue(
-            "No string resources found at all. Either the repository root is not where this " +
-                "test thinks it is, or the app has stopped using string resources.",
-            modules.isNotEmpty(),
-        )
-
-        for (module in modules) {
+    fun `every module has its strings in both languages`() {
+        for (module in MODULES) {
+            assertTrue(
+                "$module has no English strings at all. Either it lost them, or it no " +
+                    "longer ships text and should come off the list in this test.",
+                englishFile(module).exists(),
+            )
             assertTrue(
                 "$module has English strings and no Spanish ones. A module that ships text " +
                     "ships it in every language the app claims to support.",
                 spanishFile(module).exists(),
             )
         }
+    }
+
+    /**
+     * Nothing declares a string the code never reads.
+     *
+     * The other half of the same failure: a screen can be reverted to hardcoded text and
+     * leave its `strings.xml` behind, at which point both languages agree perfectly and the
+     * app is in neither of them. Matched by name against the source rather than through `R`,
+     * because `R` is generated from the resources and would agree with itself.
+     */
+    @Test
+    fun `every string is referenced from somewhere`() {
+        val sources = MODULES.flatMap { module ->
+            File(root, "$module/src/main").walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .map { it.readText() }
+                .toList()
+        } + MODULES.flatMap { module ->
+            File(root, "$module/src/main").walkTopDown()
+                .filter { it.isFile && it.extension == "xml" && it.parentFile.name !in RESOURCE_DIRS }
+                .map { it.readText() }
+                .toList()
+        }
+
+        val unused = modulesWithStrings().flatMap { module ->
+            names(englishFile(module), translatableOnly = false).filter { name ->
+                sources.none { it.contains("R.string.$name") || it.contains("@string/$name") }
+            }
+        }
+
+        assertEquals(
+            "These strings are declared and never read. Either something stopped using " +
+                "them, or something stopped reading them and went back to a literal.",
+            emptyList<String>(),
+            unused.sorted(),
+        )
     }
 
     @Test
@@ -138,6 +180,9 @@ class TranslationTest {
          * day somebody moved it, and the whole value of this test is that it notices things
          * nobody remembered to tell it.
          */
+        /** Resource value directories, whose XML is the declaration rather than a use. */
+        val RESOURCE_DIRS = setOf("values", "values-es")
+
         val MODULES = listOf(
             "app",
             "core/designsystem",

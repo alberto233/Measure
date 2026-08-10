@@ -17,6 +17,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.annotation.StringRes
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.measure.core.designsystem.MeasureButton
@@ -93,7 +95,11 @@ fun OnboardingScreen(
             .padding(horizontal = MeasureSpace.Base),
     ) {
         Box(Modifier.fillMaxWidth().padding(top = MeasureSpace.Tight)) {
-            MeasureTag(if (firstRun) "welcome" else "guide")
+            MeasureTag(
+                stringResource(
+                    if (firstRun) R.string.onboarding_tag_welcome else R.string.onboarding_tag_guide,
+                ),
+            )
         }
 
         HorizontalPager(
@@ -114,7 +120,7 @@ fun OnboardingScreen(
         ) {
             if (!last) {
                 Text(
-                    text = "Skip",
+                    text = stringResource(R.string.onboarding_skip),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Label,
                     modifier = Modifier
@@ -125,11 +131,13 @@ fun OnboardingScreen(
                 )
             }
             MeasurePrimaryButton(
-                label = when {
-                    last && firstRun -> "Start measuring"
-                    last -> "Done"
-                    else -> "Next"
-                },
+                label = stringResource(
+                    when {
+                        last && firstRun -> R.string.onboarding_start
+                        last -> R.string.onboarding_done
+                        else -> R.string.onboarding_next
+                    },
+                ),
                 onClick = {
                     if (last) {
                         onDone()
@@ -162,14 +170,14 @@ private fun StepCard(step: GuidanceStep) {
         )
         Spacer(Modifier.height(MeasureSpace.Wide))
         Text(
-            text = step.title,
+            text = stringResource(step.title),
             color = MeasureColours.Ink,
             style = MeasureType.Display,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(MeasureSpace.Snug))
         Text(
-            text = step.body,
+            text = stringResource(step.body),
             color = MeasureColours.InkMuted,
             style = MeasureType.Body,
             textAlign = TextAlign.Center,
@@ -200,8 +208,8 @@ private fun Dots(count: Int, current: Int) {
 }
 
 internal data class GuidanceStep(
-    val title: String,
-    val body: String,
+    @param:StringRes val title: Int,
+    @param:StringRes val body: Int,
     val art: StepArt,
 )
 
@@ -212,41 +220,35 @@ internal data class GuidanceStep(
  * cooperates: the app can refuse a bad point, but it cannot walk the room for them.
  * Deliberately not longer — a deck nobody finishes teaches nothing, and these cover the
  * failures that actually appear in competitors' one-star reviews.
+ *
+ * The prose lives in `res/values/strings.xml`, and the order lives here. Which card comes
+ * first is a product decision — the accuracy figure leads, and a translator moving it would
+ * be moving the mitigation — so it is not something a string file gets to express.
  */
 private val STEPS = listOf(
     GuidanceStep(
-        title = "Expect about ±2–3 cm",
-        body = "Your phone measures with its camera, not a laser. Done well that is " +
-            "accurate enough to order flooring or check a sofa fits. Every measurement " +
-            "is shown with its own tolerance, so you can always see how much to trust " +
-            "it — and for anything that has to be exact, check it with a tape.",
+        title = R.string.onboarding_tolerance_title,
+        body = R.string.onboarding_tolerance_body,
         art = StepArt.TOLERANCE,
     ),
     GuidanceStep(
-        title = "Walk the room",
-        body = "Stand 1–3 m from each corner and move round to the next one. Measuring " +
-            "the far wall from the doorway is the single most common way to get a bad " +
-            "plan — accuracy falls off with distance.",
+        title = R.string.onboarding_walk_title,
+        body = R.string.onboarding_walk_body,
         art = StepArt.WALK,
     ),
     GuidanceStep(
-        title = "Give it light and detail",
-        body = "The camera needs to see texture to know where it is. A dim room, blank " +
-            "white walls or a glossy floor all make tracking drift. Put the lights on.",
+        title = R.string.onboarding_light_title,
+        body = R.string.onboarding_light_body,
         art = StepArt.LIGHT,
     ),
     GuidanceStep(
-        title = "Move slowly",
-        body = "Sweep the phone gently and pause before each tap. Quick movements blur " +
-            "the frames the measurement is built from, and the app will tell you when " +
-            "it has lost confidence.",
+        title = R.string.onboarding_slow_title,
+        body = R.string.onboarding_slow_body,
         art = StepArt.SLOW,
     ),
     GuidanceStep(
-        title = "Aim where the wall meets the floor",
-        body = "Put the reticle in the joint itself, not on the skirting board above it. " +
-            "A skirting board is a couple of centimetres proud of the wall, and that " +
-            "error goes straight into the plan.",
+        title = R.string.onboarding_joint_title,
+        body = R.string.onboarding_joint_body,
         art = StepArt.JOINT,
     ),
 )
@@ -261,5 +263,9 @@ private val STEPS = listOf(
  */
 @Composable
 fun GuidanceButton(onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    MeasureButton(label = "How to measure", onClick = onOpen, modifier = modifier)
+    MeasureButton(
+        label = stringResource(R.string.onboarding_open),
+        onClick = onOpen,
+        modifier = modifier,
+    )
 }
