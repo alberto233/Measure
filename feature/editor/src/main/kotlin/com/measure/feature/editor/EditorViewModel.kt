@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.measure.core.data.MeasureData
+import com.measure.core.designsystem.labelRes
 import com.measure.core.data.ProjectDetail
 import com.measure.core.data.SavedOpening
 import com.measure.core.data.SavedPlanMeasurement
@@ -76,10 +78,18 @@ sealed interface Selection {
  *
  * The order is the order of the work: draw the plan, read it, buy from it.
  */
-enum class EditorMode(val label: String) {
-    PLAN("Plan"),
-    MEASURE("Measure"),
-    QUANTITIES("Quantities"),
+enum class EditorMode {
+    PLAN,
+    MEASURE,
+    QUANTITIES,
+    ;
+
+    @StringRes
+    fun labelRes(): Int = when (this) {
+        PLAN -> R.string.editor_tab_plan
+        MEASURE -> R.string.editor_tab_measure
+        QUANTITIES -> R.string.editor_tab_quantities
+    }
 }
 
 /**
@@ -124,6 +134,17 @@ private data class RoomSnapshot(
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = MeasureData.repository(application)
+
+    /**
+     * A string, in the phone's language.
+     *
+     * Every `confirm` and `warn` below is a sentence the user reads on a toast over their
+     * own plan, so none of them can be a literal here. See the same helper in
+     * `CaptureViewModel` — this is the second view model that needs it and the point at
+     * which it stops being a one-off.
+     */
+    private fun say(@StringRes id: Int, vararg args: Any): String =
+        getApplication<Application>().getString(id, *args)
 
     private val projectIdFlow = MutableStateFlow(0L)
 
@@ -255,7 +276,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Says so when a share fails, rather than leaving a tap that appeared to do nothing. */
     fun reportExportFailure(error: Throwable) {
-        warn("Could not share this plan — ${error.javaClass.simpleName}")
+        warn(say(R.string.editor_cannot_share, error.javaClass.simpleName))
     }
 
     // --- dragging -------------------------------------------------------------------
@@ -333,7 +354,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val projectId = projectId
         viewModelScope.launch {
             repository.moveRoom(move.roomId, projectId, offset.x, offset.y)
-            confirm("${room.name} moved — placement is yours, not measured")
+            confirm(say(R.string.editor_room_moved, room.name))
         }
     }
 
@@ -355,7 +376,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val projectId = projectId
         viewModelScope.launch {
             repository.rotateRoom(roomId, projectId, Math.toRadians(degrees))
-            confirm("${room.name} turned ${degrees.roundToInt()}°")
+            confirm(say(R.string.editor_room_turned, room.name, degrees.roundToInt()))
         }
     }
 
@@ -380,7 +401,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
         val angle = RoomPlacement.squaringAngle(room.outline, reference)
         if (abs(angle) < MINIMUM_TURN_RADIANS) {
-            confirm("${room.name} is already square to the plan")
+            confirm(say(R.string.editor_already_square, room.name))
             return
         }
 
@@ -388,7 +409,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val projectId = projectId
         viewModelScope.launch {
             repository.rotateRoom(roomId, projectId, angle)
-            confirm("${room.name} squared — turned ${Math.toDegrees(angle).roundToInt()}°")
+            confirm(
+                say(R.string.editor_room_squared, room.name, Math.toDegrees(angle).roundToInt()),
+            )
         }
     }
 
@@ -407,7 +430,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val room = roomById(roomId) ?: return
         val parsed = LengthParser.parse(typed, unitSystem())
         if (parsed == null || parsed.metres <= 0.0) {
-            warn("Could not read \"$typed\" as a length")
+            warn(say(R.string.editor_cannot_read, typed, say(R.string.editor_as_length)))
             return
         }
 
@@ -415,7 +438,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.setLockedLength(roomId, index, parsed.metres)
             resolveWith(room, room.measured, room.sigmas, room.lockedLengths + (index to parsed.metres))
-            confirm("Wall ${index + 1} locked to ${formatLength(parsed.metres)} — room re-solved")
+            confirm(say(R.string.editor_wall_locked_to, index + 1, formatLength(parsed.metres)))
         }
     }
 
@@ -425,7 +448,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.setLockedLength(roomId, index, null)
             resolveWith(room, room.measured, room.sigmas, room.lockedLengths - index)
-            confirm("Wall ${index + 1} unlocked")
+            confirm(say(R.string.editor_wall_unlocked, index + 1))
         }
     }
 
@@ -549,7 +572,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         // leave a saved distance the user never agreed to and can no longer see. Said
         // rather than silently ignored, so the tap is not simply dead.
         if (unconfirmed != null) {
-            warn("Keep or discard this measurement first")
+            warn(say(R.string.editor_finish_this))
             return
         }
         // Toggle rather than replace. Tapping a selected run again is how a comparison is
@@ -586,7 +609,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     /** Begin placing points. Refused until the last measurement has been accepted. */
     fun beginDrawing() {
         if (unconfirmed != null) {
-            warn("Keep or discard the last measurement first")
+            warn(say(R.string.editor_finish_last))
             return
         }
         drawing = true
@@ -669,7 +692,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (candidate.isDegenerate) {
             // Refused rather than stored: a zero-length measurement is a double tap, and
             // silently saving one leaves the user hunting for a line that is a dot.
-            warn("Those two points are the same — put the second one somewhere else")
+            warn(say(R.string.editor_same_point))
             return
         }
 
@@ -699,12 +722,22 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private fun straighten(from: ResolvedPoint, to: ResolvedPoint): ResolvedPoint {
         val preferred = buildList {
             wallDirectionOf(from)?.let {
-                add(PreferredDirection(it.perpendicular(), "square to ${from.description}"))
-                add(PreferredDirection(it, "along ${from.description}"))
+                add(
+                    PreferredDirection(
+                        it.perpendicular(),
+                        say(R.string.editor_square_to, from.description),
+                    ),
+                )
+                add(PreferredDirection(it, say(R.string.editor_along, from.description)))
             }
             val grid = dominantDirection()
-            add(PreferredDirection(grid.perpendicular(), "square to the plan"))
-            add(PreferredDirection(grid, "along the plan"))
+            add(
+                PreferredDirection(
+                    grid.perpendicular(),
+                    say(R.string.editor_square_to_the_plan),
+                ),
+            )
+            add(PreferredDirection(grid, say(R.string.editor_along_plan)))
         }
 
         val result = PlanConstraints.straighten(from.position, to.position, preferred)
@@ -713,7 +746,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         // Said out loud when it moved the point a long way, because that means the user
         // was pointing at something this constraint does not describe.
         if (result.isNotable) {
-            warn("Moved ${formatLength(result.correction)} to keep it ${result.description}")
+            warn(
+                say(
+                    R.string.editor_moved_to_keep,
+                    formatLength(result.correction),
+                    result.description.orEmpty(),
+                ),
+            )
         }
         lastStraightening = result.description
         return to.copy(anchor = PlanAnchor.Free(result.position), position = result.position)
@@ -752,7 +791,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             anchor.copy(t = t),
         ) ?: return null
 
-        lastStraightening = "square to ${from.description}"
+        lastStraightening = say(R.string.editor_square_to, from.description)
         return squared
     }
 
@@ -893,7 +932,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val used = existing.sumOf { it.opening.width }
         val candidate = Opening.standard(kind, wallLength, height)
         if (used + candidate.width > wallLength) {
-            warn("No room left in that wall")
+            warn(say(R.string.editor_opening_no_room))
             return
         }
 
@@ -906,7 +945,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 candidate.copy(offset = (used + GAP_BETWEEN_OPENINGS).coerceAtMost(wallLength - candidate.width))
             }
             lastAddedOpening = repository.addOpening(roomId, wallIndex, placed)
-            confirm("${kind.label} added to wall ${wallIndex + 1}")
+            confirm(say(R.string.editor_opening_added, say(kind.labelRes()), wallIndex + 1))
         }
     }
 
@@ -952,12 +991,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             sillHeight = sill ?: saved.opening.sillHeight,
         )
         if (!updated.fitsIn(wallLength, ceiling)) {
-            warn("That will not fit this wall")
+            warn(say(R.string.editor_opening_too_big))
             return
         }
         viewModelScope.launch {
             repository.updateOpening(saved.id, roomId, saved.wallIndex, updated)
-            confirm("${updated.kind.label} updated")
+            confirm(say(R.string.editor_opening_updated, say(updated.kind.labelRes())))
         }
     }
 
@@ -976,18 +1015,18 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (typed.isBlank()) {
             viewModelScope.launch {
                 repository.setCeilingHeight(roomId, null)
-                confirm("Ceiling height cleared")
+                confirm(say(R.string.editor_ceiling_cleared))
             }
             return
         }
         val parsed = LengthParser.parse(typed, unitSystem())
         if (parsed == null || parsed.metres <= 0.0) {
-            warn("Could not read \"$typed\" as a height")
+            warn(say(R.string.editor_cannot_read, typed, say(R.string.editor_as_height)))
             return
         }
         viewModelScope.launch {
             repository.setCeilingHeight(roomId, parsed.metres)
-            confirm("Ceiling set to ${formatLength(parsed.metres)} — wall area and volume follow from it")
+            confirm(say(R.string.editor_ceiling_set, formatLength(parsed.metres)))
         }
     }
 
@@ -1002,7 +1041,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             repository.renameRoom(roomId, trimmed)
-            confirm("Renamed to $trimmed")
+            confirm(say(R.string.editor_renamed_to, trimmed))
         }
     }
 
@@ -1010,7 +1049,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val name = roomById(roomId)?.name
         viewModelScope.launch {
             repository.deleteRoom(roomId)
-            confirm("${name ?: "Room"} deleted")
+            confirm(
+                say(
+                    R.string.editor_opening_deleted,
+                    name ?: say(R.string.editor_default_room_name),
+                ),
+            )
         }
         selection = Selection.None
     }
@@ -1059,12 +1103,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 lockedLengths = constraints,
             )
         }.getOrElse {
-            warn("Could not re-solve this room")
+            warn(say(R.string.editor_cannot_resolve))
             return
         }
 
         if (!solution.solver.converged) {
-            warn("Constraints conflict — try unlocking a wall")
+            warn(say(R.string.editor_constraints_conflict))
         }
         repository.updateRoomGeometry(room.id, solution, corners, sigmas)
     }

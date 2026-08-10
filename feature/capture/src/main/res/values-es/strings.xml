@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. Frases cortas: esto se lee de un vistazo, con el móvil en alto, andando de
+  espaldas por una habitación.
+
+  "Deriva" para drift y "error de cierre" para misclosure son los términos de topografía, y
+  son deliberadamente francos. Decirle al usuario que su plano es peor de lo que cree es la
+  posición del producto entera; una traducción que suene tranquilizadora rompe justo eso.
+-->
+<resources>
+    <string name="capture_mode_distance">Distancia</string>
+    <string name="capture_mode_room">Habitación</string>
+
+    <string name="capture_ready">Listo</string>
+    <string name="capture_tracking">Seguimiento %1$s</string>
+    <string name="capture_depth">· profundidad</string>
+    <string name="capture_off_floor">Apunta al suelo — eso no está en él</string>
+    <string name="capture_reading_from">Leyendo de %1$s</string>
+
+    <string name="capture_try_again">Reintentar</string>
+    <string name="capture_done">Listo</string>
+    <string name="capture_back">Atrás</string>
+    <string name="capture_undo">Deshacer</string>
+
+    <string name="capture_metres">Metros</string>
+    <string name="capture_feet">Pies</string>
+    <string name="capture_range_away">a %1$s</string>
+
+    <string name="capture_snap_on">Esquinas rectas: sí</string>
+    <string name="capture_snap_off">Esquinas rectas: no</string>
+    <string name="capture_snap_turned_on">Esquinas rectas activadas — desde la siguiente esquina</string>
+    <string name="capture_snap_turned_off">Esquinas rectas desactivadas — las esquinas caen donde apuntes</string>
+
+    <string name="capture_new_room">Nueva habitación</string>
+    <string name="capture_close">Cerrar</string>
+    <string name="capture_hide_planes">Ocultar planos</string>
+    <string name="capture_show_planes">Ver planos</string>
+
+    <string name="capture_summary">Perímetro %1$s · %2$d paredes</string>
+    <string name="capture_summary_height">%1$s · %2$s de altura</string>
+    <string name="capture_closure_unmeasured">Cerrada sin segunda lectura — deriva sin medir</string>
+    <string name="capture_closure_good">Cerrada con un %1$s del perímetro</string>
+    <string name="capture_closure_poor">Deriva del %1$s — vuelve a medir para un plano mejor</string>
+
+    <string name="capture_finding_floor">Buscando el suelo…</string>
+    <string name="capture_first_corner">Toca la primera esquina</string>
+    <string name="capture_tap_to_close">Toca para cerrar la habitación</string>
+    <string name="capture_near_start">Cerca del inicio otra vez</string>
+    <plurals name="capture_corner_count">
+        <item quantity="one">%1$d esquina</item>
+        <item quantity="other">%1$d esquinas</item>
+    </plurals>
+
+    <string name="capture_hint_find_floor">Apunta al suelo y muévete despacio</string>
+    <string name="capture_hint_off_floor">Las esquinas salen del suelo, no de lo que hay encima</string>
+    <string name="capture_hint_walk">Después recorre la habitación tocando cada esquina</string>
+    <string name="capture_hint_closing">Cerrar aquí mide la deriva y corrige el plano</string>
+    <string name="capture_hint_aim_first">Apunta a la primera esquina para cerrar, o toca Cerrar</string>
+    <string name="capture_hint_keep_going">Sigue dando la vuelta a la habitación</string>
+    <string name="capture_hint_return">Vuelve a la primera esquina para cerrar</string>
+
+    <string name="capture_measurement_suffix">%1$s · %2$d medidas</string>
+
+    <string name="capture_hint_distance">Toca dos puntos para medir entre ellos</string>
+    <string name="capture_hint_room">Toca cada esquina de la habitación en orden, dando la vuelta</string>
+    <string name="capture_other_end">Ahora apunta al otro extremo</string>
+
+    <string name="capture_corner_added">Esquina añadida — toca Cerrar para terminar, o la primera esquina</string>
+    <string name="capture_second_corner">Ve a la siguiente esquina y toca otra vez</string>
+    <string name="capture_keep_going">Sigue, y vuelve a la primera esquina para cerrar</string>
+    <string name="capture_needs_three">Una habitación necesita al menos tres esquinas</string>
+
+    <string name="capture_closed_with_drift">Cerrada con un %1$s de deriva — plantéate volver a medir</string>
+    <string name="capture_closed_unmeasured">Habitación cerrada — sin segunda lectura, la deriva queda sin medir</string>
+    <string name="capture_closed">Habitación cerrada</string>
+    <string name="capture_unsolvable">No se ha podido resolver esta habitación — prueba a medirla otra vez</string>
+    <string name="capture_moved_to_keep">Movido %1$s para mantenerlo en %2$s</string>
+    <string name="capture_save_failed">No se ha podido guardar — %1$s</string>
+</resources>

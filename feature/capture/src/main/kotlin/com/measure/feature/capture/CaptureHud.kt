@@ -13,6 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.measure.core.designsystem.labelRes
+import com.measure.core.designsystem.messageRes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -45,8 +48,14 @@ internal fun TrackingChip(
     // The dot still carries the gradation for anyone watching for it.
     val text = when {
         tracking.issue != TrackingIssue.NONE -> tracking.issue.advice
-        tracking.canCapture -> "Ready"
-        else -> "Tracking ${tracking.quality.name.lowercase()}"
+        tracking.canCapture -> stringResource(R.string.capture_ready)
+        else -> stringResource(
+            R.string.capture_tracking,
+            // The quality word itself is an enum name, not a sentence. It is deliberately
+            // left untranslated: POOR/LIMITED/GOOD are ARCore's own vocabulary, and a user
+            // searching for what "limited" means will find ARCore's documentation.
+            tracking.quality.name.lowercase(java.util.Locale.ROOT),
+        )
     }
 
     Row(
@@ -76,7 +85,7 @@ internal fun TrackingChip(
         // fitted a plane to, which is most of the room for the first few seconds.
         if (depthEnabled) {
             Text(
-                text = "· depth",
+                text = stringResource(R.string.capture_depth),
                 color = MeasureColours.OnScrimMuted,
                 fontSize = MeasureType.Small.fontSize,
                 // Never wraps. It is a two-word aside; breaking it is always wrong.
@@ -102,10 +111,15 @@ internal fun AimAdvice(
 ) {
     val lines = buildList {
         // First, because it is the one that explains a dead shutter.
-        if (offFloor) add("Aim at the floor — that is not on it" to MeasureColours.Warning)
-        advice.message?.let { add(it to MeasureColours.Warning) }
+        if (offFloor) {
+            add(stringResource(R.string.capture_off_floor) to MeasureColours.Warning)
+        }
+        advice.messageRes()?.let { add(stringResource(it) to MeasureColours.Warning) }
         if (source != null && !source.isStructural) {
-            add("Reading from ${source.label}" to MeasureColours.OnScrimMuted)
+            add(
+                stringResource(R.string.capture_reading_from, stringResource(source.labelRes())) to
+                    MeasureColours.OnScrimMuted,
+            )
         }
         if (rangeText != null && advice == RangeAdvice.IDEAL && isEmpty()) {
             add(rangeText to MeasureColours.OnScrimMuted)

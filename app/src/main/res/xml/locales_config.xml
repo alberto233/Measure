@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages this app is actually written in.
+
+  Two things depend on it. Android 13 and later reads it to offer a per-app language in
+  Settings, which matters for a measuring app more than for most: somebody working in
+  Spanish on an English phone is an ordinary case on a building site. And it is the honest
+  list — without it the system infers the languages from whatever the bundled libraries
+  happen to be translated into, and offers the user languages the app itself does not speak.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="es" />
+</locale-config>

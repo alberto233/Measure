@@ -24,6 +24,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.measure.core.designsystem.labelRes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
@@ -136,7 +139,7 @@ fun CaptureScreen(
             SessionProblem(
                 title = failure.message,
                 detail = failure.detail,
-                actionLabel = if (failure.recoverable) "Try again" else null,
+                actionLabel = if (failure.recoverable) stringResource(R.string.capture_try_again) else null,
                 onAction = { activity?.let { viewModel.controller.resume(it) } },
                 onExit = onExit,
             )
@@ -230,7 +233,7 @@ private fun TopBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PillButton("Done", onClick = onExit)
+            PillButton(stringResource(R.string.capture_done), onClick = onExit)
             // Weighted, so the chip takes what is left between the two buttons instead of
             // whatever its longest advice string asks for. The advice can run to two lines
             // inside it; what it may not do is push its neighbours off the row.
@@ -240,7 +243,13 @@ private fun TopBar(
                 modifier = Modifier.weight(1f).padding(horizontal = MeasureSpace.Tight),
             )
             PillButton(
-                label = if (viewModel.unitSystem == UnitSystem.METRIC) "Metres" else "Feet",
+                label = stringResource(
+                    if (viewModel.unitSystem == UnitSystem.METRIC) {
+                        R.string.capture_metres
+                    } else {
+                        R.string.capture_feet
+                    },
+                ),
                 onClick = viewModel::toggleUnits,
             )
         }
@@ -248,7 +257,9 @@ private fun TopBar(
         AimAdvice(
             advice = state.rangeAdvice,
             source = state.target?.source,
-            rangeText = state.target?.let { "${viewModel.formatLength(it.range)} away" },
+            rangeText = state.target?.let {
+                stringResource(R.string.capture_range_away, viewModel.formatLength(it.range))
+            },
             offFloor = state.offFloor,
         )
     }
@@ -280,7 +291,9 @@ private fun BottomBar(
         // widest row on the screen and the one that must not start wrapping.
         if (room) {
             PillButton(
-                label = if (viewModel.snapEnabled) "Square corners: on" else "Square corners: off",
+                label = stringResource(
+                    if (viewModel.snapEnabled) R.string.capture_snap_on else R.string.capture_snap_off,
+                ),
                 onClick = viewModel::toggleSnap,
             )
         }
@@ -291,7 +304,7 @@ private fun BottomBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PillButton(
-                label = "Undo",
+                label = stringResource(R.string.capture_undo),
                 enabled = if (room) {
                     viewModel.canUndoRoom
                 } else {
@@ -306,7 +319,9 @@ private fun BottomBar(
             )
             if (room) {
                 PillButton(
-                    label = if (viewModel.isRoomClosed) "New room" else "Close",
+                    label = stringResource(
+                        if (viewModel.isRoomClosed) R.string.capture_new_room else R.string.capture_close,
+                    ),
                     enabled = viewModel.isRoomClosed || viewModel.canCloseRoom,
                     onClick = {
                         if (viewModel.isRoomClosed) viewModel.restartRoom() else viewModel.closeRoom()
@@ -314,7 +329,13 @@ private fun BottomBar(
                 )
             } else {
                 PillButton(
-                    label = if (viewModel.showPlanes) "Hide planes" else "Show planes",
+                    label = stringResource(
+                        if (viewModel.showPlanes) {
+                            R.string.capture_hide_planes
+                        } else {
+                            R.string.capture_show_planes
+                        },
+                    ),
                     onClick = viewModel::togglePlanes,
                 )
             }
@@ -351,9 +372,19 @@ private fun RoomReadout(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Perimeter ${viewModel.formatLength(solution.perimeter.metres)}" +
-                    " · ${solution.polygon.size} walls" +
-                    (viewModel.detectedCeilingHeight?.let { " · ${viewModel.formatLength(it)} high" } ?: ""),
+                text = stringResource(
+                    R.string.capture_summary,
+                    viewModel.formatLength(solution.perimeter.metres),
+                    solution.polygon.size,
+                ).let { summary ->
+                    viewModel.detectedCeilingHeight?.let {
+                        stringResource(
+                            R.string.capture_summary_height,
+                            summary,
+                            viewModel.formatLength(it),
+                        )
+                    } ?: summary
+                },
                 color = MeasureColours.OnScrimMuted,
                 fontSize = MeasureType.Small.fontSize,
             )
@@ -362,12 +393,18 @@ private fun RoomReadout(
                     // Shut with the button rather than by re-reading the first corner:
                     // nothing checked the walk, so there is no misclosure to quote and
                     // "0.0%" would be reporting a check that never happened.
-                    !solution.closure.wasAdjusted -> "Closed without a second reading — drift unmeasured"
-                    solution.isReliable ->
-                        "Closed to ${viewModel.percent(solution.closure.relativeError)} of perimeter"
+                    !solution.closure.wasAdjusted ->
+                        stringResource(R.string.capture_closure_unmeasured)
 
-                    else ->
-                        "Drift ${viewModel.percent(solution.closure.relativeError)} — re-measure for a better plan"
+                    solution.isReliable -> stringResource(
+                        R.string.capture_closure_good,
+                        viewModel.percent(solution.closure.relativeError),
+                    )
+
+                    else -> stringResource(
+                        R.string.capture_closure_poor,
+                        viewModel.percent(solution.closure.relativeError),
+                    )
                 },
                 color = if (solution.isReliable) MeasureColours.OnScrimMuted else MeasureColours.Warning,
                 fontSize = MeasureType.Small.fontSize,
@@ -378,11 +415,11 @@ private fun RoomReadout(
         val corners = viewModel.roomCorners.size
         Text(
             text = when {
-                state.floor?.isEstablished != true -> "Finding the floor…"
-                corners == 0 -> "Tap the first corner"
-                viewModel.isNearStartCorner -> "Tap to close the room"
-                viewModel.isApproachingStart -> "Back near the start"
-                else -> "$corners ${if (corners == 1) "corner" else "corners"}"
+                state.floor?.isEstablished != true -> stringResource(R.string.capture_finding_floor)
+                corners == 0 -> stringResource(R.string.capture_first_corner)
+                viewModel.isNearStartCorner -> stringResource(R.string.capture_tap_to_close)
+                viewModel.isApproachingStart -> stringResource(R.string.capture_near_start)
+                else -> pluralStringResource(R.plurals.capture_corner_count, corners, corners)
             },
             color = if (viewModel.isNearStartCorner) MeasureColours.Ready else MeasureColours.OnScrim,
             fontSize = MeasureType.Title.fontSize,
@@ -390,16 +427,16 @@ private fun RoomReadout(
         )
         Text(
             text = when {
-                state.floor?.isEstablished != true -> "Point at the floor and move slowly"
-                state.offFloor -> "Corners come from the floor, not from what is stacked on it"
-                corners == 0 -> "Then walk round, tapping each corner"
-                viewModel.isNearStartCorner -> "Closing here measures the drift and corrects the plan"
+                state.floor?.isEstablished != true -> stringResource(R.string.capture_hint_find_floor)
+                state.offFloor -> stringResource(R.string.capture_hint_off_floor)
+                corners == 0 -> stringResource(R.string.capture_hint_walk)
+                viewModel.isNearStartCorner -> stringResource(R.string.capture_hint_closing)
                 // Only the first corner itself closes the room. A tap anywhere else here
                 // is a corner, which is what makes an alcove beside the doorway you began
                 // at possible to record at all.
-                viewModel.isApproachingStart -> "Aim at the first corner to close, or tap Close"
-                corners < 3 -> "Keep going round the room"
-                else -> "Return to the first corner to close"
+                viewModel.isApproachingStart -> stringResource(R.string.capture_hint_aim_first)
+                corners < 3 -> stringResource(R.string.capture_hint_keep_going)
+                else -> stringResource(R.string.capture_hint_return)
             },
             color = MeasureColours.OnScrimMuted,
             fontSize = MeasureType.Small.fontSize,
@@ -425,9 +462,13 @@ private fun LatestMeasurement(viewModel: CaptureViewModel, modifier: Modifier = 
             fontSize = MeasureType.Display.fontSize,
             fontWeight = FontWeight.Bold,
         )
-        val suffix = if (viewModel.segments.size > 1) " · ${viewModel.segments.size} measurements" else ""
+        val mode = stringResource(latest.mode.labelRes())
         Text(
-            text = latest.mode.label + suffix,
+            text = if (viewModel.segments.size > 1) {
+                stringResource(R.string.capture_measurement_suffix, mode, viewModel.segments.size)
+            } else {
+                mode
+            },
             color = MeasureColours.OnScrimMuted,
             fontSize = MeasureType.Small.fontSize,
         )
@@ -563,7 +604,7 @@ private fun SessionProblem(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (actionLabel != null) PillButton(actionLabel, onClick = onAction)
-            PillButton("Back", onClick = onExit)
+            PillButton(stringResource(R.string.capture_back), onClick = onExit)
         }
     }
 }

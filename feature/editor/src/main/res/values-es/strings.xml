@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. Vocabulario de obra: "hueco" para una abertura sin puerta, "rodapié", "mano"
+  para una capa de pintura, "merma" para el desperdicio de corte del suelo.
+
+  Se mantiene entera la distinción entre lo medido y lo derivado. Una distancia trazada sobre
+  el plano, una habitación colocada a mano, una esquina que el solucionador ha escuadrado:
+  cada una lo dice, porque si no el usuario se fía de un número más de lo que debe.
+-->
+<resources>
+    <string name="editor_undo">Deshacer</string>
+    <string name="editor_send">Enviar</string>
+    <string name="editor_send_plan">Enviar %1$s</string>
+    <string name="editor_done">Listo</string>
+    <string name="editor_cancel">Cancelar</string>
+    <string name="editor_delete">Borrar</string>
+    <string name="editor_keep">Guardar</string>
+    <string name="editor_discard">Descartar</string>
+    <string name="editor_save">Guardar</string>
+    <string name="editor_skip">Saltar</string>
+    <string name="editor_set">Fijar</string>
+    <string name="editor_clear">Quitar</string>
+    <string name="editor_remove">Eliminar</string>
+    <string name="editor_rename">Renombrar</string>
+
+    <string name="editor_nothing_yet">Nada todavía</string>
+    <plurals name="editor_room_count">
+        <item quantity="one">%1$d habitación</item>
+        <item quantity="other">%1$d habitaciones</item>
+    </plurals>
+    <plurals name="editor_measurement_count">
+        <item quantity="one">%1$d medida</item>
+        <item quantity="other">%1$d medidas</item>
+    </plurals>
+
+    <string name="editor_unrelated_title">Habitaciones de capturas distintas</string>
+    <string name="editor_unrelated_body">Cada habitación está medida, pero cómo encajan entre ellas no — mantén pulsada una habitación y arrástrala para colocarla.</string>
+
+    <string name="editor_empty_title">Todavía no hay nada que editar</string>
+    <string name="editor_empty_body">Captura una habitación y aparecerá aquí</string>
+    <string name="editor_add_room">+ Habitación</string>
+    <string name="editor_plan_help">Pellizca para ampliar · toca una pared para fijar su longitud real · mantén pulsada una esquina para moverla · Medir para tamaños y distancias</string>
+
+    <string name="editor_room_name_hint">Nombre de la habitación</string>
+    <string name="editor_room_summary">%1$s de suelo · %2$s de perímetro</string>
+    <string name="editor_room_drag_help">Mantén pulsada esta habitación y arrástrala para moverla</string>
+    <string name="editor_square_to_plan">Escuadrar al plano</string>
+    <string name="editor_fits_inside">Cabe en %1$s × %2$s</string>
+
+    <string name="editor_ceiling">Techo</string>
+    <string name="editor_ceiling_hint">p. ej. 2,4</string>
+    <string name="editor_ceiling_help">Fija la altura de techo para tener superficie de pared y volumen. Mira hacia arriba mientras capturas y se rellena sola.</string>
+    <string name="editor_surfaces">Paredes %1$s · volumen %2$s</string>
+    <string name="editor_after_openings">Descontando %1$s de puertas y ventanas</string>
+    <string name="editor_delete_room">Borrar la habitación</string>
+
+    <string name="editor_tap_first_point">Toca el primer punto</string>
+    <string name="editor_tap_second_point">Toca el segundo punto</string>
+    <string name="editor_tap_a_dimension">Toca una cota para leerla</string>
+    <string name="editor_from_point">Desde %1$s</string>
+    <string name="editor_snap_help">Las esquinas y las paredes atraen el punto</string>
+    <string name="editor_sizes_marked">Las medidas están acotadas alrededor del plano</string>
+    <string name="editor_pulled">Ajustado a %1$s</string>
+    <string name="editor_redo_point">Rehacer el punto</string>
+    <string name="editor_add_distance">+ Distancia</string>
+
+    <string name="editor_quantities_empty">Captura una habitación y sus mediciones aparecerán aquí</string>
+    <string name="editor_floor">Suelo</string>
+    <string name="editor_walls_net">Paredes, neto</string>
+    <string name="editor_totals">Perímetro %1$s · volumen %2$s</string>
+    <string name="editor_no_ceiling_for">Sin altura de techo en %1$s — no se cuentan paredes ni volumen para %2$s. Toca la habitación en Plano y fíjala.</string>
+    <string name="editor_it">ella</string>
+    <string name="editor_them">ellas</string>
+
+    <string name="editor_tag_flooring">Suelo</string>
+    <string name="editor_order">Pedir</string>
+    <string name="editor_flooring_note">%1$s de suelo más un %2$d%% de merma. Súbelo para una colocación en diagonal o en espiga, o para habitaciones que no sean rectangulares.</string>
+
+    <string name="editor_tag_paint">Pintura</string>
+    <plurals name="editor_coats">
+        <item quantity="one">%1$d mano</item>
+        <item quantity="other">%1$d manos</item>
+    </plurals>
+    <string name="editor_ceilings_too">Techos también</string>
+    <string name="editor_buy">Comprar</string>
+    <string name="editor_paint_note">%1$s a %2$s, %3$d m² por litro. Mira el bote — el rendimiento varía, y una pared que cambia de color chupa más.</string>
+    <string name="editor_openings_deducted">Puertas y ventanas ya descontadas: %1$s</string>
+    <string name="editor_tag_by_room">Por habitación</string>
+    <string name="editor_no_height">sin altura</string>
+
+    <string name="editor_focus_overall">Total, en todo el plano</string>
+    <string name="editor_focus_between">Entre las esquinas marcadas</string>
+    <string name="editor_focus_help">Las líneas discontinuas muestran qué parte del plano abarca.</string>
+    <string name="editor_selected_added">%1$d seleccionadas, sumadas</string>
+
+    <string name="editor_orphaned">Esta distancia estaba unida a una geometría que ya no existe</string>
+    <string name="editor_off_the_plan">Sacada del plano, no medida en la habitación</string>
+    <string name="editor_snapped_warning">Un extremo cae en una esquina que el solucionador escuadró, así que parte de esta distancia es el modelo y no la habitación.</string>
+
+    <string name="editor_name_measurement">Ponle nombre a la medida</string>
+    <string name="editor_name_hint">Nombre</string>
+    <string name="editor_description_hint">Para qué es, si hace falta decirlo</string>
+    <string name="editor_name_optional">Los dos son opcionales. Sáltalo y la medida se guarda igual.</string>
+    <string name="editor_mode_measurement">Medida en %1$s</string>
+
+    <string name="editor_corner_of">%1$s · esquina %2$d</string>
+    <string name="editor_corner_help">Mantén pulsado y arrastra para moverla. La habitación se vuelve a resolver al soltar, así que los ángulos rectos y las paredes fijadas se mantienen.</string>
+
+    <string name="editor_wall_of">%1$s · pared %2$d</string>
+    <string name="editor_wall_locked">Fijada a %1$s</string>
+    <string name="editor_wall_measured">Medida %1$s</string>
+    <string name="editor_wall_help">¿Has medido esta pared con un metro? Escribe la longitud real y toda la habitación se ajusta a ella.</string>
+    <string name="editor_true_length">Longitud real</string>
+    <string name="editor_lock">Fijar</string>
+    <string name="editor_unlock">Soltar</string>
+
+    <string name="editor_no_openings">Sin puertas ni ventanas</string>
+    <plurals name="editor_door_count">
+        <item quantity="one">%1$d puerta</item>
+        <item quantity="other">%1$d puertas</item>
+    </plurals>
+    <plurals name="editor_window_count">
+        <item quantity="one">%1$d ventana</item>
+        <item quantity="other">%1$d ventanas</item>
+    </plurals>
+    <plurals name="editor_opening_count">
+        <item quantity="one">%1$d hueco</item>
+        <item quantity="other">%1$d huecos</item>
+    </plurals>
+    <string name="editor_opening_at">%1$s %2$s</string>
+    <string name="editor_add_door">+ Puerta</string>
+    <string name="editor_add_window">+ Ventana</string>
+    <string name="editor_opening_wide">ancho</string>
+    <string name="editor_opening_high">alto</string>
+    <string name="editor_opening_from">desde</string>
+    <string name="editor_opening_at_label">a</string>
+
+    <string name="editor_hinge">Bisagra</string>
+    <string name="editor_hinge_left">Izquierda</string>
+    <string name="editor_hinge_right">Derecha</string>
+    <string name="editor_opens">Abre</string>
+    <string name="editor_opens_in">Dentro</string>
+    <string name="editor_opens_out">Fuera</string>
+
+    <string name="editor_tab_plan">Plano</string>
+    <string name="editor_tab_measure">Medir</string>
+    <string name="editor_tab_quantities">Mediciones</string>
+
+    <string name="editor_opening_added">%1$s añadida a la pared %2$d</string>
+    <string name="editor_opening_updated">%1$s actualizada</string>
+    <string name="editor_opening_deleted">%1$s borrada</string>
+    <string name="editor_opening_no_room">No queda sitio en esa pared</string>
+    <string name="editor_opening_too_big">Eso no cabe en esta pared</string>
+
+    <string name="editor_already_square">%1$s ya está escuadrada al plano</string>
+    <string name="editor_room_moved">%1$s movida — la colocación es tuya, no está medida</string>
+    <string name="editor_room_squared">%1$s escuadrada — girada %2$d°</string>
+    <string name="editor_room_turned">%1$s girada %2$d°</string>
+    <string name="editor_renamed_to">Renombrada a %1$s</string>
+
+    <string name="editor_ceiling_cleared">Altura de techo borrada</string>
+    <string name="editor_ceiling_set">Techo fijado a %1$s — la superficie de pared y el volumen salen de ahí</string>
+    <string name="editor_constraints_conflict">Las restricciones se contradicen — prueba a soltar una pared</string>
+    <string name="editor_cannot_resolve">No se ha podido resolver esta habitación</string>
+    <string name="editor_cannot_read">No se ha podido leer «%1$s» como %2$s</string>
+    <string name="editor_as_length">longitud</string>
+    <string name="editor_as_height">altura</string>
+    <string name="editor_cannot_share">No se ha podido compartir este plano — %1$s</string>
+    <string name="editor_finish_last">Guarda o descarta antes la última medida</string>
+    <string name="editor_finish_this">Guarda o descarta antes esta medida</string>
+    <string name="editor_same_point">Esos dos puntos son el mismo — pon el segundo en otro sitio</string>
+    <string name="editor_moved_to_keep">Movido %1$s para mantenerlo %2$s</string>
+    <string name="editor_along">a lo largo de %1$s</string>
+    <string name="editor_along_plan">a lo largo del plano</string>
+    <string name="editor_square_to">en escuadra con %1$s</string>
+    <string name="editor_square_to_the_plan">en escuadra con el plano</string>
+    <string name="editor_wall_locked_to">Pared %1$d fijada a %2$s — habitación resuelta de nuevo</string>
+    <string name="editor_wall_unlocked">Pared %1$d suelta</string>
+    <string name="editor_default_room_name">Habitación</string>
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Castellano. "Nivel" y "Plomada" son las palabras de obra para horizontal y vertical, igual
+  que en inglés: describen la herramienta que impone la restricción, no la dirección.
+
+  En los sentidos de apertura, "izquierda" y "derecha" son los extremos del muro (el mismo
+  extremo desde el que se mide el desplazamiento del hueco), y "dentro"/"fuera" son respecto
+  a la habitación.
+-->
+<resources>
+    <string name="mode_free">Libre</string>
+    <string name="mode_free_hint">Dos puntos cualesquiera</string>
+    <string name="mode_level">Nivel</string>
+    <string name="mode_level_hint">Fijado a la altura del primer punto</string>
+    <string name="mode_plumb">Plomada</string>
+    <string name="mode_plumb_hint">Fijado en vertical sobre el primer punto</string>
+
+    <string name="opening_door">Puerta</string>
+    <string name="opening_window">Ventana</string>
+    <string name="opening_passage">Hueco</string>
+
+    <string name="swing_near_in">Izquierda, dentro</string>
+    <string name="swing_far_in">Derecha, dentro</string>
+    <string name="swing_near_out">Izquierda, fuera</string>
+    <string name="swing_far_out">Derecha, fuera</string>
+
+    <string name="source_surface">superficie</string>
+    <string name="source_surface_extended">superficie (ampliada)</string>
+    <string name="source_depth">profundidad</string>
+    <string name="source_plumb">plomada</string>
+    <string name="source_feature">punto</string>
+    <string name="source_estimate">estimación</string>
+
+    <!-- How far away the user is aiming. -->
+    <string name="range_too_close">Demasiado cerca — retrocede</string>
+    <string name="range_long">Bastante lejos — acércate si puedes</string>
+    <string name="range_very_long">Muy lejos — cuenta con varios centímetros de error</string>
+</resources>

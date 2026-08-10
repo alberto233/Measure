@@ -150,7 +150,7 @@ object JsonExporter {
             append("\"label\": ${string(measurement.label)}, ")
             append("\"length\": ${number(measurement.length)}, ")
             append("\"tolerance\": ${number(measurement.sigma)}, ")
-            append("\"mode\": ${string(measurement.mode)}}")
+            append("\"mode\": ${string(measurement.modeKey)}}")
             append(if (index == plan.measurements.lastIndex) "\n" else ",\n")
         }
         append("  ],\n")

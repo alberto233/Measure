@@ -26,11 +26,10 @@ enum class HitSource(
     val baseSigma: Double,
     val sigmaPerMetre: Double,
     val spatialCorrelation: Double,
-    val label: String,
 ) {
-    PLANE_POLYGON(0.008, 0.004, 0.80, "surface"),
-    PLANE_INFINITE(0.015, 0.008, 0.75, "surface (extended)"),
-    DEPTH(0.020, 0.012, 0.50, "depth"),
+    PLANE_POLYGON(0.008, 0.004, 0.80),
+    PLANE_INFINITE(0.015, 0.008, 0.75),
+    DEPTH(0.020, 0.012, 0.50),
 
     /**
      * Derived from gravity rather than from any surface: the point where the line of
@@ -42,9 +41,9 @@ enum class HitSource(
      * where along that vertical the aim lands, so it grows with range like everything
      * else.
      */
-    PLUMB(0.024, 0.016, 0.40, "plumb"),
-    FEATURE_POINT(0.030, 0.020, 0.20, "feature"),
-    INSTANT_PLACEMENT(0.060, 0.040, 0.60, "estimate"),
+    PLUMB(0.024, 0.016, 0.40),
+    FEATURE_POINT(0.030, 0.020, 0.20),
+    INSTANT_PLACEMENT(0.060, 0.040, 0.60),
     ;
 
     /**

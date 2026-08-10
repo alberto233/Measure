@@ -10,6 +10,7 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.measure.core.data.ProjectDetail
 import com.measure.core.data.SavedRoom
+import com.measure.core.designsystem.labelRes
 import com.measure.core.export.CsvExporter
 import com.measure.core.export.DxfExporter
 import com.measure.core.export.ExportFormat
@@ -199,10 +200,13 @@ internal fun ProjectDetail.toExportable(resources: Resources) = ExportablePlan(
     rooms = rooms.map(SavedRoom::toExportable),
     measurements = measurements.map {
         ExportableMeasurement(
-            label = it.label ?: it.mode.label,
+            label = it.label ?: resources.getString(it.mode.labelRes()),
             length = it.length.metres,
             sigma = it.sigma.metres,
-            mode = it.mode.label,
+            mode = resources.getString(it.mode.labelRes()),
+            // The project file's own word for it, which a machine reads and a language
+            // must not move.
+            modeKey = it.mode.name,
         )
     },
     // Distances drawn on the plan were being left out of every export entirely, which

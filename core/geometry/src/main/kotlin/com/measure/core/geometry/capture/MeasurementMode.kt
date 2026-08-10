@@ -13,23 +13,23 @@ import kotlin.math.abs
  * length cannot keep a reticle level to better than a couple of degrees. Constraining to
  * gravity therefore removes error rather than merely tidying the number.
  */
-enum class MeasurementMode(val label: String, val hint: String) {
+enum class MeasurementMode {
     /** Straight line between two points, however they lie. */
-    FREE("Free", "Any two points"),
+    FREE,
 
     /**
      * Level: the second point is forced to the first point's height. This is the mode
      * for a room width across furniture, or an alcove where floor and ceiling are not
      * both reachable.
      */
-    HORIZONTAL("Level", "Locked to the first point's height"),
+    HORIZONTAL,
 
     /**
      * Plumb: the second point is forced directly above or below the first. This is how
      * ceiling height and wall height get measured, and it is the case a tape measure
      * genuinely struggles with.
      */
-    VERTICAL("Plumb", "Locked vertically above the first point"),
+    VERTICAL,
     ;
 
     /**

@@ -1,6 +1,7 @@
 package com.measure.feature.capture
 
 import android.app.Application
+import androidx.annotation.StringRes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +14,8 @@ import com.measure.ar.CaptureMode
 import com.measure.ar.MeasureArController
 import com.measure.core.data.MeasureData
 import com.measure.core.data.MeasureRepository
+import com.measure.core.designsystem.hintRes
+import com.measure.core.designsystem.labelRes
 import com.measure.core.geometry.CapturedCorner
 import com.measure.core.geometry.RoomCapture
 import com.measure.core.geometry.RoomSolution
@@ -49,6 +52,17 @@ sealed interface CaptureNotice {
 class CaptureViewModel(application: Application) : AndroidViewModel(application) {
 
     val controller = MeasureArController(application)
+
+    /**
+     * A string, in the phone's language.
+     *
+     * The notices this view model produces are sentences the user reads over the camera
+     * image, so they cannot be literals here. Named short because it appears twenty times
+     * and `getApplication<Application>().getString(...)` at each of them would bury what
+     * each notice actually says under the machinery of saying it.
+     */
+    private fun say(@StringRes id: Int, vararg args: Any): String =
+        getApplication<Application>().getString(id, *args)
 
     private val repository: MeasureRepository = MeasureData.repository(application)
 
@@ -203,10 +217,12 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         if (next == captureMode) return
         captureMode = next
         notice = CaptureNotice.Advice(
-            when (next) {
-                CaptureMode.DISTANCE -> "Tap two points to measure between them"
-                CaptureMode.ROOM -> "Tap each corner of the room in order, walking round"
-            },
+            say(
+                when (next) {
+                    CaptureMode.DISTANCE -> R.string.capture_hint_distance
+                    CaptureMode.ROOM -> R.string.capture_hint_room
+                },
+            ),
         )
         pushScene()
     }
@@ -272,7 +288,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     fun selectMode(next: MeasurementMode) {
         if (next == mode) return
         mode = next
-        notice = CaptureNotice.Advice(next.hint)
+        notice = CaptureNotice.Advice(say(next.hintRes()))
         pushScene()
     }
 
@@ -300,11 +316,13 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
     fun toggleSnap() {
         snapEnabled = !snapEnabled
         notice = CaptureNotice.Advice(
-            if (snapEnabled) {
-                "Square corners on — from the next corner"
-            } else {
-                "Square corners off — corners land where you aim"
-            },
+            say(
+                if (snapEnabled) {
+                    R.string.capture_snap_turned_on
+                } else {
+                    R.string.capture_snap_turned_off
+                },
+            ),
         )
         pushScene()
     }
@@ -384,7 +402,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                     val anchor = pending
                     if (anchor == null) {
                         pending = outcome.point
-                        notice = CaptureNotice.Advice("Now aim at the other end")
+                        notice = CaptureNotice.Advice(say(R.string.capture_other_end))
                     } else {
                         completeSegment(anchor, outcome.point)
                     }
@@ -421,11 +439,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             // breast, the corner of a fitted unit next to the doorway you began at. The
             // corner is taken, and the way to finish is the button that says so.
             intent == ClosingIntent.APPROACHING_START ->
-                CaptureNotice.Advice("Corner added — tap Close to finish, or the first corner itself")
+                CaptureNotice.Advice(say(R.string.capture_corner_added))
 
-            roomCorners.size == 1 -> CaptureNotice.Advice("Walk to the next corner and tap again")
+            roomCorners.size == 1 -> CaptureNotice.Advice(say(R.string.capture_second_corner))
             roomCorners.size == LoopClosure.MINIMUM_CORNERS ->
-                CaptureNotice.Advice("Keep going, then return to the first corner to close")
+                CaptureNotice.Advice(say(R.string.capture_keep_going))
 
             else -> null
         }
@@ -435,7 +453,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
 
     private fun solveRoom(closingObservation: SampledPoint?) {
         if (roomCorners.size < LoopClosure.MINIMUM_CORNERS) {
-            notice = CaptureNotice.Warning("A room needs at least three corners")
+            notice = CaptureNotice.Warning(say(R.string.capture_needs_three))
             return
         }
 
@@ -462,16 +480,19 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
             // smearing it away would be dishonest. Say so and let the user decide.
             when {
                 solution.closure.wasAdjusted && !solution.closure.isAcceptable -> CaptureNotice.Warning(
-                    "Closed with ${percent(solution.closure.relativeError)} drift — consider re-measuring",
+                    say(
+                        R.string.capture_closed_with_drift,
+                        percent(solution.closure.relativeError),
+                    ),
                 )
 
                 // Shutting the loop with the button rather than by re-reading the first
                 // corner leaves nothing to check the walk against, and reporting "0.0%
                 // drift" for that would be claiming a measurement never taken.
                 !solution.closure.wasAdjusted ->
-                    CaptureNotice.Advice("Room closed — no second reading, so drift is unmeasured")
+                    CaptureNotice.Advice(say(R.string.capture_closed_unmeasured))
 
-                else -> CaptureNotice.Advice("Room closed")
+                else -> CaptureNotice.Advice(say(R.string.capture_closed))
             }
         }
     }
@@ -483,7 +504,7 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         describe: (RoomSolution) -> CaptureNotice,
     ) {
         val solution = runCatching { RoomSolver.solve(capture) }.getOrElse {
-            notice = CaptureNotice.Warning("Could not solve this room — try re-measuring")
+            notice = CaptureNotice.Warning(say(R.string.capture_unsolvable))
             return
         }
 
@@ -532,7 +553,11 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
         // not permit. Saying so is the honest alternative to silently snapping it.
         notice = if (constrained.isNotable) {
             CaptureNotice.Warning(
-                "Moved ${formatLength(constrained.correction)} to keep it ${mode.label.lowercase()}",
+                say(
+                    R.string.capture_moved_to_keep,
+                    formatLength(constrained.correction),
+                    say(mode.labelRes()).lowercase(),
+                ),
             )
         } else {
             null
@@ -553,7 +578,9 @@ class CaptureViewModel(application: Application) : AndroidViewModel(application)
                 val id = projectId ?: repository.createDefaultProject(unitSystem).also { projectId = it }
                 write(id)
             } catch (error: Throwable) {
-                notice = CaptureNotice.Warning("Could not save — ${error.javaClass.simpleName}")
+                notice = CaptureNotice.Warning(
+                    say(R.string.capture_save_failed, error.javaClass.simpleName),
+                )
             }
         }
     }

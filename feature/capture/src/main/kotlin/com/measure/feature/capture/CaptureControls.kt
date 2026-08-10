@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.measure.core.designsystem.labelRes
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -48,7 +50,7 @@ internal fun ModeSelector(
     modifier: Modifier = Modifier,
 ) {
     MeasureScrimSegmented(
-        options = MeasurementMode.entries.map { it.label },
+        options = MeasurementMode.entries.map { stringResource(it.labelRes()) },
         selectedIndex = MeasurementMode.entries.indexOf(selected),
         onSelect = { onSelect(MeasurementMode.entries[it]) },
         modifier = modifier,
@@ -63,7 +65,15 @@ internal fun CaptureModeSelector(
     modifier: Modifier = Modifier,
 ) {
     MeasureScrimSegmented(
-        options = CaptureMode.entries.map { if (it == CaptureMode.DISTANCE) "Distance" else "Room" },
+        options = CaptureMode.entries.map {
+            stringResource(
+                if (it == CaptureMode.DISTANCE) {
+                    R.string.capture_mode_distance
+                } else {
+                    R.string.capture_mode_room
+                },
+            )
+        },
         selectedIndex = CaptureMode.entries.indexOf(selected),
         onSelect = { onSelect(CaptureMode.entries[it]) },
         modifier = modifier,

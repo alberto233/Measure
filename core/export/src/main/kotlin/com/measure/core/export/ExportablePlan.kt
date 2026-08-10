@@ -125,7 +125,16 @@ data class ExportableMeasurement(
     val label: String,
     val length: Double,
     val sigma: Double,
+    /** How it was constrained, in the reader's language. Goes on the drawing and in the CSV. */
     val mode: String,
+    /**
+     * The same thing as a stable identifier, for the project file.
+     *
+     * A JSON field a machine reads must not change meaning with the phone's language.
+     * Defaults to [mode] so the exporters' own tests, which have no locale, stay honest
+     * about what a single-language plan looks like.
+     */
+    val modeKey: String = mode,
 )
 
 /**

@@ -8,11 +8,13 @@ package com.measure.core.geometry.capture
  * (docs/ACCURACY.md M4). We warn rather than refuse, because a long shot is sometimes
  * the only one available.
  */
-enum class RangeAdvice(val message: String?) {
-    TOO_CLOSE("Too close — step back"),
-    IDEAL(null),
-    LONG("Quite far — walk closer if you can"),
-    VERY_LONG("Very far — expect several centimetres of error"),
+enum class RangeAdvice {
+    TOO_CLOSE,
+
+    /** The comfortable band. Says nothing, because an indicator always lit stops being read. */
+    IDEAL,
+    LONG,
+    VERY_LONG,
 }
 
 object RangeGate {

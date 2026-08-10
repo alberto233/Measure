@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The camera screen: what to do next, and how well it is going.
+
+  Translators: almost everything here is read at arm's length, in one glance, by somebody
+  walking backwards round a room with a phone held up. Short wins over complete. The two
+  halves of the prompt work together — `capture_room_*` is the state and
+  `capture_room_*_hint` is what to do about it — so they should not repeat each other.
+
+  Never soften the drift and closure wording. Telling a user their plan is worse than they
+  think is the entire product position (docs/PRODUCT_PLAN.md §5); a translation that reads as
+  reassurance breaks the thing the app is for.
+-->
+<resources>
+    <string name="capture_mode_distance">Distance</string>
+    <string name="capture_mode_room">Room</string>
+
+    <string name="capture_ready">Ready</string>
+    <string name="capture_tracking">Tracking %1$s</string>
+    <string name="capture_depth">· depth</string>
+    <string name="capture_off_floor">Aim at the floor — that is not on it</string>
+    <string name="capture_reading_from">Reading from %1$s</string>
+
+    <string name="capture_try_again">Try again</string>
+    <string name="capture_done">Done</string>
+    <string name="capture_back">Back</string>
+    <string name="capture_undo">Undo</string>
+
+    <string name="capture_metres">Metres</string>
+    <string name="capture_feet">Feet</string>
+    <string name="capture_range_away">%1$s away</string>
+
+    <string name="capture_snap_on">Square corners: on</string>
+    <string name="capture_snap_off">Square corners: off</string>
+    <string name="capture_snap_turned_on">Square corners on — from the next corner</string>
+    <string name="capture_snap_turned_off">Square corners off — corners land where you aim</string>
+
+    <string name="capture_new_room">New room</string>
+    <string name="capture_close">Close</string>
+    <string name="capture_hide_planes">Hide planes</string>
+    <string name="capture_show_planes">Show planes</string>
+
+    <string name="capture_summary">Perimeter %1$s · %2$d walls</string>
+    <string name="capture_summary_height">%1$s · %2$s high</string>
+    <string name="capture_closure_unmeasured">Closed without a second reading — drift unmeasured</string>
+    <string name="capture_closure_good">Closed to %1$s of perimeter</string>
+    <string name="capture_closure_poor">Drift %1$s — re-measure for a better plan</string>
+
+    <string name="capture_finding_floor">Finding the floor…</string>
+    <string name="capture_first_corner">Tap the first corner</string>
+    <string name="capture_tap_to_close">Tap to close the room</string>
+    <string name="capture_near_start">Back near the start</string>
+    <plurals name="capture_corner_count">
+        <item quantity="one">%1$d corner</item>
+        <item quantity="other">%1$d corners</item>
+    </plurals>
+
+    <string name="capture_hint_find_floor">Point at the floor and move slowly</string>
+    <string name="capture_hint_off_floor">Corners come from the floor, not from what is stacked on it</string>
+    <string name="capture_hint_walk">Then walk round, tapping each corner</string>
+    <string name="capture_hint_closing">Closing here measures the drift and corrects the plan</string>
+    <string name="capture_hint_aim_first">Aim at the first corner to close, or tap Close</string>
+    <string name="capture_hint_keep_going">Keep going round the room</string>
+    <string name="capture_hint_return">Return to the first corner to close</string>
+
+    <string name="capture_measurement_suffix">%1$s · %2$d measurements</string>
+
+    <string name="capture_hint_distance">Tap two points to measure between them</string>
+    <string name="capture_hint_room">Tap each corner of the room in order, walking round</string>
+    <string name="capture_other_end">Now aim at the other end</string>
+
+    <string name="capture_corner_added">Corner added — tap Close to finish, or the first corner itself</string>
+    <string name="capture_second_corner">Walk to the next corner and tap again</string>
+    <string name="capture_keep_going">Keep going, then return to the first corner to close</string>
+    <string name="capture_needs_three">A room needs at least three corners</string>
+
+    <string name="capture_closed_with_drift">Closed with %1$s drift — consider re-measuring</string>
+    <string name="capture_closed_unmeasured">Room closed — no second reading, so drift is unmeasured</string>
+    <string name="capture_closed">Room closed</string>
+    <string name="capture_unsolvable">Could not solve this room — try re-measuring</string>
+    <string name="capture_moved_to_keep">Moved %1$s to keep it %2$s</string>
+    <string name="capture_save_failed">Could not save — %1$s</string>
+</resources>

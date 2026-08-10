@@ -183,10 +183,8 @@ class RangeGateTest {
         assertEquals(RangeAdvice.IDEAL, RangeGate.advise(2.0))
         assertEquals(RangeAdvice.LONG, RangeGate.advise(6.0))
         assertEquals(RangeAdvice.VERY_LONG, RangeGate.advise(12.0))
-
-        assertEquals(null, RangeAdvice.IDEAL.message)
-        RangeAdvice.entries.filter { it != RangeAdvice.IDEAL }
-            .forEach { assertNotNull(it.message, "$it should warn") }
+        // Which of these has something to say is asserted where the words now live, in
+        // `:core:designsystem`. This module knows the bands and no longer knows English.
     }
 
     @Test
@@ -477,13 +475,6 @@ class MeasurementModeTest {
         assertFalse(MeasurementMode.HORIZONTAL.constrain(anchor, Vec3(1.0, 0.02, -2.0)).isNotable)
     }
 
-    @Test
-    fun `every mode has a label and a hint`() {
-        MeasurementMode.entries.forEach {
-            assertTrue(it.label.isNotBlank())
-            assertTrue(it.hint.isNotBlank())
-        }
-    }
 }
 
 class MeasuredSegmentTest {

@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The plan editor: the drawing, what is selected on it, and the quantities that come off it.
+
+  Translators, three things this file will not bend on:
+
+  1. Anything that distinguishes *measured* from *derived* is load-bearing, not hedging. A
+     distance drawn on the plan, a room placed by hand, a corner the solver squared up —
+     each says so because the alternative is a number the user trusts more than it deserves
+     (docs/PRODUCT_PLAN.md §5). Keep the qualification even where it makes a sentence longer.
+  2. The quantities are advice with a reason attached. "Check the tin" and "raise it for a
+     diagonal lay" are the parts that stop somebody ordering the wrong amount.
+  3. `editor_wall_help` and `editor_ceiling_help` explain a feature that is otherwise
+     invisible — typing a tape measurement, and looking up while capturing. They are the only
+     place either is taught.
+-->
+<resources>
+    <!-- Symbols and pure substitutions: the same in every language. -->
+    <string name="editor_back" translatable="false">←</string>
+    <string name="editor_undo">Undo</string>
+    <string name="editor_send">Send</string>
+    <string name="editor_send_plan">Send %1$s</string>
+    <string name="editor_done">Done</string>
+    <string name="editor_cancel">Cancel</string>
+    <string name="editor_delete">Delete</string>
+    <string name="editor_keep">Keep</string>
+    <string name="editor_discard">Discard</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_skip">Skip</string>
+    <string name="editor_set">Set</string>
+    <string name="editor_clear">Clear</string>
+    <string name="editor_remove">Remove</string>
+    <string name="editor_rename">Rename</string>
+
+    <string name="editor_nothing_yet">Nothing yet</string>
+    <plurals name="editor_room_count">
+        <item quantity="one">%1$d room</item>
+        <item quantity="other">%1$d rooms</item>
+    </plurals>
+    <plurals name="editor_measurement_count">
+        <item quantity="one">%1$d measurement</item>
+        <item quantity="other">%1$d measurements</item>
+    </plurals>
+
+    <string name="editor_unrelated_title">Rooms from separate captures</string>
+    <string name="editor_unrelated_body">Each room is measured, but how they sit together is not — long-press a room and drag to place it.</string>
+
+    <string name="editor_empty_title">Nothing to edit yet</string>
+    <string name="editor_empty_body">Capture a room and it appears here</string>
+    <string name="editor_add_room">+ Room</string>
+    <string name="editor_plan_help">Pinch to zoom · tap a wall to set its true length · long-press a corner to move it · Measure for sizes and distances</string>
+
+    <string name="editor_room_name_hint">Room name</string>
+    <string name="editor_room_summary">%1$s floor · %2$s perimeter</string>
+    <string name="editor_room_drag_help">Long-press this room and drag to move it</string>
+    <string name="editor_square_to_plan">Square to plan</string>
+    <string name="editor_turn_left" translatable="false">⟲ 90°</string>
+    <string name="editor_turn_right" translatable="false">⟳ 90°</string>
+    <string name="editor_fits_inside">Fits inside %1$s × %2$s</string>
+
+    <string name="editor_ceiling">Ceiling</string>
+    <string name="editor_ceiling_hint">e.g. 2.4</string>
+    <string name="editor_ceiling_help">Set a ceiling height for wall area and volume. Look up while capturing and it fills itself in.</string>
+    <string name="editor_surfaces">Walls %1$s · volume %2$s</string>
+    <string name="editor_after_openings">After taking out %1$s of doors and windows</string>
+    <string name="editor_delete_room">Delete room</string>
+
+    <string name="editor_tap_first_point">Tap the first point</string>
+    <string name="editor_tap_second_point">Tap the second point</string>
+    <string name="editor_tap_a_dimension">Tap a dimension to read it</string>
+    <string name="editor_from_point">From %1$s</string>
+    <string name="editor_snap_help">Corners and walls pull the point onto them</string>
+    <string name="editor_sizes_marked">Sizes are marked around the plan</string>
+    <string name="editor_pulled">Pulled %1$s</string>
+    <string name="editor_redo_point">Redo point</string>
+    <string name="editor_add_distance">+ Distance</string>
+
+    <string name="editor_quantities_empty">Capture a room and its quantities appear here</string>
+    <string name="editor_floor">Floor</string>
+    <string name="editor_walls_net">Walls, net</string>
+    <string name="editor_totals">Perimeter %1$s · volume %2$s</string>
+    <string name="editor_no_ceiling_for">No ceiling height for %1$s — walls and volume not counted for %2$s. Tap the room in Plan and set one.</string>
+    <string name="editor_it">it</string>
+    <string name="editor_them">them</string>
+
+    <string name="editor_tag_flooring">Flooring</string>
+    <string name="editor_waste_percent" translatable="false">%1$d%%</string>
+    <string name="editor_order">Order</string>
+    <string name="editor_flooring_note">%1$s of floor plus %2$d%% for offcuts. Raise it for a diagonal or herringbone lay, or for rooms that are not rectangles.</string>
+
+    <string name="editor_tag_paint">Paint</string>
+    <plurals name="editor_coats">
+        <item quantity="one">%1$d coat</item>
+        <item quantity="other">%1$d coats</item>
+    </plurals>
+    <string name="editor_ceilings_too">Ceilings too</string>
+    <string name="editor_buy">Buy</string>
+    <string name="editor_paint_note">%1$s at %2$s, %3$d m² per litre. Check the tin — coverage varies, and a wall changing colour drinks more.</string>
+    <string name="editor_openings_deducted">Doors and windows already taken out: %1$s</string>
+    <string name="editor_tag_by_room">By room</string>
+    <string name="editor_no_height">no height</string>
+
+    <string name="editor_focus_overall">Overall, across the whole plan</string>
+    <string name="editor_focus_between">Between the marked corners</string>
+    <string name="editor_focus_help">The dashed lines show which part of the plan this covers.</string>
+    <string name="editor_selected_added">%1$d selected, added together</string>
+
+    <string name="editor_orphaned">This distance was attached to geometry that has gone</string>
+    <string name="editor_off_the_plan">Off the plan, not measured in the room</string>
+    <string name="editor_between_points" translatable="false">%1$s → %2$s</string>
+    <string name="editor_snapped_warning">One end sits on a corner the solver squared up, so part of this distance is the model rather than the room.</string>
+
+    <string name="editor_name_measurement">Name this measurement</string>
+    <string name="editor_name_hint">Name</string>
+    <string name="editor_description_hint">What it is for, if it needs saying</string>
+    <string name="editor_name_optional">Both optional. Skip and the measurement is still kept.</string>
+    <string name="editor_mode_measurement">%1$s measurement</string>
+
+    <string name="editor_corner_of">%1$s · corner %2$d</string>
+    <string name="editor_corner_help">Long-press and drag to move it. The room re-solves when you let go, so right angles and locked walls still hold.</string>
+
+    <string name="editor_wall_of">%1$s · wall %2$d</string>
+    <string name="editor_wall_locked">Locked to %1$s</string>
+    <string name="editor_wall_measured">Measured %1$s</string>
+    <string name="editor_wall_help">Measured this wall with a tape? Type the true length — the whole room tightens around it.</string>
+    <string name="editor_true_length">True length</string>
+    <string name="editor_lock">Lock</string>
+    <string name="editor_unlock">Unlock</string>
+
+    <string name="editor_no_openings">No doors or windows</string>
+    <plurals name="editor_door_count">
+        <item quantity="one">%1$d door</item>
+        <item quantity="other">%1$d doors</item>
+    </plurals>
+    <plurals name="editor_window_count">
+        <item quantity="one">%1$d window</item>
+        <item quantity="other">%1$d windows</item>
+    </plurals>
+    <plurals name="editor_opening_count">
+        <item quantity="one">%1$d opening</item>
+        <item quantity="other">%1$d openings</item>
+    </plurals>
+    <string name="editor_add_door">+ Door</string>
+    <string name="editor_add_window">+ Window</string>
+    <string name="editor_opening_at">%1$s %2$s</string>
+    <string name="editor_opening_wide">wide</string>
+    <string name="editor_opening_high">high</string>
+    <string name="editor_opening_from">from</string>
+    <string name="editor_opening_by" translatable="false">×</string>
+    <string name="editor_opening_at_label">at</string>
+
+    <string name="editor_hinge">Hinge</string>
+    <string name="editor_hinge_left">Left</string>
+    <string name="editor_hinge_right">Right</string>
+    <string name="editor_opens">Opens</string>
+    <string name="editor_opens_in">In</string>
+    <string name="editor_opens_out">Out</string>
+
+    <!-- The three tabs, and what the view model says back. -->
+    <string name="editor_tab_plan">Plan</string>
+    <string name="editor_tab_measure">Measure</string>
+    <string name="editor_tab_quantities">Quantities</string>
+
+    <string name="editor_opening_added">%1$s added to wall %2$d</string>
+    <string name="editor_opening_updated">%1$s updated</string>
+    <string name="editor_opening_deleted">%1$s deleted</string>
+    <string name="editor_opening_no_room">No room left in that wall</string>
+    <string name="editor_opening_too_big">That will not fit this wall</string>
+
+    <string name="editor_already_square">%1$s is already square to the plan</string>
+    <string name="editor_room_moved">%1$s moved — placement is yours, not measured</string>
+    <string name="editor_room_squared">%1$s squared — turned %2$d°</string>
+    <string name="editor_room_turned">%1$s turned %2$d°</string>
+    <string name="editor_renamed_to">Renamed to %1$s</string>
+
+    <string name="editor_ceiling_cleared">Ceiling height cleared</string>
+    <string name="editor_ceiling_set">Ceiling set to %1$s — wall area and volume follow from it</string>
+    <string name="editor_constraints_conflict">Constraints conflict — try unlocking a wall</string>
+    <string name="editor_cannot_resolve">Could not re-solve this room</string>
+    <string name="editor_cannot_read">Could not read “%1$s” as a %2$s</string>
+    <string name="editor_as_length">length</string>
+    <string name="editor_as_height">height</string>
+    <string name="editor_cannot_share">Could not share this plan — %1$s</string>
+    <string name="editor_finish_last">Keep or discard the last measurement first</string>
+    <string name="editor_finish_this">Keep or discard this measurement first</string>
+    <string name="editor_same_point">Those two points are the same — put the second one somewhere else</string>
+    <string name="editor_moved_to_keep">Moved %1$s to keep it %2$s</string>
+    <string name="editor_along">along %1$s</string>
+    <string name="editor_along_plan">along the plan</string>
+    <string name="editor_square_to">square to %1$s</string>
+    <string name="editor_square_to_the_plan">square to the plan</string>
+    <string name="editor_wall_locked_to">Wall %1$d locked to %2$s — room re-solved</string>
+    <string name="editor_wall_unlocked">Wall %1$d unlocked</string>
+    <string name="editor_default_room_name">Room</string>
+</resources>

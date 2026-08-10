@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,12 @@ private val Hairline = 1.dp
  * A blanket `uppercase()` on every label produced two shipped bugs on its own — a units
  * toggle labelled `"m"` that became a lone capital letter in a box, and the Turkish `i`,
  * which `String.uppercase()` turns into `İ` under the default locale.
+ *
+ * **The casing follows the text, not the phone.** `uppercase()` with no argument uses
+ * `Locale.getDefault()`, which is the *device* locale — so an English string on a Turkish
+ * phone becomes `İ`, and the string being uppercased has nothing to do with the language
+ * that rule belongs to. Taking the locale from the resource configuration asks the right
+ * question: uppercase this the way the language it is written in does.
  */
 @Composable
 fun MeasureTag(
@@ -62,7 +69,8 @@ fun MeasureTag(
     modifier: Modifier = Modifier,
     colour: Color = MeasureColours.InkFaint,
 ) {
-    Text(text.uppercase(), modifier, color = colour, style = MeasureType.Tag)
+    val locale = LocalConfiguration.current.locales[0]
+    Text(text.uppercase(locale), modifier, color = colour, style = MeasureType.Tag)
 }
 
 /**

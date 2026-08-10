@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The names the interface gives to values from `:core:geometry`.
+
+  They live here rather than on the enums because `:core:geometry` is pure Kotlin and cannot
+  read a translation, and they live *once* rather than per feature because the capture
+  screen, the editor and the exporter all name the same door and must name it the same way.
+
+  Translators: "Level" and "Plumb" are the builder's words for horizontal and vertical, and
+  they are what the constraint actually does. "Near" and "far" in the door swings are ends of
+  a wall, not distances from the reader.
+-->
+<resources>
+    <string name="mode_free">Free</string>
+    <string name="mode_free_hint">Any two points</string>
+    <string name="mode_level">Level</string>
+    <string name="mode_level_hint">Locked to the first point\'s height</string>
+    <string name="mode_plumb">Plumb</string>
+    <string name="mode_plumb_hint">Locked vertically above the first point</string>
+
+    <string name="opening_door">Door</string>
+    <string name="opening_window">Window</string>
+    <string name="opening_passage">Opening</string>
+
+    <string name="swing_near_in">Left, in</string>
+    <string name="swing_far_in">Right, in</string>
+    <string name="swing_near_out">Left, out</string>
+    <string name="swing_far_out">Right, out</string>
+
+    <!-- What a measured point latched onto. Lower case: they complete "Reading from …". -->
+    <string name="source_surface">surface</string>
+    <string name="source_surface_extended">surface (extended)</string>
+    <string name="source_depth">depth</string>
+    <string name="source_plumb">plumb</string>
+    <string name="source_feature">feature</string>
+    <string name="source_estimate">estimate</string>
+
+    <!-- How far away the user is aiming. -->
+    <string name="range_too_close">Too close — step back</string>
+    <string name="range_long">Quite far — walk closer if you can</string>
+    <string name="range_very_long">Very far — expect several centimetres of error</string>
+</resources>

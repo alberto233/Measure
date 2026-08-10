@@ -28,6 +28,9 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import com.measure.core.designsystem.labelRes
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -214,7 +217,7 @@ fun EditorScreen(
                             context.startActivity(
                                 android.content.Intent.createChooser(
                                     PlanExporter.share(context, detail, format),
-                                    "Send ${detail.name}",
+                                    context.getString(R.string.editor_send_plan, detail.name),
                                 ),
                             )
                         }.onFailure { viewModel.reportExportFailure(it) }
@@ -279,6 +282,7 @@ fun EditorScreen(
     }
 }
 
+@Composable
 private fun summarise(
     rooms: List<SavedRoom>,
     measurements: List<com.measure.core.data.SavedMeasurement>,
@@ -286,7 +290,7 @@ private fun summarise(
 ): String {
     val parts = buildList {
         if (rooms.isNotEmpty()) {
-            add("${rooms.size} ${if (rooms.size == 1) "room" else "rooms"}")
+            add(pluralStringResource(R.plurals.editor_room_count, rooms.size, rooms.size))
             add(
                 com.measure.core.units.AreaFormatter.format(
                     com.measure.core.units.Area(rooms.sumOf { it.area.squareMetres }),
@@ -295,10 +299,16 @@ private fun summarise(
             )
         }
         if (measurements.isNotEmpty()) {
-            add("${measurements.size} ${if (measurements.size == 1) "measurement" else "measurements"}")
+            add(
+                pluralStringResource(
+                    R.plurals.editor_measurement_count,
+                    measurements.size,
+                    measurements.size,
+                ),
+            )
         }
     }
-    return if (parts.isEmpty()) "Nothing yet" else parts.joinToString(" · ")
+    return if (parts.isEmpty()) stringResource(R.string.editor_nothing_yet) else parts.joinToString(" · ")
 }
 
 /** Which room a tap landed in, whatever part of it was hit. */
@@ -341,7 +351,7 @@ private fun TopBar(
             horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Pill("←", onClick = onBack)
+            Pill(stringResource(R.string.editor_back), onClick = onBack)
             Column(Modifier.weight(1f)) {
                 Text(
                     text = title,
@@ -361,11 +371,11 @@ private fun TopBar(
             // Disabled rather than absent. A control that comes and goes makes the row
             // reflow under the finger, and "where did Undo go" is a worse question than
             // "why is Undo grey".
-            Pill("Undo", enabled = canUndo, onClick = onUndo)
-            Pill("Send", enabled = canExport, onClick = onExport)
+            Pill(stringResource(R.string.editor_undo), enabled = canUndo, onClick = onUndo)
+            Pill(stringResource(R.string.editor_send), enabled = canExport, onClick = onExport)
         }
         MeasureSegmented(
-            options = EditorMode.entries.map { it.label },
+            options = EditorMode.entries.map { stringResource(it.labelRes()) },
             selectedIndex = mode.ordinal,
             onSelect = { onSelectMode(EditorMode.entries[it]) },
         )
@@ -388,14 +398,13 @@ private fun TopBar(
 private fun UnrelatedCapturesNote() {
     MeasureCard(Modifier.fillMaxWidth().padding(horizontal = MeasureSpace.Base)) {
         Text(
-            text = "Rooms from separate captures",
+            text = stringResource(R.string.editor_unrelated_title),
             color = MeasureColours.Warning,
             fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Each room is measured, but how they sit together is not — " +
-                "long-press a room and drag to place it.",
+            text = stringResource(R.string.editor_unrelated_body),
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
@@ -409,16 +418,20 @@ private fun EmptyPlan(onAddRoom: () -> Unit, modifier: Modifier = Modifier) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug),
     ) {
-        Text("Nothing to edit yet", color = MeasureColours.Ink, style = MeasureType.Title)
         Text(
-            "Capture a room and it appears here",
+            text = stringResource(R.string.editor_empty_title),
+            color = MeasureColours.Ink,
+            style = MeasureType.Title,
+        )
+        Text(
+            stringResource(R.string.editor_empty_body),
             color = MeasureColours.InkMuted,
             style = MeasureType.Label,
         )
         // The way out of the empty state, on the empty state. An empty screen whose only
         // route forward is a control somewhere else is a dead end for as long as it takes
         // to find that control.
-        Pill("+ Room", highlighted = true, onClick = onAddRoom)
+        Pill(stringResource(R.string.editor_add_room), highlighted = true, onClick = onAddRoom)
     }
 }
 
@@ -458,11 +471,10 @@ private fun PlanContent(
         Selection.None -> {
             // Adding a room is the plan view's own action, which is why it is here rather
             // than in the top bar: it belongs to the plan, not to the editor's chrome.
-            Pill("+ Room", highlighted = true, onClick = onAddRoom)
+            Pill(stringResource(R.string.editor_add_room), highlighted = true, onClick = onAddRoom)
             MeasurementList(viewModel, measurements)
             Text(
-                text = "Pinch to zoom · tap a wall to set its true length · " +
-                    "long-press a corner to move it · Measure for sizes and distances",
+                text = stringResource(R.string.editor_plan_help),
                 color = MeasureColours.InkMuted,
                 style = MeasureType.Label,
             )
@@ -500,14 +512,21 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         Field(
             value = name,
             onValueChange = { name = it },
-            hint = "Room name",
+            hint = stringResource(R.string.editor_room_name_hint),
             modifier = Modifier.weight(1f),
         )
-        Pill("Rename", onClick = { viewModel.renameRoom(room.id, name) })
+        Pill(
+            label = stringResource(R.string.editor_rename),
+            onClick = { viewModel.renameRoom(room.id, name) },
+        )
     }
 
     Text(
-        text = "${viewModel.formatArea(room)} floor · ${viewModel.formatLength(room.perimeter.metres)} perimeter",
+        text = stringResource(
+            R.string.editor_room_summary,
+            viewModel.formatArea(room),
+            viewModel.formatLength(room.perimeter.metres),
+        ),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
@@ -517,14 +536,23 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     // capture began — so the turn controls are not a refinement of the move, they are the
     // other half of it.
     Text(
-        text = "Long-press this room and drag to move it",
+        text = stringResource(R.string.editor_room_drag_help),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill("Square to plan", onClick = { viewModel.squareRoomToPlan(room.id) })
-        Pill("⟲ 90°", onClick = { viewModel.turnRoom(room.id, 90.0) })
-        Pill("⟳ 90°", onClick = { viewModel.turnRoom(room.id, -90.0) })
+        Pill(
+            label = stringResource(R.string.editor_square_to_plan),
+            onClick = { viewModel.squareRoomToPlan(room.id) },
+        )
+        Pill(
+            label = stringResource(R.string.editor_turn_left),
+            onClick = { viewModel.turnRoom(room.id, 90.0) },
+        )
+        Pill(
+            label = stringResource(R.string.editor_turn_right),
+            onClick = { viewModel.turnRoom(room.id, -90.0) },
+        )
     }
 
     // The bounding box, because "will it fit" is asked about a rectangle far more often
@@ -533,7 +561,11 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     // check.
     viewModel.boundingSize(room)?.let { (width, depth) ->
         Text(
-            text = "Fits inside ${viewModel.formatLength(width)} × ${viewModel.formatLength(depth)}",
+            text = stringResource(
+            R.string.editor_fits_inside,
+            viewModel.formatLength(width),
+            viewModel.formatLength(depth),
+        ),
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
@@ -544,37 +576,47 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Ceiling", color = MeasureColours.InkMuted, fontSize = MeasureType.Label.fontSize)
+        Text(
+            text = stringResource(R.string.editor_ceiling),
+            color = MeasureColours.InkMuted,
+            fontSize = MeasureType.Label.fontSize,
+        )
         Field(
             value = height,
             onValueChange = { height = it },
             numeric = true,
-            hint = "e.g. 2.4",
+            hint = stringResource(R.string.editor_ceiling_hint),
             modifier = Modifier.weight(1f),
         )
-        Pill("Set", onClick = { viewModel.setCeilingHeight(room.id, height) })
+        Pill(
+            label = stringResource(R.string.editor_set),
+            onClick = { viewModel.setCeilingHeight(room.id, height) },
+        )
     }
 
     if (surfaces == null) {
         Text(
-            text = "Set a ceiling height for wall area and volume. Look up while capturing " +
-                "and it fills itself in.",
+            text = stringResource(R.string.editor_ceiling_help),
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
     } else {
         Text(
-            text = "Walls ${com.measure.core.units.AreaFormatter.format(surfaces.netWallArea, viewModel.unitSystem())}" +
-                " · volume ${com.measure.core.units.VolumeFormatter.format(surfaces.volume, viewModel.unitSystem())}",
+            text = stringResource(
+                R.string.editor_surfaces,
+                com.measure.core.units.AreaFormatter.format(surfaces.netWallArea, viewModel.unitSystem()),
+                com.measure.core.units.VolumeFormatter.format(surfaces.volume, viewModel.unitSystem()),
+            ),
             color = MeasureColours.Ink,
             fontSize = MeasureType.Label.fontSize,
             fontWeight = FontWeight.SemiBold,
         )
         if (surfaces.openingArea.squareMetres > 0.0) {
             Text(
-                text = "After taking out " +
-                    com.measure.core.units.AreaFormatter.format(surfaces.openingArea, viewModel.unitSystem()) +
-                    " of doors and windows",
+                text = stringResource(
+                    R.string.editor_after_openings,
+                    com.measure.core.units.AreaFormatter.format(surfaces.openingArea, viewModel.unitSystem()),
+                ),
                 color = MeasureColours.InkMuted,
                 fontSize = MeasureType.Small.fontSize,
             )
@@ -582,8 +624,11 @@ private fun RoomPanel(viewModel: EditorViewModel, selection: Selection.Room) {
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill("Delete room", onClick = { viewModel.deleteRoom(room.id) })
-        Pill("Done", onClick = viewModel::clearSelection)
+        Pill(
+            label = stringResource(R.string.editor_delete_room),
+            onClick = { viewModel.deleteRoom(room.id) },
+        )
+        Pill(stringResource(R.string.editor_done), onClick = viewModel::clearSelection)
     }
 }
 
@@ -604,7 +649,11 @@ private fun MeasurementList(
     if (measurements.isEmpty()) return
 
     Text(
-        text = "${measurements.size} ${if (measurements.size == 1) "measurement" else "measurements"}",
+        text = pluralStringResource(
+            R.plurals.editor_measurement_count,
+            measurements.size,
+            measurements.size,
+        ),
         color = MeasureColours.Ink,
         fontSize = MeasureType.Body.fontSize,
         fontWeight = FontWeight.SemiBold,
@@ -633,7 +682,7 @@ private fun MeasurementList(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = measurement.mode.label,
+                text = stringResource(measurement.mode.labelRes()),
                 color = MeasureColours.InkMuted,
                 fontSize = MeasureType.Small.fontSize,
             )
@@ -687,9 +736,9 @@ private fun MeasureContent(viewModel: EditorViewModel) {
             Column(Modifier.weight(1f)) {
                 Text(
                     text = when {
-                        drawing && pending == null -> "Tap the first point"
-                        drawing -> "Tap the second point"
-                        else -> "Tap a dimension to read it"
+                        drawing && pending == null -> stringResource(R.string.editor_tap_first_point)
+                        drawing -> stringResource(R.string.editor_tap_second_point)
+                        else -> stringResource(R.string.editor_tap_a_dimension)
                     },
                     color = MeasureColours.Ink,
                     fontSize = MeasureType.Label.fontSize,
@@ -697,16 +746,18 @@ private fun MeasureContent(viewModel: EditorViewModel) {
                 )
                 Text(
                     text = when {
-                        pending != null -> "From ${pending.description}"
-                        drawing -> "Corners and walls pull the point onto them"
-                        else -> "Sizes are marked around the plan"
+                        pending != null ->
+                            stringResource(R.string.editor_from_point, pending.description)
+
+                        drawing -> stringResource(R.string.editor_snap_help)
+                        else -> stringResource(R.string.editor_sizes_marked)
                     },
                     color = if (pending == null) MeasureColours.InkMuted else MeasureColours.Accent,
                     fontSize = MeasureType.Small.fontSize,
                 )
                 viewModel.lastStraightening?.let { straightened ->
                     Text(
-                        text = "Pulled $straightened",
+                        text = stringResource(R.string.editor_pulled, straightened),
                         color = MeasureColours.Accent,
                         fontSize = MeasureType.Small.fontSize,
                     )
@@ -715,20 +766,32 @@ private fun MeasureContent(viewModel: EditorViewModel) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
                     pending != null -> {
-                        Pill("Redo point", onClick = viewModel::clearPendingEnd)
-                        Pill("Cancel", onClick = viewModel::cancelDrawing)
+                        Pill(
+                            label = stringResource(R.string.editor_redo_point),
+                            onClick = viewModel::clearPendingEnd,
+                        )
+                        Pill(
+                            label = stringResource(R.string.editor_cancel),
+                            onClick = viewModel::cancelDrawing,
+                        )
                     }
 
-                    drawing -> Pill("Cancel", onClick = viewModel::cancelDrawing)
+                    drawing -> Pill(
+                        label = stringResource(R.string.editor_cancel),
+                        onClick = viewModel::cancelDrawing,
+                    )
 
                     // Tapping each one again is the other way out, and it is tedious past
                     // about three.
-                    viewModel.focuses.size > 1 -> Pill("Clear", onClick = viewModel::clearFocus)
+                    viewModel.focuses.size > 1 -> Pill(
+                        label = stringResource(R.string.editor_clear),
+                        onClick = viewModel::clearFocus,
+                    )
 
                     // Refused rather than hidden while a measurement is unconfirmed, so the
                     // reason is visible instead of the control merely being absent.
                     else -> Pill(
-                        label = "+ Distance",
+                        label = stringResource(R.string.editor_add_distance),
                         enabled = viewModel.unconfirmed == null,
                         highlighted = true,
                         onClick = viewModel::beginDrawing,
@@ -759,7 +822,7 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
 
     if (takeoff.isEmpty) {
         Text(
-            text = "Capture a room and its quantities appear here",
+            text = stringResource(R.string.editor_quantities_empty),
             color = MeasureColours.InkMuted,
             style = MeasureType.Label,
         )
@@ -770,13 +833,13 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
 
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Base)) {
         MeasureReading(
-            label = "Floor",
+            label = stringResource(R.string.editor_floor),
             value = viewModel.areaValue(takeoff.floorArea),
             modifier = Modifier.weight(1f),
             unit = areaUnit,
         )
         MeasureReading(
-            label = "Walls, net",
+            label = stringResource(R.string.editor_walls_net),
             value = viewModel.areaValue(takeoff.netWallArea),
             modifier = Modifier.weight(1f),
             unit = areaUnit,
@@ -793,18 +856,28 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
     // that was asked for. They stay because skirting is bought by the metre and heating is
     // sized by the cubic one.
     Text(
-        text = "Perimeter ${viewModel.formatLength(takeoff.perimeter.metres)} · " +
-            "volume ${com.measure.core.units.VolumeFormatter.format(takeoff.volume, viewModel.unitSystem())}",
+        text = stringResource(
+            R.string.editor_totals,
+            viewModel.formatLength(takeoff.perimeter.metres),
+            com.measure.core.units.VolumeFormatter.format(takeoff.volume, viewModel.unitSystem()),
+        ),
         color = MeasureColours.InkMuted,
         style = MeasureType.Small,
     )
 
     if (takeoff.wallsAreIncomplete) {
         Text(
-            text = "No ceiling height for ${takeoff.roomsWithoutHeight.joinToString(", ")} — " +
-                "walls and volume not counted for " +
-                "${if (takeoff.roomsWithoutHeight.size == 1) "it" else "them"}. " +
-                "Tap the room in Plan and set one.",
+            text = stringResource(
+                R.string.editor_no_ceiling_for,
+                takeoff.roomsWithoutHeight.joinToString(", "),
+                stringResource(
+                    if (takeoff.roomsWithoutHeight.size == 1) {
+                        R.string.editor_it
+                    } else {
+                        R.string.editor_them
+                    },
+                ),
+            ),
             color = MeasureColours.Warning,
             style = MeasureType.Small,
         )
@@ -814,26 +887,28 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
 
     // --- flooring ---------------------------------------------------------------------
 
-    MeasureTag("Flooring")
+    MeasureTag(stringResource(R.string.editor_tag_flooring))
     Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
         Flooring.WASTE_OPTIONS.forEach { percent ->
             MeasureChip(
-                label = "$percent%",
+                label = stringResource(R.string.editor_waste_percent, percent),
                 onClick = { viewModel.selectWaste(percent) },
                 selected = percent == viewModel.wastePercent,
             )
         }
     }
     MeasureReading(
-        label = "Order",
+        label = stringResource(R.string.editor_order),
         value = viewModel.areaValue(viewModel.flooringRequired(takeoff)),
         unit = areaUnit,
         large = true,
     )
     Text(
-        text = "${viewModel.formatArea(takeoff.floorArea)} of floor plus " +
-            "${viewModel.wastePercent}% for offcuts. Raise it for a diagonal or " +
-            "herringbone lay, or for rooms that are not rectangles.",
+        text = stringResource(
+            R.string.editor_flooring_note,
+            viewModel.formatArea(takeoff.floorArea),
+            viewModel.wastePercent,
+        ),
         color = MeasureColours.InkMuted,
         style = MeasureType.Small,
     )
@@ -842,39 +917,43 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
 
     // --- paint ------------------------------------------------------------------------
 
-    MeasureTag("Paint")
+    MeasureTag(stringResource(R.string.editor_tag_paint))
     Row(horizontalArrangement = Arrangement.spacedBy(MeasureSpace.Tight)) {
         Painting.COAT_OPTIONS.forEach { count ->
             MeasureChip(
-                label = if (count == 1) "1 coat" else "$count coats",
+                label = pluralStringResource(R.plurals.editor_coats, count, count),
                 onClick = { viewModel.selectCoats(count) },
                 selected = count == viewModel.coats,
             )
         }
     }
     MeasureChip(
-        label = "Ceilings too",
+        label = stringResource(R.string.editor_ceilings_too),
         onClick = viewModel::togglePaintCeilings,
         selected = viewModel.paintCeilings,
     )
     MeasureReading(
-        label = "Buy",
+        label = stringResource(R.string.editor_buy),
         value = viewModel.capacityValue(viewModel.paintRequired(takeoff)),
         unit = viewModel.capacityUnit(),
         large = true,
     )
     Text(
-        text = "${viewModel.formatArea(viewModel.paintableArea(takeoff))} at " +
-            "${viewModel.coats} ${if (viewModel.coats == 1) "coat" else "coats"}, " +
-            "${Painting.TYPICAL_COVERAGE.toInt()} m² per litre. Check the tin — coverage " +
-            "varies, and a wall changing colour drinks more.",
+        text = stringResource(
+            R.string.editor_paint_note,
+            viewModel.formatArea(viewModel.paintableArea(takeoff)),
+            pluralStringResource(R.plurals.editor_coats, viewModel.coats, viewModel.coats),
+            Painting.TYPICAL_COVERAGE.toInt(),
+        ),
         color = MeasureColours.InkMuted,
         style = MeasureType.Small,
     )
     if (takeoff.openingArea.squareMetres > 0.0) {
         Text(
-            text = "Doors and windows already taken out: " +
+            text = stringResource(
+                R.string.editor_openings_deducted,
                 viewModel.formatArea(takeoff.openingArea),
+            ),
             color = MeasureColours.InkMuted,
             style = MeasureType.Small,
         )
@@ -884,7 +963,7 @@ private fun QuantitiesContent(viewModel: EditorViewModel) {
 
     // --- by room ----------------------------------------------------------------------
 
-    MeasureTag("By room")
+    MeasureTag(stringResource(R.string.editor_tag_by_room))
     // Driven from the rooms rather than from `takeoff.rooms`, even though the two hold the
     // same values in the same order. A row needs the room's id to select it, and pairing a
     // list of quantities back up with a list of rooms by position is the kind of implicit
@@ -940,7 +1019,8 @@ private fun RoomQuantityRow(
             style = MeasureType.ValueSmall,
         )
         Text(
-            text = surfaces?.let { viewModel.formatArea(it.netWallArea) } ?: "no height",
+            text = surfaces?.let { viewModel.formatArea(it.netWallArea) }
+                ?: stringResource(R.string.editor_no_height),
             color = if (surfaces != null) MeasureColours.InkMuted else MeasureColours.Warning,
             style = if (surfaces != null) MeasureType.ValueSmall else MeasureType.Small,
         )
@@ -958,12 +1038,14 @@ private fun DimensionReadout(viewModel: EditorViewModel, focus: MeasureFocus.Dim
         fontWeight = FontWeight.Bold,
     )
     Text(
-        text = if (focus.isOverall) "Overall, across the whole plan" else "Between the marked corners",
+        text = stringResource(
+            if (focus.isOverall) R.string.editor_focus_overall else R.string.editor_focus_between,
+        ),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
     Text(
-        text = "The dashed lines show which part of the plan this covers.",
+        text = stringResource(R.string.editor_focus_help),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
@@ -994,7 +1076,7 @@ private fun SelectionTotal(viewModel: EditorViewModel) {
             fontWeight = FontWeight.Bold,
         )
         Text(
-            text = lengths.size.toString() + " selected, added together",
+            text = stringResource(R.string.editor_selected_added, lengths.size),
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
@@ -1021,7 +1103,7 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
 
     if (measurement == null) {
         Text(
-            text = "This distance was attached to geometry that has gone",
+            text = stringResource(R.string.editor_orphaned),
             color = MeasureColours.Warning,
             fontSize = MeasureType.Label.fontSize,
         )
@@ -1042,19 +1124,22 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
         fontWeight = FontWeight.Bold,
     )
     Text(
-        text = "Off the plan, not measured in the room",
+        text = stringResource(R.string.editor_off_the_plan),
         color = MeasureColours.Warning,
         fontSize = MeasureType.Small.fontSize,
     )
     Text(
-        text = "${measurement.from.description} → ${measurement.to.description}",
+        text = stringResource(
+            R.string.editor_between_points,
+            measurement.from.description,
+            measurement.to.description,
+        ),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
     if (measurement.isModelled) {
         Text(
-            text = "One end sits on a corner the solver squared up, so part of this " +
-                "distance is the model rather than the room.",
+            text = stringResource(R.string.editor_snapped_warning),
             color = MeasureColours.InkMuted,
             fontSize = MeasureType.Small.fontSize,
         )
@@ -1064,8 +1149,15 @@ private fun CustomDistanceReadout(viewModel: EditorViewModel, focus: MeasureFocu
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (unconfirmed) {
-            Pill("Keep", highlighted = true, onClick = { naming = true })
-            Pill("Discard", onClick = viewModel::discardMeasurement)
+            Pill(
+                label = stringResource(R.string.editor_keep),
+                highlighted = true,
+                onClick = { naming = true },
+            )
+            Pill(
+                label = stringResource(R.string.editor_discard),
+                onClick = viewModel::discardMeasurement,
+            )
         } else {
             Pill("Delete", onClick = { viewModel.deletePlanMeasurement(saved.id) })
         }
@@ -1112,18 +1204,29 @@ private fun NameMeasurementDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MeasureColours.Panel,
-        title = { Text("Name this measurement", color = MeasureColours.Ink, style = MeasureType.Title) },
+        title = {
+            Text(
+                text = stringResource(R.string.editor_name_measurement),
+                color = MeasureColours.Ink,
+                style = MeasureType.Title,
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(MeasureSpace.Snug)) {
-                MeasureField(name, { name = it }, hint = "Name", modifier = Modifier.fillMaxWidth())
+                MeasureField(
+                    value = name,
+                    onValueChange = { name = it },
+                    hint = stringResource(R.string.editor_name_hint),
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 MeasureField(
                     value = description,
                     onValueChange = { description = it },
-                    hint = "What it is for, if it needs saying",
+                    hint = stringResource(R.string.editor_description_hint),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = "Both optional. Skip and the measurement is still kept.",
+                    text = stringResource(R.string.editor_name_optional),
                     color = MeasureColours.InkMuted,
                     style = MeasureType.Small,
                 )
@@ -1131,12 +1234,12 @@ private fun NameMeasurementDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSave(name, description) }) {
-                Text("Save", color = MeasureColours.Accent)
+                Text(stringResource(R.string.editor_save), color = MeasureColours.Accent)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Skip", color = MeasureColours.InkMuted)
+                Text(stringResource(R.string.editor_skip), color = MeasureColours.InkMuted)
             }
         },
     )
@@ -1169,7 +1272,10 @@ private fun MeasurementPanel(viewModel: EditorViewModel, selection: Selection.Me
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = measurement.mode.label + " measurement",
+                text = stringResource(
+                    R.string.editor_mode_measurement,
+                    stringResource(measurement.mode.labelRes()),
+                ),
                 color = MeasureColours.InkMuted,
                 fontSize = MeasureType.Small.fontSize,
             )
@@ -1186,14 +1292,13 @@ private fun CornerPanel(viewModel: EditorViewModel, selection: Selection.Corner)
     val room = viewModel.roomById(selection.roomId) ?: return
 
     Text(
-        text = "${room.name} · corner ${selection.index + 1}",
+        text = stringResource(R.string.editor_corner_of, room.name, selection.index + 1),
         color = MeasureColours.Ink,
         fontSize = MeasureType.Body.fontSize,
         fontWeight = FontWeight.SemiBold,
     )
     Text(
-        text = "Long-press and drag to move it. The room re-solves when you let go, so " +
-            "right angles and locked walls still hold.",
+        text = stringResource(R.string.editor_corner_help),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
@@ -1224,16 +1329,16 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
     ) {
         Column {
             Text(
-                text = "${room.name} · wall ${selection.index + 1}",
+                text = stringResource(R.string.editor_wall_of, room.name, selection.index + 1),
                 color = MeasureColours.Ink,
                 fontSize = MeasureType.Body.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = if (locked != null) {
-                    "Locked to ${viewModel.formatLength(locked)}"
+                    stringResource(R.string.editor_wall_locked, viewModel.formatLength(locked))
                 } else {
-                    "Measured ${viewModel.formatLength(current)}"
+                    stringResource(R.string.editor_wall_measured, viewModel.formatLength(current))
                 },
                 color = if (locked != null) MeasureColours.Ready else MeasureColours.InkMuted,
                 fontSize = MeasureType.Small.fontSize,
@@ -1243,8 +1348,7 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
     }
 
     Text(
-        text = "Measured this wall with a tape? Type the true length — the whole room " +
-            "tightens around it.",
+        text = stringResource(R.string.editor_wall_help),
         color = MeasureColours.InkMuted,
         fontSize = MeasureType.Small.fontSize,
     )
@@ -1258,32 +1362,36 @@ private fun WallPanel(viewModel: EditorViewModel, selection: Selection.Wall) {
             value = typed,
             onValueChange = { typed = it },
             numeric = true,
-            hint = "True length",
+            hint = stringResource(R.string.editor_true_length),
             modifier = Modifier.weight(1f),
         )
         Pill(
-            label = "Lock",
+            label = stringResource(R.string.editor_lock),
             enabled = typed.isNotBlank(),
             highlighted = true,
             onClick = { viewModel.lockWall(selection.roomId, selection.index, typed) },
         )
         if (locked != null) {
-            Pill("Unlock", onClick = { viewModel.unlockWall(selection.roomId, selection.index) })
+            Pill(
+                label = stringResource(R.string.editor_unlock),
+                onClick = { viewModel.unlockWall(selection.roomId, selection.index) },
+            )
         }
     }
 
     OpeningsSection(viewModel, room, selection.index)
 }
 
+@Composable
 private fun describeOpenings(openings: List<com.measure.core.data.SavedOpening>): String {
-    if (openings.isEmpty()) return "No doors or windows"
+    if (openings.isEmpty()) return stringResource(R.string.editor_no_openings)
     val doors = openings.count { it.opening.kind == OpeningKind.DOOR }
     val windows = openings.count { it.opening.kind == OpeningKind.WINDOW }
     val other = openings.size - doors - windows
     return buildList {
-        if (doors > 0) add("$doors ${if (doors == 1) "door" else "doors"}")
-        if (windows > 0) add("$windows ${if (windows == 1) "window" else "windows"}")
-        if (other > 0) add("$other ${if (other == 1) "opening" else "openings"}")
+        if (doors > 0) add(pluralStringResource(R.plurals.editor_door_count, doors, doors))
+        if (windows > 0) add(pluralStringResource(R.plurals.editor_window_count, windows, windows))
+        if (other > 0) add(pluralStringResource(R.plurals.editor_opening_count, other, other))
     }.joinToString(", ")
 }
 
@@ -1315,8 +1423,14 @@ private fun OpeningsSection(
             fontWeight = if (openings.isEmpty()) FontWeight.Normal else FontWeight.SemiBold,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("+ Door", onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.DOOR) })
-            Pill("+ Window", onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.WINDOW) })
+            Pill(
+                label = stringResource(R.string.editor_add_door),
+                onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.DOOR) },
+            )
+            Pill(
+                label = stringResource(R.string.editor_add_window),
+                onClick = { viewModel.addOpening(room.id, wallIndex, OpeningKind.WINDOW) },
+            )
         }
     }
 
@@ -1351,25 +1465,58 @@ private fun OpeningRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${saved.opening.kind.label} $position",
+                text = stringResource(
+                    R.string.editor_opening_at,
+                    stringResource(saved.opening.kind.labelRes()),
+                    position,
+                ),
                 color = MeasureColours.Ink,
                 fontSize = MeasureType.Label.fontSize,
                 fontWeight = FontWeight.SemiBold,
             )
-            Pill("Remove", onClick = { viewModel.deleteOpening(saved.id) })
+            Pill(
+                label = stringResource(R.string.editor_remove),
+                onClick = { viewModel.deleteOpening(saved.id) },
+            )
         }
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Field(width, { width = it }, numeric = true, hint = "wide", modifier = Modifier.weight(1f))
-            Text("×", color = MeasureColours.InkMuted, fontSize = MeasureType.Label.fontSize)
-            Field(height, { height = it }, numeric = true, hint = "high", modifier = Modifier.weight(1f))
-            Text("at", color = MeasureColours.InkMuted, fontSize = MeasureType.Label.fontSize)
-            Field(offset, { offset = it }, numeric = true, hint = "from", modifier = Modifier.weight(1f))
+            Field(
+                value = width,
+                onValueChange = { width = it },
+                numeric = true,
+                hint = stringResource(R.string.editor_opening_wide),
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.editor_opening_by),
+                color = MeasureColours.InkMuted,
+                fontSize = MeasureType.Label.fontSize,
+            )
+            Field(
+                value = height,
+                onValueChange = { height = it },
+                numeric = true,
+                hint = stringResource(R.string.editor_opening_high),
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = stringResource(R.string.editor_opening_at_label),
+                color = MeasureColours.InkMuted,
+                fontSize = MeasureType.Label.fontSize,
+            )
+            Field(
+                value = offset,
+                onValueChange = { offset = it },
+                numeric = true,
+                hint = stringResource(R.string.editor_opening_from),
+                modifier = Modifier.weight(1f),
+            )
             Pill(
-                label = "Set",
+                label = stringResource(R.string.editor_set),
                 onClick = {
                     viewModel.resizeOpening(
                         roomId = room.id,
@@ -1410,16 +1557,28 @@ private fun DoorSwingControls(viewModel: EditorViewModel, roomId: Long, saved: S
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Hinge", color = MeasureColours.InkMuted, fontSize = MeasureType.Small.fontSize)
+        Text(
+            text = stringResource(R.string.editor_hinge),
+            color = MeasureColours.InkMuted,
+            fontSize = MeasureType.Small.fontSize,
+        )
         Pill(
-            label = if (swing.hingeAtFarJamb) "Right" else "Left",
+            label = stringResource(
+                if (swing.hingeAtFarJamb) R.string.editor_hinge_right else R.string.editor_hinge_left,
+            ),
             onClick = {
                 viewModel.setDoorSwing(roomId, saved, swing.with(hingeAtFarJamb = !swing.hingeAtFarJamb))
             },
         )
-        Text("Opens", color = MeasureColours.InkMuted, fontSize = MeasureType.Small.fontSize)
+        Text(
+            text = stringResource(R.string.editor_opens),
+            color = MeasureColours.InkMuted,
+            fontSize = MeasureType.Small.fontSize,
+        )
         Pill(
-            label = if (swing.opensOut) "Out" else "In",
+            label = stringResource(
+                if (swing.opensOut) R.string.editor_opens_out else R.string.editor_opens_in,
+            ),
             onClick = {
                 viewModel.setDoorSwing(roomId, saved, swing.with(opensOut = !swing.opensOut))
             },

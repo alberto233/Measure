@@ -5,12 +5,12 @@ import com.measure.core.units.Length
 import com.measure.core.units.Volume
 import com.measure.core.units.times
 
-enum class OpeningKind(val label: String, val sitsOnFloor: Boolean) {
-    DOOR("Door", true),
-    WINDOW("Window", false),
+enum class OpeningKind(val sitsOnFloor: Boolean) {
+    DOOR(true),
+    WINDOW(false),
 
     /** An opening with no door in it — an archway, or a knocked-through wall. */
-    PASSAGE("Opening", true),
+    PASSAGE(true),
 }
 
 /**
@@ -32,12 +32,11 @@ enum class OpeningKind(val label: String, val sitsOnFloor: Boolean) {
 enum class DoorSwing(
     val hingeAtFarJamb: Boolean,
     val opensOut: Boolean,
-    val label: String,
 ) {
-    HINGE_NEAR_OPENS_IN(false, false, "Left, in"),
-    HINGE_FAR_OPENS_IN(true, false, "Right, in"),
-    HINGE_NEAR_OPENS_OUT(false, true, "Left, out"),
-    HINGE_FAR_OPENS_OUT(true, true, "Right, out");
+    HINGE_NEAR_OPENS_IN(false, false),
+    HINGE_FAR_OPENS_IN(true, false),
+    HINGE_NEAR_OPENS_OUT(false, true),
+    HINGE_FAR_OPENS_OUT(true, true);
 
     /** The same door with one of its two choices flipped. */
     fun with(hingeAtFarJamb: Boolean = this.hingeAtFarJamb, opensOut: Boolean = this.opensOut) =
