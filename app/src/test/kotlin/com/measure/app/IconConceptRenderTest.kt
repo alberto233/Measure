@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -70,7 +72,7 @@ class IconConceptRenderTest {
                 // silently clipped the last two concepts out of the picture entirely.
                 // Ours, large enough to judge the drawing.
                 Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                    for ((_, art) in CONCEPTS) Tile(180.dp, art)
+                    for ((name, art) in CONCEPTS) Tile(180.dp, art, tag = "big-" + name)
                 }
 
                 // The shelf: ours interleaved with the genre decoys, at the size a store
@@ -80,20 +82,33 @@ class IconConceptRenderTest {
                     DECOYS[0], CONCEPTS[0], DECOYS[1],
                     CONCEPTS[1], DECOYS[2], CONCEPTS[2],
                 )
-                for (row in shelf.chunked(3)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                        for ((_, art) in row) Tile(38.dp, art)
+                Box(Modifier.testTag("shelf")) {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        for (row in shelf.chunked(3)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                                for ((_, art) in row) Tile(38.dp, art)
+                            }
+                        }
                     }
                 }
             }
         }
         compose.onRoot().captureRoboImage("build/outputs/roborazzi/icon-concepts.png")
+
+        // Each candidate on its own too, so a review page can put a verdict beside a
+        // picture rather than beside a strip and an instruction to count across.
+        for ((name, _) in CONCEPTS) {
+            compose.onNodeWithTag("big-" + name)
+                .captureRoboImage("build/outputs/roborazzi/icon-$name.png")
+        }
+        compose.onNodeWithTag("shelf").captureRoboImage("build/outputs/roborazzi/icon-shelf.png")
     }
 
     @Composable
-    private fun Tile(side: androidx.compose.ui.unit.Dp, art: DrawScope.() -> Unit) {
+    private fun Tile(side: androidx.compose.ui.unit.Dp, art: DrawScope.() -> Unit, tag: String = "") {
         Box(
             Modifier
+                .testTag(tag)
                 .size(side)
                 .clip(RoundedCornerShape(side * 0.22f))
                 .background(INK),
